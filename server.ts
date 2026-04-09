@@ -14,12 +14,18 @@ import excelExportService from "./src/services/excelExportService.js";
 dotenv.config();
 
 const upload = multer({ storage: multer.memoryStorage() });
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:5003";
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:5002";
 
 async function startServer() {
   const app = express();
   const PORT = 3001;
+  // 设置响应的字符编码，确保中文显示正常
+  app.use((req, res, next) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    next();
+  });
   app.use(express.json({ limit: '10mb' }));
+
 
   console.log('🔍 Testing database connection...');
   const dbConnected = await testConnection();
