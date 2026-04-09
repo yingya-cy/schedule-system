@@ -1,0 +1,5 @@
+{
+  "name": "课表识别与空闲统计系统",
+  "description": "批量解析 PDF 课表，提取课程分块并统计成员空闲时间。",
+  "requestFramePermissions": []
+}

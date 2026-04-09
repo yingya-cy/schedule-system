@@ -1,0 +1,66 @@
+version: '3.9'
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: schedule-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./dist:/usr/share/nginx/html
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+      - ai-service
+    restart: always
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: schedule-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=753412
+      - DB_NAME=schedule_system
+      - AI_SERVICE_URL=http://ai-service:5002
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      - db
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: docker/ai-service.Dockerfile
+    container_name: schedule-ai-service
+    restart: always
+    ports:
+      - "5002:5002"
+
+  db:
+    image: mysql:8.0
+    container_name: schedule-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 753412
+      MYSQL_DATABASE: schedule_system
+    command: 
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+volumes:
+  mysql_data:
+  uploads:

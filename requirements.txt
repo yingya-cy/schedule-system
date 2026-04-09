@@ -1,0 +1,6 @@
+Flask
+Flask-CORS
+Pillow
+pdfplumber
+requests
+openai
