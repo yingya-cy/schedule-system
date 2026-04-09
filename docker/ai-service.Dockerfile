@@ -18,6 +18,7 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
         libxslt1-dev \
         zlib1g-dev \
         ca-certificates \
+        poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
