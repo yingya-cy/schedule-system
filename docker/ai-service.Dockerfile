@@ -2,25 +2,29 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# 安装系统依赖，支持编译一些 Python 库
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libssl-dev \
-    libffi-dev \
-    libxml2-dev \
-    libxslt1-dev \
-    zlib1g-dev \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/* && apt-get clean
+# ==================== 关键修改：换成国内阿里云源，解决安装卡死 ====================
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libssl-dev \
+        libffi-dev \
+        libxml2-dev \
+        libxslt1-dev \
+        zlib1g-dev \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# 升级 pip，避免依赖找不到
-RUN python -m pip install --upgrade pip
+# ==================== 修改：pip 换成国内清华源，加速安装 ====================
+RUN python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 复制依赖文件并安装
+# 复制依赖并使用国内源安装
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 复制服务代码
+# 复制代码
 COPY service.py ./
 COPY prompts/ ./prompts/
 COPY utils/ ./utils/
