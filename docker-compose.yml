@@ -21,7 +21,7 @@ services:
     container_name: schedule-backend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3000:3001"
     environment:
       - NODE_ENV=production
       - DB_HOST=db
@@ -29,7 +29,7 @@ services:
       - DB_USER=root
       - DB_PASSWORD=753412
       - DB_NAME=schedule_system
-      - AI_SERVICE_URL=http://ai-service:5002
+      - AI_SERVICE_URL=http://ai-service:5003
     volumes:
       - uploads:/app/uploads
     depends_on:

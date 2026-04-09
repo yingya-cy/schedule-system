@@ -2,6 +2,10 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
+# 设置环境变量，确保中文显示正常
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+
 # ==================== 关键修改：换成国内阿里云源，解决安装卡死 ====================
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
     && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
