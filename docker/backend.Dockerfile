@@ -15,6 +15,6 @@ COPY src/ ./src/
 COPY dist/ ./dist/
 COPY tsconfig.json ./
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["npx", "tsx", "server.ts"]
