@@ -46,6 +46,7 @@ export interface UnifiedCourse {
   courseName: string;
   time: string;
   weeks: string;
+  weeksList?: number[];
   teacher?: string;
   classroom?: string;
   remark?: string;
@@ -76,6 +77,7 @@ export interface BackendCourseData {
   time?: string;
   weeks?: string;
   week?: string;
+  weeks_list?: number[];
   teacher?: string;
   classroom?: string;
   location?: string;

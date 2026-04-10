@@ -249,7 +249,7 @@ export default function FilesView() {
           const courses: EditableCourse[] = result.courses.map((course, index) => {
             const weekday = parseWeekday(course.time);
             const sections = parseSections(course.time);
-            const weeks = parseWeeks(course.weeks);
+            const weeks = parseWeeks(course.weeks, course.weeksList);
             
             return {
               id: `ocr-${i}-${index}-${Date.now()}`,
@@ -362,14 +362,39 @@ export default function FilesView() {
     return [1, 2];
   };
 
-  const parseWeeks = (weeksStr: string): number[] => {
+  const parseWeeks = (weeksStr: string, weeksList?: number[]): number[] => {
+    // 优先使用后端返回的 weeks_list 数组
+    if (weeksList && weeksList.length > 0) {
+      return weeksList;
+    }
+    
+    // 如果没有 weeks_list，则解析字符串
     if (!weeksStr) return Array.from({ length: 18 }, (_, i) => i + 1);
     
+    // 匹配单个周数，例如 "4周"
+    const singleMatch = weeksStr.match(/^(\d+)周$/);
+    if (singleMatch) {
+      return [parseInt(singleMatch[1])];
+    }
+    
+    // 匹配周数范围，例如 "1-16周"
     const match = weeksStr.match(/(\d+)[-~](\d+)/);
     if (match) {
       const start = parseInt(match[1]);
       const end = parseInt(match[2]);
       return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    }
+    
+    // 匹配多个周数，例如 "1周,3周,5周" 或 "1,3,5周"
+    const multiMatch = weeksStr.match(/(\d+)[,，]/g);
+    if (multiMatch) {
+      const weeks = multiMatch.map(m => parseInt(m.match(/\d+/)![0]));
+      // 检查最后一个数字
+      const lastMatch = weeksStr.match(/[,，](\d+)周?$/);
+      if (lastMatch) {
+        weeks.push(parseInt(lastMatch[1]));
+      }
+      return weeks.sort((a, b) => a - b);
     }
     
     return Array.from({ length: 18 }, (_, i) => i + 1);

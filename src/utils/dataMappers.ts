@@ -10,6 +10,7 @@ export const mapBackendDataToArray = (data: BackendCourseData[]): UnifiedCourse[
       courseName: item.course_name || item.course || item.name || '未知课程',
       time: `${dayStr} ${sectionStr}`.trim() || '未指定时间',
       weeks: formatWeekInfo(item.week || item.weeks),
+      weeksList: item.weeks_list,
       teacher: item.teacher || '',
       classroom: item.classroom || item.location || '',
       remark: item.remark || ''

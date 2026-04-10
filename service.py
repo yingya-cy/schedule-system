@@ -175,29 +175,114 @@ def ocr_image():
 @app.route('/api/ocr/pdf', methods=['POST'])
 def ocr_pdf():
     temp_pdf_path = None
+    temp_image_paths = []
     try:
         file = request.files['file']
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
             file.save(temp_file.name); temp_pdf_path = temp_file.name
 
-        # PDF文件只使用本地规则识别，不需要AI识别
+        # 先尝试本地规则识别
         try:
             records = parse_vertical_pdf_with_plumber(temp_pdf_path)
-            if records:
+            if records and len(records) > 0:
                 logger.info("PDF本地规则识别成功")
                 return jsonify({'success': True, 'schedule_data': records, 'parse_method': 'pdfplumber'})
-            else:
-                logger.warning("PDF本地规则识别返回空结果")
-                return jsonify({'success': False, 'error': 'PDF本地规则识别返回空结果'}), 400
         except Exception as e:
-            logger.error(f"PDF本地规则识别失败: {e}")
-            return jsonify({'success': False, 'error': f'PDF本地规则识别失败: {str(e)}'}), 400
+            logger.warning(f"PDF本地规则识别失败: {e}")
+        
+        # 如果本地规则识别失败或返回空结果，尝试转换为图片并用AI识别
+        logger.info("本地规则识别失败，尝试转换为图片并用AI识别...")
+        
+        try:
+            # 使用PyMuPDF将PDF转换为图片（不需要poppler依赖）
+            import fitz  # PyMuPDF
+            
+            logger.info(f"使用PyMuPDF打开PDF: {temp_pdf_path}")
+            pdf_document = fitz.open(temp_pdf_path)
+            logger.info(f"PDF共 {len(pdf_document)} 页")
+            
+            images = []
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                # 设置较高的DPI以获得清晰的图片
+                mat = fitz.Matrix(200/72, 200/72)  # 200 DPI
+                pix = page.get_pixmap(matrix=mat)
+                
+                # 转换为PIL Image
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                images.append(img)
+                logger.info(f"转换第 {page_num + 1} 页: {pix.width}x{pix.height}")
+            
+            pdf_document.close()
+            logger.info(f"PDF转换为 {len(images)} 张图片")
+            
+            # 保存图片到临时文件
+            for idx, image in enumerate(images):
+                temp_image = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+                image.save(temp_image.name, 'PNG')
+                temp_image_paths.append(temp_image.name)
+                logger.info(f"保存图片 {idx + 1}: {temp_image.name}")
+            
+            # 使用豆包模型识别每张图片
+            final_data, raw_data, raw_json_texts = [], [], []
+            for image_path in temp_image_paths:
+                # 获取图片尺寸
+                with Image.open(image_path) as img:
+                    width, height = img.size
+                
+                # 自动检测课表类型
+                schedule_type = auto_detect_schedule_type(image_path)
+                dynamic_timeout = calculate_dynamic_timeout(width, height)
+                
+                res = extract_direct_json(image_path, schedule_type, dynamic_timeout)
+                if res: 
+                    final_data.extend(res['schedule_data'])
+                    raw_data.extend(res['raw_data'])
+                    raw_json_texts.append(res['raw_json_text'])
+            
+            if final_data:
+                logger.info(f"AI识别成功，提取到 {len(final_data)} 条课程")
+                return jsonify({
+                    'success': True, 
+                    'schedule_data': final_data, 
+                    'parse_method': 'ai_image',
+                    'page_count': len(images)
+                })
+            else:
+                logger.warning("AI识别也未能提取到课程数据")
+                return jsonify({'success': False, 'error': '无法识别PDF内容，请检查文件是否清晰'}), 400
+                
+        except ImportError:
+            logger.error("PyMuPDF库未安装，无法转换PDF为图片")
+            return jsonify({'success': False, 'error': 'PDF识别失败：缺少PyMuPDF库，请运行 pip install PyMuPDF'}), 500
+        except Exception as e:
+            logger.error(f"PDF转图片识别失败: {e}")
+            return jsonify({'success': False, 'error': f'PDF识别失败: {str(e)}'}), 400
+            
     except Exception as e:
         logger.error(f"OCR PDF处理错误: {str(e)}")
         return jsonify({'error': str(e)}), 500
     finally:
+        # 强制垃圾回收，释放文件句柄
+        import gc
+        gc.collect()
+        
+        # 添加小延迟，确保文件句柄完全释放
+        import time
+        time.sleep(0.1)
+        
         if temp_pdf_path and os.path.exists(temp_pdf_path):
-            os.unlink(temp_pdf_path)
+            try:
+                os.unlink(temp_pdf_path)
+            except Exception as e:
+                logger.warning(f"删除临时PDF文件失败: {e}")
+        
+        for p in temp_image_paths:
+            if os.path.exists(p):
+                try:
+                    os.unlink(p)
+                except Exception as e:
+                    logger.warning(f"删除临时图片文件失败: {e}")
 
 @app.route('/api/ocr/horizontal_rules', methods=['POST'])
 def ocr_horizontal_rules():
