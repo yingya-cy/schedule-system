@@ -17,11 +17,12 @@ const dbConfig = {
   supportBigNumbers: true,
   bigNumberStrings: true,
   typeCast: true,
-  // 强制设置字符集
+  // 强制设置字符集 - 最稳定的配置
   queryFormat: undefined,
   stringifyObjects: false,
   insecureAuth: false,
   multipleStatements: false,
+  // 确保连接时使用正确的字符集
   flags: ['-FOUND_ROWS', '-IGNORE_SPACE', '-CLIENT_PROTOCOL_41', '-CLIENT_SECURE_CONNECTION', '-CLIENT_MULTI_RESULTS', '-CLIENT_PS_MULTI_RESULTS', '-CLIENT_SSL', '-CLIENT_TRANSACTIONS', '-CLIENT_MULTI_STATEMENTS']
 };
 
@@ -67,6 +68,9 @@ export async function initializeDatabase() {
     
     // 现在使用正确的数据库连接
     connection = await pool.getConnection();
+    
+    // 强制设置连接字符集为 utf8mb4 - 最稳定的配置
+    await connection.query(`SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci`);
     
     // 创建部门表
     await connection.query(`
