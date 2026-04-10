@@ -6,10 +6,11 @@ import axios from "axios";
 import FormData from "form-data";
 import fs from "fs";
 import dotenv from "dotenv";
-import { testConnection, initializeDatabase } from "./src/config/database.js";
-import scheduleService from "./src/services/scheduleService.js";
-import queryService from "./src/services/queryService.js";
-import excelExportService from "./src/services/excelExportService.js";
+import { testConnection, initializeDatabase } from "./src/config/database.ts";
+import scheduleService from "./src/services/scheduleService.ts";
+import queryService from "./src/services/queryService.ts";
+import excelExportService from "./src/services/excelExportService.ts";
+import pool from './src/config/database.ts';
 
 dotenv.config();
 
@@ -86,7 +87,45 @@ async function startServer() {
       res.json(response.data);
     } catch (error) { res.status(500).json({ error: "Service down" }); }
   });
-
+// ✅ 重置部门数据接口（修复乱码专用）
+app.get("/api/reset-departments", async (req, res) => {
+  let connection = null;
+  try {
+    // 从连接池获取连接
+    connection = await pool.getConnection();
+    
+    // 1. 清空旧的乱码数据
+    await connection.query("DELETE FROM departments");
+    
+    // 2. 插入正确的中文部门数据（后端UTF-8编码，绝对不乱码）
+    await connection.query(`
+      INSERT INTO departments (name, sort_order) VALUES 
+      ('主任团', 1),
+      ('网编部', 2),
+      ('秘书部', 3),
+      ('策划部', 4),
+      ('咨询部', 5),
+      ('外联部', 6),
+      ('宣传部', 7)
+    `);
+    
+    res.json({ 
+      success: true, 
+      message: "✅ 部门数据已成功重置为正确中文" 
+    });
+  } catch (error: any) {
+    console.error("❌ 重置部门数据失败:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  } finally {
+    // ✅ 必须释放连接，避免连接池泄漏
+    if (connection) {
+      connection.release();
+    }
+  }
+});
   app.get("/api/departments", async (req, res) => {
     try {
       const departments = await scheduleService.getAllDepartments();
