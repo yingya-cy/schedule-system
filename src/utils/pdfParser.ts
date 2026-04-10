@@ -1,10 +1,7 @@
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
-// @ts-ignore - Vite handles ?url suffix
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 
-// Set worker source using a Vite-managed asset URL
-// This avoids dynamic import issues by letting Vite bundle the worker
-GlobalWorkerOptions.workerSrc = pdfWorker;
+// 使用 CDN 方式加载 PDF.js worker，避免本地文件的 MIME 类型问题
+GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.5.207/build/pdf.worker.mjs';
 
 export interface TextItem {
   str: string;
