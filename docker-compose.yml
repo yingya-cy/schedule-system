@@ -49,6 +49,8 @@ services:
     container_name: schedule-mysql
     restart: unless-stopped
     environment:
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
       MYSQL_ROOT_PASSWORD: 753412
       MYSQL_DATABASE: schedule_system
     command: 
