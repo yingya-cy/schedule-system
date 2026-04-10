@@ -10,24 +10,27 @@ const dbConfig = {
   connectionLimit: 10,
   waitForConnections: true,
   queueLimit: 0,
-  // 显式设置字符集，确保中文正确显示
   connectTimeout: 10000,
   timezone: '+08:00',
   dateStrings: true,
   supportBigNumbers: true,
   bigNumberStrings: true,
   typeCast: true,
-  // 强制设置字符集 - 最稳定的配置
   queryFormat: undefined,
   stringifyObjects: false,
   insecureAuth: false,
   multipleStatements: false,
-  // 确保连接时使用正确的字符集
   flags: ['-FOUND_ROWS', '-IGNORE_SPACE', '-CLIENT_PROTOCOL_41', '-CLIENT_SECURE_CONNECTION', '-CLIENT_MULTI_RESULTS', '-CLIENT_PS_MULTI_RESULTS', '-CLIENT_SSL', '-CLIENT_TRANSACTIONS', '-CLIENT_MULTI_STATEMENTS']
 };
 
 // 创建连接池
 const pool = mysql.createPool(dbConfig);
+
+// ✅ 终极强制方案：每次获取连接都强制设置 utf8mb4
+pool.on('connection', (connection) => {
+  connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
+  console.log('🔗 新连接已强制设置为 utf8mb4');
+});
 
 export async function testConnection() {
   try {
@@ -48,10 +51,10 @@ export async function initializeDatabase() {
     // 首先创建一个没有指定数据库的连接来创建数据库
     const tempConfig = { ...dbConfig };
     delete tempConfig.database; // 移除数据库名称，创建通用连接
-    
+
     const tempPool = mysql.createPool(tempConfig);
     const adminConnection = await tempPool.getConnection();
-    
+
     // 创建数据库（如果不存在）
     try {
       await adminConnection.query(`
@@ -62,16 +65,16 @@ export async function initializeDatabase() {
     } catch (error) {
       console.log('ℹ️  Database creation note:', error.message);
     }
-    
+
     adminConnection.release();
     await tempPool.end();
-    
+
     // 现在使用正确的数据库连接
     connection = await pool.getConnection();
-    
+
     // 强制设置连接字符集为 utf8mb4 - 最稳定的配置
     await connection.query(`SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci`);
-    
+
     // 创建部门表
     await connection.query(`
       CREATE TABLE IF NOT EXISTS departments (
@@ -82,7 +85,7 @@ export async function initializeDatabase() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
-    
+
     // 创建课表表
     await connection.query(`
       CREATE TABLE IF NOT EXISTS schedules (
@@ -104,7 +107,7 @@ export async function initializeDatabase() {
         INDEX idx_file_hash (file_hash)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
-    
+
     // 检查并添加新字段（如果不存在）
     try {
       const checkAndAddColumn = async (columnName: string, columnDefinition: string) => {
@@ -121,11 +124,11 @@ export async function initializeDatabase() {
       await checkAndAddColumn('file_path', 'VARCHAR(500)');
       await checkAndAddColumn('file_size', 'BIGINT DEFAULT 0');
       await checkAndAddColumn('file_hash', 'VARCHAR(64)');
-      
+
     } catch (alterError) {
       console.log('ℹ️  Column check/add note:', alterError.message);
     }
-    
+
     // 创建课程表
     await connection.query(`
       CREATE TABLE IF NOT EXISTS courses (
@@ -145,11 +148,11 @@ export async function initializeDatabase() {
         INDEX idx_weekday (weekday)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
-    
+
     // 检查部门表中是否有数据，如果没有则插入默认部门
     const [deptRows] = await connection.query('SELECT COUNT(*) as count FROM departments');
     const deptCount = (deptRows as any)[0].count;
-    
+
     if (deptCount === 0) {
       await connection.query(`
         INSERT INTO departments (name, sort_order) VALUES 
@@ -163,7 +166,7 @@ export async function initializeDatabase() {
       `);
       console.log('✅ Default departments inserted');
     }
-    
+
     connection.release();
     console.log('✅ Database initialized successfully');
     return true;
