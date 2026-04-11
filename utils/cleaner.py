@@ -316,6 +316,10 @@ def clean_schedule_ultimate(ai_extracted_json):
 
         # 写回清洗结果
         course["weekday"] = current_computed_weekday
+        
+        if 'week' in course and 'weeks_list' not in course:
+            course['weeks_list'] = convert_week_to_list(course.get('week'))
+        
         cleaned_data.append(course)
         
         # 更新追踪器
@@ -334,6 +338,68 @@ def clean_schedule_ultimate(ai_extracted_json):
 
     return cleaned_data
 
+def convert_week_to_list(week_data):
+    """
+    将 AI 返回的 week 对象转换为 weeks_list 数组
+    支持格式：
+    - {"type":"range", "start":1, "end":16, "rule":"all"} -> [1,2,3,...,16]
+    - {"type":"range", "start":1, "end":8, "rule":"odd"} -> [1,3,5,7]
+    - {"type":"range", "start":2, "end":8, "rule":"even"} -> [2,4,6,8]
+    - {"type":"multi_range", "ranges": [...], "rule":"all"} -> 合并所有范围
+    - {"type":"list", "weeks":[3,7]} -> [3,7]
+    """
+    if not week_data:
+        return []
+    
+    if isinstance(week_data, list):
+        return week_data
+    
+    if isinstance(week_data, str):
+        return []
+    
+    if not isinstance(week_data, dict):
+        return []
+    
+    week_type = week_data.get('type')
+    
+    if week_type == 'list':
+        return sorted(week_data.get('weeks', []))
+    
+    if week_type == 'range':
+        start = week_data.get('start', 1)
+        end = week_data.get('end', 1)
+        rule = week_data.get('rule', 'all')
+        
+        if rule == 'odd':
+            return list(range(start, end + 1, 2))
+        elif rule == 'even':
+            first = start if start % 2 == 0 else start + 1
+            return list(range(first, end + 1, 2))
+        else:
+            return list(range(start, end + 1))
+    
+    if week_type == 'multi_range':
+        ranges = week_data.get('ranges', [])
+        rule = week_data.get('rule', 'all')
+        weeks = set()
+        
+        for r in ranges:
+            start = r.get('start', 1)
+            end = r.get('end', 1)
+            
+            if rule == 'odd':
+                weeks.update(range(start, end + 1, 2))
+            elif rule == 'even':
+                first = start if start % 2 == 0 else start + 1
+                weeks.update(range(first, end + 1, 2))
+            else:
+                weeks.update(range(start, end + 1))
+        
+        return sorted(weeks)
+    
+    return []
+
+
 def enrich_footer_courses(courses):
     if not courses: return []
     master_map = {} 
@@ -351,4 +417,8 @@ def enrich_footer_courses(courses):
             if not c.get('classroom'): c['classroom'] = master.get('classroom')
             if not c.get('teacher'): c['teacher'] = master.get('teacher')
             c['remark'] = (c.get('remark') or '') + " [已从主表补全元数据]"
+        
+        if 'week' in c and 'weeks_list' not in c:
+            c['weeks_list'] = convert_week_to_list(c.get('week'))
+    
     return courses
