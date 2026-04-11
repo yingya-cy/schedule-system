@@ -2,6 +2,12 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# 设置时区为上海
+ENV TZ=Asia/Shanghai
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone
+
 # 设置环境变量，确保中文显示正常
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8

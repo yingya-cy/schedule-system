@@ -24,6 +24,7 @@ services:
       - "3000:3001"
     environment:
       - NODE_ENV=production
+      - TZ=Asia/Shanghai
       - DB_HOST=db
       - DB_PORT=3306
       - DB_USER=root
@@ -43,12 +44,15 @@ services:
     restart: always
     ports:
       - "5002:5002"
+    environment:
+      - TZ=Asia/Shanghai
 
   db:
     image: mysql:8.0
     container_name: schedule-mysql
     restart: unless-stopped
     environment:
+      TZ: Asia/Shanghai
       MYSQL_CHARSET: utf8mb4
       MYSQL_COLLATION: utf8mb4_unicode_ci
       MYSQL_ROOT_PASSWORD: 753412

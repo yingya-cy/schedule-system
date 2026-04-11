@@ -2,6 +2,10 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
+# 设置时区为上海
+ENV TZ=Asia/Shanghai
+ENV DEBIAN_FRONTEND=noninteractive
+
 # 设置环境变量，确保中文显示正常
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
@@ -18,6 +22,9 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
         libxslt1-dev \
         zlib1g-dev \
         ca-certificates \
+        tzdata \
+    && ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && dpkg-reconfigure --frontend noninteractive tzdata \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
