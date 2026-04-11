@@ -340,13 +340,14 @@ def clean_schedule_ultimate(ai_extracted_json):
 
 def convert_week_to_list(week_data):
     """
-    将 AI 返回的 week 对象转换为 weeks_list 数组
+    将 AI 返回的 week 数据转换为 weeks_list 数组
     支持格式：
-    - {"type":"range", "start":1, "end":16, "rule":"all"} -> [1,2,3,...,16]
-    - {"type":"range", "start":1, "end":8, "rule":"odd"} -> [1,3,5,7]
-    - {"type":"range", "start":2, "end":8, "rule":"even"} -> [2,4,6,8]
-    - {"type":"multi_range", "ranges": [...], "rule":"all"} -> 合并所有范围
-    - {"type":"list", "weeks":[3,7]} -> [3,7]
+    - 对象格式：{"type":"range", "start":1, "end":16, "rule":"all"} -> [1,2,3,...,16]
+    - 字符串格式："1-16周" -> [1,2,3,...,16]
+    - 字符串格式："1-8周(单)" -> [1,3,5,7]
+    - 字符串格式："2-8周(双)" -> [2,4,6,8]
+    - 字符串格式："1-12周,15-16周" -> [1,2,...,12,15,16]
+    - 字符串格式："4周" -> [4]
     """
     if not week_data:
         return []
@@ -355,7 +356,40 @@ def convert_week_to_list(week_data):
         return week_data
     
     if isinstance(week_data, str):
-        return []
+        weeks = set()
+        text = week_data.replace('\n', '').replace(' ', '')
+        
+        parts = text.split(',')
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            
+            week_type = None
+            if '(单)' in part or '（单）' in part:
+                week_type = 'odd'
+            elif '(双)' in part or '（双）' in part:
+                week_type = 'even'
+            
+            range_match = re.match(r'(\d+)-(\d+)周', part)
+            if range_match:
+                start = int(range_match.group(1))
+                end = int(range_match.group(2))
+                
+                if week_type == 'odd':
+                    weeks.update(range(start, end + 1, 2))
+                elif week_type == 'even':
+                    first = start if start % 2 == 0 else start + 1
+                    weeks.update(range(first, end + 1, 2))
+                else:
+                    weeks.update(range(start, end + 1))
+                continue
+            
+            single_match = re.match(r'(\d+)周', part)
+            if single_match:
+                weeks.add(int(single_match.group(1)))
+        
+        return sorted(weeks)
     
     if not isinstance(week_data, dict):
         return []
