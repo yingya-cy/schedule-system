@@ -32,8 +32,107 @@ interface ScheduleEditorProps {
   isSaving?: boolean;
 }
 
+interface WeekRange {
+  id: string;
+  start: number | null;
+  end: number | null;
+  type: 'all' | 'odd' | 'even';
+}
+
 const getCourseColor = (index: number) => COURSE_COLORS[index % COURSE_COLORS.length];
 const CURRENT_WEEK_KEY = 'schedule_editor_current_week';
+
+const formatWeeksDisplay = (weeks: number[]): string => {
+  if (!weeks || weeks.length === 0) return '未设置';
+  
+  const sorted = [...weeks].sort((a, b) => a - b);
+  const ranges: { start: number; end: number; isOdd?: boolean; isEven?: boolean }[] = [];
+  
+  let i = 0;
+  while (i < sorted.length) {
+    const start = sorted[i];
+    let end = start;
+    
+    while (i + 1 < sorted.length && sorted[i + 1] === sorted[i] + 1) {
+      i++;
+      end = sorted[i];
+    }
+    
+    const rangeWeeks = sorted.filter(w => w >= start && w <= end);
+    const isOdd = rangeWeeks.every(w => w % 2 === 1) && rangeWeeks.length > 1;
+    const isEven = rangeWeeks.every(w => w % 2 === 0) && rangeWeeks.length > 1;
+    
+    ranges.push({ start, end, isOdd, isEven });
+    i++;
+  }
+  
+  return ranges.map(r => {
+    let str = r.start === r.end ? `${r.start}周` : `${r.start}-${r.end}周`;
+    if (r.isOdd) str += '(单)';
+    if (r.isEven) str += '(双)';
+    return str;
+  }).join(',');
+};
+
+const parseWeeksFromRanges = (ranges: WeekRange[]): number[] => {
+  const weeks = new Set<number>();
+  
+  for (const range of ranges) {
+    if (range.start === null || range.end === null) continue;
+    
+    const start = range.start;
+    const end = range.end;
+    
+    if (range.type === 'odd') {
+      for (let w = start; w <= end; w += 2) {
+        if (w % 2 === 1) weeks.add(w);
+      }
+    } else if (range.type === 'even') {
+      for (let w = start; w <= end; w += 2) {
+        if (w % 2 === 0) weeks.add(w);
+      }
+    } else {
+      for (let w = start; w <= end; w++) {
+        weeks.add(w);
+      }
+    }
+  }
+  
+  return Array.from(weeks).sort((a, b) => a - b);
+};
+
+const weeksToRanges = (weeks: number[]): WeekRange[] => {
+  if (!weeks || weeks.length === 0) return [];
+  
+  const sorted = [...weeks].sort((a, b) => a - b);
+  const ranges: WeekRange[] = [];
+  
+  let i = 0;
+  while (i < sorted.length) {
+    const start = sorted[i];
+    let end = start;
+    
+    while (i + 1 < sorted.length && sorted[i + 1] === sorted[i] + 1) {
+      i++;
+      end = sorted[i];
+    }
+    
+    const rangeWeeks = sorted.filter(w => w >= start && w <= end);
+    const isOdd = rangeWeeks.every(w => w % 2 === 1) && rangeWeeks.length > 1;
+    const isEven = rangeWeeks.every(w => w % 2 === 0) && rangeWeeks.length > 1;
+    
+    ranges.push({
+      id: `range-${Date.now()}-${Math.random()}`,
+      start,
+      end,
+      type: isOdd ? 'odd' : isEven ? 'even' : 'all'
+    });
+    
+    i++;
+  }
+  
+  return ranges;
+};
 
 export default function ScheduleEditor({
   courses,
@@ -52,8 +151,8 @@ export default function ScheduleEditor({
   const [newCourse, setNewCourse] = useState<Partial<EditableCourse>>({
     course_name: '',
     weekday: 1,
-    sections: [1, 2],
-    weeks: Array.from({ length: 18 }, (_, i) => i + 1),
+    sections: [],
+    weeks: [],
     teacher: '',
     location: '',
     remark: ''
@@ -153,7 +252,7 @@ export default function ScheduleEditor({
       course_name: newCourse.course_name,
       weekday: newCourse.weekday,
       sections: newCourse.sections,
-      weeks: newCourse.weeks || Array.from({ length: 18 }, (_, i) => i + 1),
+      weeks: newCourse.weeks && newCourse.weeks.length > 0 ? newCourse.weeks : [],
       teacher: newCourse.teacher || '',
       location: newCourse.location || '',
       remark: newCourse.remark || '',
@@ -165,8 +264,8 @@ export default function ScheduleEditor({
     setNewCourse({
       course_name: '',
       weekday: 1,
-      sections: [1, 2],
-      weeks: Array.from({ length: 18 }, (_, i) => i + 1),
+      sections: [],
+      weeks: [],
       teacher: '',
       location: '',
       remark: ''
@@ -283,7 +382,9 @@ export default function ScheduleEditor({
               </span>
               <span className="flex items-center gap-1">
                 <Clock size={10} />
-                第{course.sections[0]}-{course.sections[course.sections.length - 1]}节
+                {course.sections.length > 0 
+                  ? `第${course.sections[0]}-${course.sections[course.sections.length - 1]}节`
+                  : '未设置节次'}
               </span>
               {course.location && (
                 <span className="flex items-center gap-1">
@@ -298,21 +399,9 @@ export default function ScheduleEditor({
                 {course.teacher}
               </div>
             )}
-            <div className="flex items-center gap-1 mt-1.5">
-              <span className="text-[10px] text-outline">周次:</span>
-              <div className="flex gap-0.5">
-                {course.weeks.slice(0, 8).map(w => (
-                  <span key={w} className={cn(
-                    "w-4 h-4 text-[8px] flex items-center justify-center rounded",
-                    w === currentWeek ? "bg-primary text-on-primary font-bold" : "bg-surface-container text-on-surface-variant"
-                  )}>
-                    {w}
-                  </span>
-                ))}
-                {course.weeks.length > 8 && (
-                  <span className="text-[10px] text-on-surface-variant">+{course.weeks.length - 8}</span>
-                )}
-              </div>
+            <div className="mt-1.5 text-xs text-on-surface-variant">
+              <span className="font-medium">周次: </span>
+              <span className="text-on-surface">{formatWeeksDisplay(course.weeks)}</span>
             </div>
           </div>
         </div>
@@ -334,21 +423,20 @@ export default function ScheduleEditor({
     <div className="bg-surface-container-lowest rounded-2xl shadow-lg border border-surface-container-high overflow-hidden">
       <div className="p-4 border-b border-surface-container-high flex flex-col gap-4">
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <h3 className="font-bold text-lg text-on-surface font-headline">课表编辑</h3>
+          <h3 className="font-bold text-lg text-on-surface font-headline">课表编辑</h3>
+          <div className="flex gap-2">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
               className={cn(
-                "p-2 rounded-lg transition-all",
+                "px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold",
                 showSidebar 
                   ? "bg-primary text-on-primary" 
                   : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
               )}
             >
-              <List size={18} />
+              <List size={16} />
+              {showSidebar ? '隐藏列表' : '课程列表'}
             </button>
-          </div>
-          <div className="flex gap-2">
             <button
               onClick={() => setShowAddModal(true)}
               className="px-4 py-2 bg-primary text-on-primary text-sm font-semibold rounded-lg hover:scale-[0.98] transition-all flex items-center gap-2"
@@ -448,17 +536,17 @@ export default function ScheduleEditor({
         </div>
       </div>
 
-      <div className="flex">
-        <div className="flex-1 overflow-x-auto">
+      <div className="flex relative">
+        <div className="flex-1 overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)]" id="schedule-table-container">
           <div className="min-w-[800px]">
             <div className="grid grid-cols-[60px_repeat(7,1fr)] gap-px bg-surface-container-high">
-              <div className="bg-surface-container-low p-2 text-center text-xs font-bold text-outline sticky left-0">
+              <div className="bg-surface-container-low p-2 text-center text-xs font-bold text-outline sticky left-0 top-0 z-20">
                 节次
               </div>
-              {WEEKDAYS.map((day, index) => (
+              {WEEKDAYS.map((day) => (
                 <div 
                   key={day} 
-                  className="bg-surface-container-low p-2 text-center text-sm font-bold text-on-surface"
+                  className="bg-surface-container-low p-2 text-center text-sm font-bold text-on-surface sticky top-0 z-10"
                 >
                   {day}
                 </div>
@@ -466,7 +554,7 @@ export default function ScheduleEditor({
 
               {SECTION_TIMES.map((sectionInfo, sectionIndex) => (
                 <React.Fragment key={sectionInfo.section}>
-                  <div className="bg-surface-container-lowest p-2 text-center sticky left-0">
+                  <div className="bg-surface-container-lowest p-2 text-center sticky left-0 z-10">
                     <div className="text-xs font-bold text-on-surface">第{sectionInfo.section}节</div>
                     <div className="text-[10px] text-outline">{sectionInfo.time}</div>
                   </div>
@@ -503,17 +591,26 @@ export default function ScheduleEditor({
         <AnimatePresence>
           {showSidebar && (
             <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 320, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              className="border-l border-surface-container-high bg-surface-container-low/30"
+              initial={{ opacity: 0, x: 450 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 450 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="absolute right-0 top-0 w-[450px] h-full max-h-[calc(100vh-320px)] bg-surface-container-lowest border-l border-surface-container-high shadow-2xl z-30"
             >
-              <div className="w-80 h-full flex flex-col max-h-[calc(100vh-280px)]">
+              <div className="h-full flex flex-col">
                 <div className="p-4 border-b border-surface-container-high flex items-center justify-between flex-shrink-0">
-                  <h4 className="font-bold text-on-surface font-headline">课程列表</h4>
-                  <span className="text-xs text-on-surface-variant">共 {courses.length} 门</span>
+                  <h4 className="font-bold text-on-surface font-headline text-lg">课程列表</h4>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-on-surface-variant">共 {courses.length} 门</span>
+                    <button
+                      onClick={() => setShowSidebar(false)}
+                      className="p-1.5 hover:bg-surface-container-low rounded-lg transition-colors"
+                    >
+                      <X size={16} className="text-on-surface-variant" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin scrollbar-thumb-surface-container-high scrollbar-track-transparent hover:scrollbar-thumb-surface-container">
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   <AnimatePresence>
                     {courses.length === 0 ? (
                       <div className="text-center py-8 text-on-surface-variant">
@@ -555,295 +652,317 @@ export default function ScheduleEditor({
 
       <AnimatePresence>
         {editingCourse && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setEditingCourse(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-surface-container-lowest rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-6 border-b border-surface-container-high flex justify-between items-center">
-                <h3 className="font-bold text-lg text-on-surface font-headline">编辑课程</h3>
-                <button onClick={() => setEditingCourse(null)} className="p-2 hover:bg-surface-container-low rounded-lg transition-colors">
-                  <X size={20} className="text-outline" />
-                </button>
-              </div>
-              
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-on-surface-variant mb-1">课程名称</label>
-                  <input
-                    type="text"
-                    value={editingCourse.course_name}
-                    onChange={(e) => setEditingCourse({ ...editingCourse, course_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-on-surface-variant mb-1">星期</label>
-                    <select
-                      value={editingCourse.weekday}
-                      onChange={(e) => setEditingCourse({ ...editingCourse, weekday: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                    >
-                      {WEEKDAYS.map((day, index) => (
-                        <option key={day} value={index + 1}>{day}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-on-surface-variant mb-1">节次</label>
-                    <div className="flex flex-wrap gap-1">
-                      {SECTION_TIMES.map(s => (
-                        <button
-                          key={s.section}
-                          type="button"
-                          onClick={() => {
-                            const sections = editingCourse.sections.includes(s.section)
-                              ? editingCourse.sections.filter(sec => sec !== s.section)
-                              : [...editingCourse.sections, s.section].sort((a, b) => a - b);
-                            setEditingCourse({ ...editingCourse, sections });
-                          }}
-                          className={cn(
-                            "px-2 py-1.5 text-xs font-medium rounded transition-colors",
-                            editingCourse.sections.includes(s.section)
-                              ? "bg-primary text-on-primary"
-                              : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
-                          )}
-                        >
-                          第{s.section}节
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-on-surface-variant mb-1">周次 (1-18)</label>
-                  <div className="flex flex-wrap gap-1">
-                    {Array.from({ length: 18 }, (_, i) => i + 1).map(week => (
-                      <button
-                        key={week}
-                        onClick={() => {
-                          const weeks = editingCourse.weeks.includes(week)
-                            ? editingCourse.weeks.filter(w => w !== week)
-                            : [...editingCourse.weeks, week].sort((a, b) => a - b);
-                          setEditingCourse({ ...editingCourse, weeks });
-                        }}
-                        className={cn(
-                          "w-8 h-8 text-xs font-medium rounded transition-colors",
-                          editingCourse.weeks.includes(week)
-                            ? "bg-primary text-on-primary"
-                            : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
-                        )}
-                      >
-                        {week}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-on-surface-variant mb-1">教师</label>
-                  <input
-                    type="text"
-                    value={editingCourse.teacher}
-                    onChange={(e) => setEditingCourse({ ...editingCourse, teacher: e.target.value })}
-                    className="w-full px-4 py-2 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-on-surface-variant mb-1">地点</label>
-                  <input
-                    type="text"
-                    value={editingCourse.location}
-                    onChange={(e) => setEditingCourse({ ...editingCourse, location: e.target.value })}
-                    className="w-full px-4 py-2 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-on-surface-variant mb-1">备注</label>
-                  <textarea
-                    value={editingCourse.remark}
-                    onChange={(e) => setEditingCourse({ ...editingCourse, remark: e.target.value })}
-                    className="w-full px-4 py-2 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none"
-                    rows={2}
-                  />
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-surface-container-high flex justify-end gap-2">
-                <button
-                  onClick={() => setEditingCourse(null)}
-                  className="px-4 py-2 bg-surface-container-low text-on-surface-variant font-medium rounded-lg hover:bg-surface-container transition-all"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleSaveEdit}
-                  className="px-4 py-2 bg-primary text-on-primary font-semibold rounded-lg hover:scale-[0.98] transition-all flex items-center gap-2"
-                >
-                  <Check size={16} />
-                  保存修改
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <CourseEditModal
+            course={editingCourse}
+            onSave={(updated) => {
+              const updatedCourses = courses.map(c => 
+                c.id === updated.id ? { ...updated, isModified: true } : c
+              );
+              onCoursesChange(updatedCourses);
+              setEditingCourse(null);
+            }}
+            onClose={() => setEditingCourse(null)}
+          />
         )}
 
         {showAddModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowAddModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-surface-container-lowest rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-6 border-b border-surface-container-high flex justify-between items-center">
-                <h3 className="font-bold text-lg text-on-surface font-headline">添加新课程</h3>
-                <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-surface-container-low rounded-lg transition-colors">
-                  <X size={20} className="text-outline" />
-                </button>
-              </div>
-              
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-on-surface-variant mb-1">课程名称 *</label>
-                  <input
-                    type="text"
-                    value={newCourse.course_name}
-                    onChange={(e) => setNewCourse({ ...newCourse, course_name: e.target.value })}
-                    placeholder="请输入课程名称"
-                    className="w-full px-4 py-2 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-on-surface-variant mb-1">星期 *</label>
-                    <select
-                      value={newCourse.weekday}
-                      onChange={(e) => setNewCourse({ ...newCourse, weekday: parseInt(e.target.value) })}
-                      className="w-full px-4 py-2 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                    >
-                      {WEEKDAYS.map((day, index) => (
-                        <option key={day} value={index + 1}>{day}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-on-surface-variant mb-1">节次 *</label>
-                    <div className="flex flex-wrap gap-1">
-                      {SECTION_TIMES.map(s => (
-                        <button
-                          key={s.section}
-                          type="button"
-                          onClick={() => {
-                            const currentSections = newCourse.sections || [];
-                            const sections = currentSections.includes(s.section)
-                              ? currentSections.filter(sec => sec !== s.section)
-                              : [...currentSections, s.section].sort((a, b) => a - b);
-                            setNewCourse({ ...newCourse, sections });
-                          }}
-                          className={cn(
-                            "px-2 py-1.5 text-xs font-medium rounded transition-colors",
-                            (newCourse.sections || []).includes(s.section)
-                              ? "bg-primary text-on-primary"
-                              : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
-                          )}
-                        >
-                          第{s.section}节
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-on-surface-variant mb-1">周次</label>
-                  <div className="flex flex-wrap gap-1">
-                    {Array.from({ length: 18 }, (_, i) => i + 1).map(week => (
-                      <button
-                        key={week}
-                        onClick={() => {
-                          const currentWeeks = newCourse.weeks || [];
-                          const weeks = currentWeeks.includes(week)
-                            ? currentWeeks.filter(w => w !== week)
-                            : [...currentWeeks, week].sort((a, b) => a - b);
-                          setNewCourse({ ...newCourse, weeks });
-                        }}
-                        className={cn(
-                          "w-8 h-8 text-xs font-medium rounded transition-colors",
-                          (newCourse.weeks || []).includes(week)
-                            ? "bg-primary text-on-primary"
-                            : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
-                        )}
-                      >
-                        {week}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-on-surface-variant mb-1">教师</label>
-                  <input
-                    type="text"
-                    value={newCourse.teacher}
-                    onChange={(e) => setNewCourse({ ...newCourse, teacher: e.target.value })}
-                    className="w-full px-4 py-2 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-on-surface-variant mb-1">地点</label>
-                  <input
-                    type="text"
-                    value={newCourse.location}
-                    onChange={(e) => setNewCourse({ ...newCourse, location: e.target.value })}
-                    className="w-full px-4 py-2 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-surface-container-high flex justify-end gap-2">
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 bg-surface-container-low text-on-surface-variant font-medium rounded-lg hover:bg-surface-container transition-all"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleAddCourse}
-                  disabled={!newCourse.course_name || !newCourse.sections?.length}
-                  className="px-4 py-2 bg-primary text-on-primary font-semibold rounded-lg hover:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50"
-                >
-                  <Plus size={16} />
-                  添加课程
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <CourseEditModal
+            course={{
+              id: `new-${Date.now()}`,
+              course_name: '',
+              weekday: 1,
+              sections: [],
+              weeks: [],
+              teacher: '',
+              location: '',
+              remark: '',
+              isNew: true
+            }}
+            onSave={(course) => {
+              onCoursesChange([...courses, { ...course, isNew: true }]);
+              setShowAddModal(false);
+            }}
+            onClose={() => setShowAddModal(false)}
+            isNew
+          />
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+interface CourseEditModalProps {
+  course: EditableCourse;
+  onSave: (course: EditableCourse) => void;
+  onClose: () => void;
+  isNew?: boolean;
+}
+
+function CourseEditModal({ course, onSave, onClose, isNew = false }: CourseEditModalProps) {
+  const [editingCourse, setEditingCourse] = useState<EditableCourse>(course);
+  const [weekRanges, setWeekRanges] = useState<WeekRange[]>(() => weeksToRanges(course.weeks));
+  const [sectionInput, setSectionInput] = useState<string>(() => {
+    if (course.sections.length === 0) return '';
+    return `${course.sections[0]}-${course.sections[course.sections.length - 1]}`;
+  });
+
+  useEffect(() => {
+    const weeks = parseWeeksFromRanges(weekRanges);
+    setEditingCourse(prev => ({ ...prev, weeks }));
+  }, [weekRanges]);
+
+  const parseSectionInput = (input: string): number[] => {
+    const match = input.match(/(\d+)\s*[-~]\s*(\d+)/);
+    if (match) {
+      const start = parseInt(match[1]);
+      const end = parseInt(match[2]);
+      return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    }
+    const singleMatch = input.match(/(\d+)/);
+    if (singleMatch) {
+      return [parseInt(singleMatch[1])];
+    }
+    return [];
+  };
+
+  const handleSectionInputChange = (value: string) => {
+    setSectionInput(value);
+    const sections = parseSectionInput(value);
+    if (sections.length > 0) {
+      setEditingCourse(prev => ({ ...prev, sections }));
+    }
+  };
+
+  const addWeekRange = () => {
+    setWeekRanges(prev => [...prev, {
+      id: `range-${Date.now()}`,
+      start: null,
+      end: null,
+      type: 'all'
+    }]);
+  };
+
+  const updateWeekRange = (id: string, field: keyof WeekRange, value: any) => {
+    setWeekRanges(prev => prev.map(r => 
+      r.id === id ? { ...r, [field]: value } : r
+    ));
+  };
+
+  const removeWeekRange = (id: string) => {
+    setWeekRanges(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleSave = () => {
+    if (!editingCourse.course_name) return;
+    onSave(editingCourse);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-surface-container-lowest rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6 border-b border-surface-container-high flex justify-between items-center">
+          <h3 className="font-bold text-lg text-on-surface font-headline">
+            {isNew ? '添加新课程' : '编辑课程'}
+          </h3>
+          <button onClick={onClose} className="p-2 hover:bg-surface-container-low rounded-lg transition-colors">
+            <X size={20} className="text-outline" />
+          </button>
+        </div>
+        
+        <div className="p-6 space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-on-surface-variant mb-1">
+              课程名称 {!isNew && <span className="text-red-500">*</span>}
+            </label>
+            <input
+              type="text"
+              value={editingCourse.course_name}
+              onChange={(e) => setEditingCourse({ ...editingCourse, course_name: e.target.value })}
+              placeholder="请输入课程名称"
+              className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-on-surface-variant mb-1">星期</label>
+              <select
+                value={editingCourse.weekday}
+                onChange={(e) => setEditingCourse({ ...editingCourse, weekday: parseInt(e.target.value) })}
+                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+              >
+                {WEEKDAYS.map((day, index) => (
+                  <option key={day} value={index + 1}>{day}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-on-surface-variant mb-1">节次</label>
+              <input
+                type="text"
+                value={sectionInput}
+                onChange={(e) => handleSectionInputChange(e.target.value)}
+                placeholder="例如: 1-2 或 3-4"
+                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+              />
+              <div className="flex flex-wrap gap-1 mt-2">
+                {SECTION_TIMES.map(s => (
+                  <button
+                    key={s.section}
+                    type="button"
+                    onClick={() => {
+                      const sections = editingCourse.sections.includes(s.section)
+                        ? editingCourse.sections.filter(sec => sec !== s.section)
+                        : [...editingCourse.sections, s.section].sort((a, b) => a - b);
+                      setEditingCourse({ ...editingCourse, sections });
+                      if (sections.length > 0) {
+                        setSectionInput(`${sections[0]}-${sections[sections.length - 1]}`);
+                      }
+                    }}
+                    className={cn(
+                      "px-2 py-1 text-xs font-medium rounded transition-colors",
+                      editingCourse.sections.includes(s.section)
+                        ? "bg-primary text-on-primary"
+                        : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                    )}
+                  >
+                    {s.section}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-on-surface-variant">周次</label>
+              <button
+                type="button"
+                onClick={addWeekRange}
+                className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+              >
+                <Plus size={14} />
+                添加周数范围
+              </button>
+            </div>
+            
+            <div className="space-y-2">
+              {weekRanges.length === 0 ? (
+                <div className="text-sm text-on-surface-variant py-2 text-center bg-surface-container-low rounded-lg">
+                  未设置周次，请添加周数范围
+                </div>
+              ) : (
+                weekRanges.map((range) => (
+                  <div key={range.id} className="flex items-center gap-2 p-2 bg-surface-container-low rounded-lg">
+                    <input
+                      type="number"
+                      min={1}
+                      max={18}
+                      value={range.start ?? ''}
+                      onChange={(e) => updateWeekRange(range.id, 'start', e.target.value ? parseInt(e.target.value) : null)}
+                      placeholder="起始"
+                      className="w-16 px-2 py-1.5 text-sm border border-surface-container-high rounded focus:ring-2 focus:ring-primary outline-none text-center"
+                    />
+                    <span className="text-on-surface-variant">—</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={18}
+                      value={range.end ?? ''}
+                      onChange={(e) => updateWeekRange(range.id, 'end', e.target.value ? parseInt(e.target.value) : null)}
+                      placeholder="结束"
+                      className="w-16 px-2 py-1.5 text-sm border border-surface-container-high rounded focus:ring-2 focus:ring-primary outline-none text-center"
+                    />
+                    <span className="text-on-surface-variant">周</span>
+                    <select
+                      value={range.type}
+                      onChange={(e) => updateWeekRange(range.id, 'type', e.target.value)}
+                      className="px-2 py-1.5 text-sm border border-surface-container-high rounded focus:ring-2 focus:ring-primary outline-none"
+                    >
+                      <option value="all">无</option>
+                      <option value="odd">单周</option>
+                      <option value="even">双周</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeWeekRange(range.id)}
+                      className="p-1 text-on-surface-variant hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {editingCourse.weeks.length > 0 && (
+              <div className="mt-2 text-xs text-on-surface-variant">
+                已选: <span className="text-on-surface font-medium">{formatWeeksDisplay(editingCourse.weeks)}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-on-surface-variant mb-1">教师</label>
+              <input
+                type="text"
+                value={editingCourse.teacher}
+                onChange={(e) => setEditingCourse({ ...editingCourse, teacher: e.target.value })}
+                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-on-surface-variant mb-1">地点</label>
+              <input
+                type="text"
+                value={editingCourse.location}
+                onChange={(e) => setEditingCourse({ ...editingCourse, location: e.target.value })}
+                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-on-surface-variant mb-1">备注</label>
+            <textarea
+              value={editingCourse.remark}
+              onChange={(e) => setEditingCourse({ ...editingCourse, remark: e.target.value })}
+              className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none"
+              rows={2}
+            />
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-surface-container-high flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-surface-container-low text-on-surface-variant font-medium rounded-lg hover:bg-surface-container transition-all"
+          >
+            取消
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!editingCourse.course_name}
+            className="px-4 py-2 bg-primary text-on-primary font-semibold rounded-lg hover:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            <Check size={16} />
+            {isNew ? '添加课程' : '保存修改'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

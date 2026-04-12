@@ -84,6 +84,7 @@ const staggerItem = {
 export default function FilesView() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [schedules, setSchedules] = useState<ScheduleData[]>([]);
+  const [allSchedules, setAllSchedules] = useState<ScheduleData[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
   
@@ -135,11 +136,14 @@ export default function FilesView() {
   const loadSchedules = async () => {
     try {
       setLoading(true);
-      const data = await api.getSchedules({
+      const allData = await api.getSchedules({});
+      setAllSchedules(allData);
+      
+      const filteredData = await api.getSchedules({
         department: filterDepartment || undefined,
         name: searchName || undefined
       });
-      setSchedules(data);
+      setSchedules(filteredData);
     } catch (err) {
       console.error('Failed to load schedules:', err);
     } finally {
@@ -658,23 +662,23 @@ export default function FilesView() {
   const unsavedCount = batchResults.filter(r => r.success && !r.saved).length;
 
   const stats = {
-    total: schedules.length,
-    departmentCount: new Set(schedules.map(s => s.department)).size,
-    recentCount: schedules.filter(s => {
+    total: allSchedules.length,
+    departmentCount: new Set(allSchedules.map(s => s.department)).size,
+    recentCount: allSchedules.filter(s => {
       const date = new Date(s.created_at);
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
       return date > weekAgo;
     }).length,
-    withFile: schedules.filter(s => s.filename).length
+    withFile: allSchedules.filter(s => s.filename).length
   };
 
   const departmentStats = departments.map(dept => ({
     name: dept.name,
-    count: schedules.filter(s => s.department === dept.name).length
+    count: allSchedules.filter(s => s.department === dept.name).length
   })).filter(d => d.count > 0).sort((a, b) => b.count - a.count);
 
-  const recentSchedules = [...schedules]
+  const recentSchedules = [...allSchedules]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5);
 
@@ -966,24 +970,13 @@ export default function FilesView() {
                   {departmentStats.length === 0 ? (
                     <p className="text-sm text-on-surface-variant text-center py-4">暂无数据</p>
                   ) : (
-                    <div className="space-y-3">
-                      {departmentStats.slice(0, 5).map((dept, index) => {
-                        const percentage = stats.total > 0 ? (dept.count / stats.total) * 100 : 0;
-                        const colors = ['bg-primary', 'bg-blue-500', 'bg-green-500', 'bg-amber-500', 'bg-purple-500'];
+                    <div className="space-y-2">
+                      {departmentStats.map((dept, index) => {
+                        const colors = ['text-primary', 'text-blue-500', 'text-green-500', 'text-amber-500', 'text-purple-500'];
                         return (
-                          <div key={dept.name} className="space-y-1.5">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-on-surface-variant">{dept.name}</span>
-                              <span className="font-medium text-on-surface">{dept.count}</span>
-                            </div>
-                            <div className="h-2 bg-surface-container rounded-full overflow-hidden">
-                              <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${percentage}%` }}
-                                transition={{ delay: 0.1 + index * 0.05, duration: 0.5 }}
-                                className={cn("h-full rounded-full", colors[index % colors.length])}
-                              />
-                            </div>
+                          <div key={dept.name} className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <span className="text-sm text-on-surface-variant">{dept.name}</span>
+                            <span className={cn("font-bold text-lg", colors[index % colors.length])}>{dept.count}</span>
                           </div>
                         );
                       })}
