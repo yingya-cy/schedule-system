@@ -19,11 +19,12 @@ import {
   WEEKDAYS
 } from '@/types';
 import { api } from '@/services/api';
+import { useApp } from '@/context/AppContext';
 
 const CURRENT_WEEK_KEY = 'schedule_current_week';
 
 export default function DashboardView() {
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const { departments } = useApp();
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [currentWeek, setCurrentWeek] = useState(1);
   const [actualCurrentWeek, setActualCurrentWeek] = useState<number | null>(null);
@@ -37,7 +38,6 @@ export default function DashboardView() {
   const [useCustomRange, setUseCustomRange] = useState(false);
 
   useEffect(() => {
-    loadDepartments();
     const saved = localStorage.getItem(CURRENT_WEEK_KEY);
     if (saved) {
       setActualCurrentWeek(parseInt(saved));
@@ -47,15 +47,6 @@ export default function DashboardView() {
   useEffect(() => {
     loadFreeTimeData();
   }, [currentWeek, selectedDepartment]);
-
-  const loadDepartments = async () => {
-    try {
-      const data = await api.getDepartments();
-      setDepartments(data);
-    } catch (err) {
-      console.error('Failed to load departments:', err);
-    }
-  };
 
   const loadFreeTimeData = async () => {
     try {

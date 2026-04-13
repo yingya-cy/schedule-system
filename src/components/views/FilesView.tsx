@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Upload, 
   Search, 
@@ -41,6 +41,7 @@ import { api } from '@/services/api';
 import { processSingleFile } from '@/services/fileProcessor';
 import ScheduleEditor from '@/components/ScheduleEditor';
 import ManualScheduleEntry from '@/components/ManualScheduleEntry';
+import { useApp } from '@/context/AppContext';
 
 type ViewMode = 'list' | 'upload' | 'batch_result' | 'edit' | 'manual_entry';
 
@@ -82,15 +83,31 @@ const staggerItem = {
 };
 
 export default function FilesView() {
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [schedules, setSchedules] = useState<ScheduleData[]>([]);
-  const [allSchedules, setAllSchedules] = useState<ScheduleData[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(false);
+  const {
+    schedules: allSchedules,
+    departments,
+    loading,
+    refreshSchedules,
+    addSchedule,
+    updateSchedule,
+    removeSchedule
+  } = useApp();
   
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [searchName, setSearchName] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  
+  const schedules = useMemo(() => {
+    let filtered = allSchedules;
+    if (filterDepartment) {
+      filtered = filtered.filter(s => s.department === filterDepartment);
+    }
+    if (searchName) {
+      filtered = filtered.filter(s => s.name.toLowerCase().includes(searchName.toLowerCase()));
+    }
+    return filtered;
+  }, [allSchedules, filterDepartment, searchName]);
   
   const [uploadState, setUploadState] = useState<UploadState>({
     isUploading: false,
@@ -115,41 +132,6 @@ export default function FilesView() {
   const dragRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    loadSchedules();
-  }, [searchName, filterDepartment]);
-
-  const loadData = async () => {
-    try {
-      const deptData = await api.getDepartments();
-      setDepartments(deptData);
-    } catch (err) {
-      console.error('Failed to load departments:', err);
-    }
-  };
-
-  const loadSchedules = async () => {
-    try {
-      setLoading(true);
-      const allData = await api.getSchedules({});
-      setAllSchedules(allData);
-      
-      const filteredData = await api.getSchedules({
-        department: filterDepartment || undefined,
-        name: searchName || undefined
-      });
-      setSchedules(filteredData);
-    } catch (err) {
-      console.error('Failed to load schedules:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -484,7 +466,7 @@ export default function FilesView() {
         setViewMode('list');
       }
       
-      loadSchedules();
+      refreshSchedules();
     } catch (err: any) {
       console.error('Failed to save schedule:', err);
       alert('保存失败：' + err.message);
@@ -498,7 +480,7 @@ export default function FilesView() {
     
     try {
       await api.deleteSchedule(id);
-      loadSchedules();
+      removeSchedule(id);
     } catch (err: any) {
       alert('删除失败：' + err.message);
     }
@@ -622,7 +604,7 @@ export default function FilesView() {
       
       alert('手动录入成功');
       setViewMode('list');
-      loadSchedules();
+      refreshSchedules();
     } catch (err: any) {
       console.error('Failed to save manual schedule:', err);
       alert('手动录入失败：' + err.message);
@@ -881,6 +863,7 @@ export default function FilesView() {
                       <p className="text-sm text-outline mt-1">点击上方按钮上传课表</p>
                     </div>
                   ) : (
+                    <div className="max-h-[calc(100vh-480px)] overflow-y-auto">
                     <motion.div
                       variants={staggerContainer}
                       initial="hidden"
@@ -957,6 +940,7 @@ export default function FilesView() {
                         </motion.div>
                       ))}
                     </motion.div>
+                    </div>
                   )}
                 </div>
               </div>

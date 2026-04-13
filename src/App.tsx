@@ -7,6 +7,7 @@ import ContactsView from './components/views/ContactsView';
 import ScheduleView from './components/views/ScheduleView';
 import ChatView from './components/views/ChatView';
 import { ViewType } from './types';
+import { AppProvider } from './context/AppContext';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -31,8 +32,10 @@ export default function App() {
   };
 
   return (
-    <Layout currentView={currentView} onViewChange={setCurrentView}>
-      {renderView()}
-    </Layout>
+    <AppProvider>
+      <Layout currentView={currentView} onViewChange={setCurrentView}>
+        {renderView()}
+      </Layout>
+    </AppProvider>
   );
 }
