@@ -5,6 +5,7 @@ import { EditableCourse, ScheduleData, Department } from '@/types';
 import { api } from '@/services/api';
 import ScheduleEditor from '@/components/ScheduleEditor';
 import ManualScheduleEntry from '@/components/ManualScheduleEntry';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { useAppStore } from '@/stores/appStore';
 import { ViewMode, UploadState, BatchResult, initialUploadState } from './constants';
 import ScheduleListView from './ScheduleListView';
@@ -39,6 +40,11 @@ export default function FilesView() {
   const [editName, setEditName] = useState('');
   const [editDepartment, setEditDepartment] = useState('');
 
+  // Confirm dialog state
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Handlers
@@ -68,8 +74,16 @@ export default function FilesView() {
     }
   };
 
-  const handleDeleteSchedule = async (id: number) => {
-    if (!confirm('确定要删除这个课表吗？')) return;
+  const handleDeleteSchedule = (id: number) => {
+    setPendingDeleteId(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (pendingDeleteId === null) return;
+    const id = pendingDeleteId;
+    setShowDeleteConfirm(false);
+    setPendingDeleteId(null);
 
     try {
       await api.deleteSchedule(id);
@@ -187,6 +201,18 @@ export default function FilesView() {
   };
 
   const handleBackToList = () => {
+    const unsavedResults = batchResults.filter(r => r.success && !r.saved);
+    if (unsavedResults.length > 0) {
+      setShowConfirmDialog(true);
+      return;
+    }
+    setViewMode('list');
+    setBatchResults([]);
+    resetEditState();
+  };
+
+  const confirmBackToList = () => {
+    setShowConfirmDialog(false);
     setViewMode('list');
     setBatchResults([]);
     resetEditState();
@@ -389,6 +415,31 @@ export default function FilesView() {
           />
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        isOpen={showConfirmDialog}
+        title="确认返回"
+        message={`还有 ${batchResults.filter(r => r.success && !r.saved).length} 个未保存的识别结果，确定要返回吗？`}
+        confirmText="确定返回"
+        cancelText="取消"
+        onConfirm={confirmBackToList}
+        onCancel={() => setShowConfirmDialog(false)}
+        type="warning"
+      />
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="确认删除"
+        message="确定要删除这个课表吗？此操作不可撤销。"
+        confirmText="删除"
+        cancelText="取消"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setPendingDeleteId(null);
+        }}
+        type="danger"
+      />
     </div>
   );
 }

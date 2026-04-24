@@ -37,9 +37,10 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 
 # 复制代码
 COPY service.py ./
+COPY gunicorn.conf.py ./
 COPY prompts/ ./prompts/
 COPY utils/ ./utils/
 
 EXPOSE 5002
 
-CMD ["python", "service.py"]
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "service:app"]

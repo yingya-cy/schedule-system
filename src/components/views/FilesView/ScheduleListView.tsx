@@ -102,7 +102,7 @@ export default function ScheduleListView({
       {/* Stats Cards */}
       <StatsCards schedules={schedules} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Main list area */}
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-surface-container-lowest rounded-2xl border border-surface-container-high shadow-sm overflow-hidden">
@@ -213,8 +213,8 @@ export default function ScheduleListView({
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-4">
+        {/* Sidebar - 右侧固定内容不参与滚动 */}
+        <div className="space-y-4 lg:sticky lg:top-6">
           {/* Department stats */}
           <div className="bg-surface-container-lowest rounded-2xl border border-surface-container-high shadow-sm p-5">
             <h3 className="font-semibold text-on-surface mb-4 flex items-center gap-2">

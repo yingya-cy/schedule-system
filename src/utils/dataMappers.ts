@@ -1,10 +1,37 @@
 import { UnifiedCourse, CourseRecord, BackendCourseData } from '../types';
 import { getWeekdayName, formatSection, formatWeekInfo } from './formatters';
 
-export const mapBackendDataToArray = (data: BackendCourseData[]): UnifiedCourse[] => {
+export function parsePeriod(section: any): number[] {
+  if (Array.isArray(section)) return section;
+  if (!section) return [];
+  const match = String(section).match(/(\d+)[-~](\d+)节?/);
+  if (match) {
+    const start = parseInt(match[1]);
+    const end = parseInt(match[2]);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }
+  const singleMatch = String(section).match(/第?(\d+)节/);
+  if (singleMatch) return [parseInt(singleMatch[1])];
+  return [];
+}
+
+export function mapBackendDataToArray(data: BackendCourseData[]): UnifiedCourse[] {
+  console.log('[DEBUG] AI OCR result:', JSON.stringify(data.slice(0, 2), null, 2));
   return data.map(item => {
     const dayStr = getWeekdayName(item.weekday || item.day);
-    const sectionStr = formatSection(typeof item.section === 'number' ? item.section : undefined);
+
+    // item.section 可能是数组（如 AI OCR）也可能是字符串（如旧格式）
+    // item.period 是 PDF 本地解析格式
+    const sectionArray = Array.isArray(item.section)
+      ? item.section
+      : item.section
+        ? parsePeriod(item.section)
+        : item.period
+          ? parsePeriod(item.period)
+          : [];
+    const sectionStr = sectionArray.length > 0
+      ? `${sectionArray[0]}-${sectionArray[sectionArray.length - 1]}节`
+      : '';
     
     return {
       courseName: item.course_name || item.course || item.name || '未知课程',
