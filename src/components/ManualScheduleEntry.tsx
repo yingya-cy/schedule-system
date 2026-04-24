@@ -20,18 +20,20 @@ interface ManualScheduleEntryProps {
   departments: { id: number; name: string; sort_order: number }[];
 }
 
+type CourseInput = {
+  course_name: string;
+  weekday: number;
+  sections: number[];
+  weeks: number[];
+  teacher?: string;
+  location?: string;
+  remark?: string;
+};
+
 export default function ManualScheduleEntry({ onSave, onCancel, departments }: ManualScheduleEntryProps) {
   const [name, setName] = useState('');
   const [department, setDepartment] = useState('');
-  const [courses, setCourses] = useState<Array<{
-    course_name: string;
-    weekday: number;
-    sections: number[];
-    weeks: number[];
-    teacher?: string;
-    location?: string;
-    remark?: string;
-  }>>([]);
+  const [courses, setCourses] = useState<CourseInput[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
@@ -75,7 +77,7 @@ export default function ManualScheduleEntry({ onSave, onCancel, departments }: M
     }]);
   };
 
-  const handleUpdateCourse = (index: number, field: string, value: any) => {
+  const handleUpdateCourse = (index: number, field: keyof CourseInput, value: string | number | number[]) => {
     const updatedCourses = [...courses];
     updatedCourses[index] = { ...updatedCourses[index], [field]: value };
     setCourses(updatedCourses);

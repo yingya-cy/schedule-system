@@ -381,5 +381,12 @@ def ocr_batch():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Gunicorn 入口点（生产环境使用）
+def create_app():
+    """创建 Flask 应用，供 Gunicorn 调用"""
+    return app
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002, debug=True)
+    # 开发环境直接运行（单进程单线程）
+    # 生产环境应使用: gunicorn -c gunicorn.conf.py app:app
+    app.run(host='0.0.0.0', port=5002, debug=False)

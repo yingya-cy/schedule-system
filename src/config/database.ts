@@ -7,9 +7,9 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || '753412',
   database: process.env.DB_NAME || 'schedule_system',
   charset: 'utf8mb4',
-  connectionLimit: 10,
+  connectionLimit: 20,
   waitForConnections: true,
-  queueLimit: 0,
+  queueLimit: 50,
   connectTimeout: 10000,
   timezone: '+08:00',
   dateStrings: true,
@@ -31,6 +31,29 @@ pool.on('connection', (connection) => {
   connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
   console.log('🔗 新连接已强制设置为 utf8mb4');
 });
+
+/**
+ * 确保索引存在，不存在则创建
+ */
+async function ensureIndex(
+  connection: mysql.PoolConnection,
+  table: string,
+  indexName: string,
+  indexColumns: string
+): Promise<void> {
+  try {
+    const [rows] = await connection.query(
+      `SHOW INDEX FROM ${table} WHERE Key_name = ?`,
+      [indexName]
+    );
+    if ((rows as any[]).length === 0) {
+      await connection.query(`CREATE INDEX ${indexName} ON ${table} ${indexColumns}`);
+      console.log(`✅ Created index ${indexName} on ${table}`);
+    }
+  } catch (error) {
+    console.log(`ℹ️  Index ${indexName} note:`, (error as Error).message);
+  }
+}
 
 export async function testConnection() {
   try {
@@ -86,6 +109,9 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
 
+    // 添加部门表索引
+    await ensureIndex(connection, 'departments', 'idx_departments_sort', '(sort_order)');
+
     // 创建课表表
     await connection.query(`
       CREATE TABLE IF NOT EXISTS schedules (
@@ -107,6 +133,12 @@ export async function initializeDatabase() {
         INDEX idx_file_hash (file_hash)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
+
+    // 添加 schedules 表索引
+    await ensureIndex(connection, 'schedules', 'idx_schedules_created', '(created_at DESC)');
+    await ensureIndex(connection, 'schedules', 'idx_schedules_dept_name', '(department, name)');
+    await ensureIndex(connection, 'schedules', 'idx_schedules_name', '(name)');
+    await ensureIndex(connection, 'schedules', 'idx_schedules_storage_created', '(storage_type, created_at)');
 
     // 检查并添加新字段（如果不存在）
     try {
@@ -148,6 +180,9 @@ export async function initializeDatabase() {
         INDEX idx_weekday (weekday)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
+
+    // 添加 courses 表索引
+    await ensureIndex(connection, 'courses', 'idx_courses_schedule_weekday', '(schedule_id, weekday, sections(10))');
 
     // 检查部门表中是否有数据，如果没有则插入默认部门
     const [deptRows] = await connection.query('SELECT COUNT(*) as count FROM departments');

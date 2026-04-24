@@ -35,6 +35,14 @@ services:
       - uploads:/app/uploads
     depends_on:
       - db
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
 
   ai-service:
     build:
@@ -46,6 +54,14 @@ services:
       - "5002:5002"
     environment:
       - TZ=Asia/Shanghai
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
 
   db:
     image: mysql:8.0
@@ -57,15 +73,25 @@ services:
       MYSQL_COLLATION: utf8mb4_unicode_ci
       MYSQL_ROOT_PASSWORD: 753412
       MYSQL_DATABASE: schedule_system
-    command: 
+    command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --default-authentication-plugin=mysql_native_password
+      - --innodb-buffer-pool-size=256M
+      - --max-connections=100
     ports:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
 
 volumes:
   mysql_data:

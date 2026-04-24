@@ -15,6 +15,15 @@ export interface FileMetadata {
   fileData?: Buffer;
 }
 
+interface ScheduleRow {
+  filename: string | null;
+  file_type: string | null;
+  file_size: number | null;
+  storage_type: 'database' | 'filesystem' | 'object_storage';
+  file_path: string | null;
+  file_data: Buffer | null;
+}
+
 export class FileStorageService {
   private readonly uploadDir: string;
   private readonly maxDatabaseSize = 5 * 1024 * 1024; // 5MB
@@ -35,7 +44,7 @@ export class FileStorageService {
   /**
    * 计算文件哈希值（SHA256）
    */
-  private async calculateFileHash(buffer: Buffer): Promise<string> {
+  private calculateFileHash(buffer: Buffer): string {
     return crypto.createHash('sha256').update(buffer).digest('hex');
   }
 
@@ -48,20 +57,12 @@ export class FileStorageService {
     fileType: string = 'application/octet-stream'
   ): Promise<FileMetadata> {
     const fileSize = fileBuffer.length;
-    const fileHash = await this.calculateFileHash(fileBuffer);
+    const fileHash = this.calculateFileHash(fileBuffer);
 
     // 检查是否已存在相同文件
     const existingFile = await this.findFileByHash(fileHash);
     if (existingFile) {
-      return {
-        filename,
-        fileType,
-        fileSize,
-        fileHash,
-        storageType: existingFile.storageType,
-        filePath: existingFile.filePath,
-        fileData: existingFile.fileData
-      };
+      return existingFile;
     }
 
     // 根据文件大小选择存储方式
@@ -77,7 +78,7 @@ export class FileStorageService {
       storageType = 'filesystem';
       const safeFilename = this.generateSafeFilename(filename);
       filePath = path.join(this.uploadDir, safeFilename);
-      
+
       await fs.writeFile(filePath, fileBuffer);
       storedFileData = undefined; // 不存储在数据库
     }
@@ -99,23 +100,25 @@ export class FileStorageService {
   private async findFileByHash(fileHash: string): Promise<FileMetadata | null> {
     try {
       const [rows] = await pool.execute(
-        'SELECT filename, file_type, file_size, storage_type, file_path, file_data FROM schedules WHERE file_hash = ? LIMIT 1',
+        'SELECT filename, file_type, file_size, storage_type, file_path FROM schedules WHERE file_hash = ? LIMIT 1',
         [fileHash]
       );
 
-      if (Array.isArray(rows) && rows.length > 0) {
-        const row = rows[0] as any;
-        return {
-          filename: row.filename,
-          fileType: row.file_type,
-          fileSize: row.file_size,
-          fileHash,
-          storageType: row.storage_type,
-          filePath: row.file_path,
-          fileData: row.file_data ? Buffer.from(row.file_data) : undefined
-        };
+      const scheduleRows = rows as Omit<ScheduleRow, 'file_data'>[];
+      if (scheduleRows.length === 0) {
+        return null;
       }
-      return null;
+
+      const row = scheduleRows[0];
+      return {
+        filename: row.filename || '',
+        fileType: row.file_type || '',
+        fileSize: row.file_size || 0,
+        fileHash,
+        storageType: row.storage_type,
+        filePath: row.file_path || undefined
+        // 注意：fileData 不在此查询，仅在需要时从 getScheduleFile 获取
+      };
     } catch (error) {
       console.error('Error finding file by hash:', error);
       return null;
@@ -162,7 +165,7 @@ export class FileStorageService {
         [fileMetadata.fileHash]
       );
 
-      const count = (rows as any[])[0]?.count || 0;
+      const count = (rows as { count: number }[])[0]?.count || 0;
       if (count === 0 && fileMetadata.storageType === 'filesystem' && fileMetadata.filePath) {
         // 没有其他引用，删除文件
         await fs.unlink(fileMetadata.filePath).catch(() => {
@@ -182,10 +185,10 @@ export class FileStorageService {
     const random = Math.random().toString(36).substring(2, 10);
     const extension = path.extname(originalFilename);
     const basename = path.basename(originalFilename, extension);
-    
+
     // 移除特殊字符
     const safeBasename = basename.replace(/[^a-zA-Z0-9-_]/g, '_');
-    
+
     return `${safeBasename}_${timestamp}_${random}${extension}`;
   }
 
@@ -195,14 +198,14 @@ export class FileStorageService {
   async cleanupOldFiles(maxAgeDays: number = 30): Promise<void> {
     try {
       const cutoffTime = Date.now() - (maxAgeDays * 24 * 60 * 60 * 1000);
-      
+
       // 查找需要清理的文件
       const [rows] = await pool.execute(
         'SELECT file_path FROM schedules WHERE storage_type = ? AND created_at < ?',
         ['filesystem', new Date(cutoffTime).toISOString()]
       );
 
-      for (const row of rows as any[]) {
+      for (const row of rows as { file_path: string | null }[]) {
         if (row.file_path) {
           await fs.unlink(row.file_path).catch(() => {
             // 忽略错误

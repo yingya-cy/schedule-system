@@ -1,7 +1,17 @@
-export type ViewType = 'dashboard' | 'courses' | 'files' | 'contacts' | 'schedule' | 'chat';
+// Route paths
+export type RoutePath = '/dashboard' | '/files' | '/courses' | '/contacts' | '/schedule' | '/chat';
+
+export const ROUTE_LABELS: Record<RoutePath, string> = {
+  '/dashboard': '仪表盘',
+  '/files': '课表中心',
+  '/courses': '课程目录',
+  '/contacts': '联系人',
+  '/schedule': '排班管理',
+  '/chat': '群聊',
+};
 
 export interface NavItem {
-  id: ViewType;
+  id: string;
   label: string;
   icon: string;
 }
@@ -181,3 +191,6 @@ export const COURSE_COLORS = [
   '#06b6d4',
   '#84cc16',
 ];
+
+// 学期周数
+export const WEEK_COUNT = 20;

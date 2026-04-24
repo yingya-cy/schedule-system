@@ -4,7 +4,7 @@ import { getWeekdayName, formatSection, formatWeekInfo } from './formatters';
 export const mapBackendDataToArray = (data: BackendCourseData[]): UnifiedCourse[] => {
   return data.map(item => {
     const dayStr = getWeekdayName(item.weekday || item.day);
-    const sectionStr = formatSection(item.section || item.period || item.period);
+    const sectionStr = formatSection(typeof item.section === 'number' ? item.section : undefined);
     
     return {
       courseName: item.course_name || item.course || item.name || '未知课程',

@@ -1,28 +1,74 @@
+# Dependencies
 node_modules/
-build/
+
+# Build output
 dist/
-coverage/
-.DS_Store
-*.log
-.env*
+build/
+
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.*.local
 !.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# PM2
+.pm2/
+.pm2_history
+
+# Claude Code
+.claude/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
 
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-Python/
+*.py[cod]
+*$py.class
+*.so
+.Python
 python/
+Python/
+venv/
+.venv/
 
 # Vite
 vite.config.ts.timestamp-*
 *.local
 
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# SQLite (if any)
+*.db
+*.sqlite
+
+# TypeScript cache
+*.tsbuildinfo
+
 # Misc
-*.swp
-*.swo
-*~
 .fuse_hidden*
 .directory
 .Trash-*

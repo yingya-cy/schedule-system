@@ -9,8 +9,11 @@ import {
   Department
 } from '../types/database';
 import { fileStorageService, FileMetadata } from './fileStorageService';
+import { scheduleRepository } from '../repositories/ScheduleRepository';
 
 export class ScheduleService {
+  // ==================== Department Operations ====================
+
   async getAllDepartments(): Promise<Department[]> {
     const [rows] = await pool.execute(
       'SELECT * FROM departments ORDER BY sort_order ASC'
@@ -18,227 +21,101 @@ export class ScheduleService {
     return rows as Department[];
   }
 
+  // ==================== Schedule Operations (delegated to Repository) ====================
+
   async getAllSchedules(filters?: { department?: string; name?: string }): Promise<Schedule[]> {
-    let query = 'SELECT * FROM schedules';
-    const params: any[] = [];
-    const conditions: string[] = [];
-
-    if (filters?.department) {
-      conditions.push('department = ?');
-      params.push(filters.department);
-    }
-
-    if (filters?.name) {
-      conditions.push('name LIKE ?');
-      params.push(`%${filters.name}%`);
-    }
-
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
-
-    query += ' ORDER BY created_at DESC';
-
-    const [rows] = await pool.execute(query, params);
-    return rows as Schedule[];
+    return scheduleRepository.findAll(filters);
   }
 
   async getScheduleById(id: number): Promise<Schedule | null> {
-    const [rows] = await pool.execute(
-      'SELECT * FROM schedules WHERE id = ?',
-      [id]
-    );
-    const schedules = rows as Schedule[];
-    return schedules.length > 0 ? schedules[0] : null;
+    return scheduleRepository.findById(id);
   }
 
   async getScheduleWithCourses(id: number): Promise<Schedule | null> {
-    const schedule = await this.getScheduleById(id);
-    if (!schedule) return null;
-
-    const [courseRows] = await pool.execute(
-      'SELECT * FROM courses WHERE schedule_id = ? ORDER BY weekday ASC, sections ASC',
-      [id]
-    );
-    schedule.courses = courseRows as Course[];
-
-    return schedule;
+    return scheduleRepository.findWithCourses(id);
   }
 
   async createSchedule(dto: CreateScheduleDto): Promise<Schedule> {
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
+    console.log('📝 createSchedule received:', {
+      hasFileData: !!dto.file_data,
+      fileDataLength: dto.file_data?.length,
+      fileType: dto.file_type,
+      filename: dto.filename
+    });
 
-      console.log('📝 createSchedule received:', {
-        hasFileData: !!dto.file_data,
-        fileDataLength: dto.file_data?.length,
-        fileType: dto.file_type,
-        filename: dto.filename
-      });
+    let fileMetadata: FileMetadata | null = null;
 
-      let fileMetadata: FileMetadata | null = null;
-      
-      if (dto.file_data && dto.filename) {
-        const fileBuffer = Buffer.from(dto.file_data, 'base64');
-        fileMetadata = await fileStorageService.storeFile(
-          dto.filename,
-          fileBuffer,
-          dto.file_type || 'application/octet-stream'
-        );
-      }
-
-      const [result] = await connection.execute(
-        `INSERT INTO schedules (name, department, filename, file_data, file_type, storage_type, file_path, file_size, file_hash)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          dto.name,
-          dto.department,
-          fileMetadata?.filename || dto.filename || null,
-          fileMetadata?.fileData || null,
-          fileMetadata?.fileType || dto.file_type || null,
-          fileMetadata?.storageType || 'database',
-          fileMetadata?.filePath || null,
-          fileMetadata?.fileSize || 0,
-          fileMetadata?.fileHash || null
-        ]
+    if (dto.file_data && dto.filename) {
+      const fileBuffer = Buffer.from(dto.file_data, 'base64');
+      fileMetadata = await fileStorageService.storeFile(
+        dto.filename,
+        fileBuffer,
+        dto.file_type || 'application/octet-stream'
       );
-
-      const scheduleId = (result as any).insertId;
-
-      for (const courseDto of dto.courses) {
-        await connection.execute(
-          `INSERT INTO courses (schedule_id, course_name, weekday, sections, weeks, teacher, location, remark)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            scheduleId,
-            courseDto.course_name,
-            courseDto.weekday,
-            JSON.stringify(courseDto.sections),
-            JSON.stringify(courseDto.weeks),
-            courseDto.teacher || null,
-            courseDto.location || null,
-            courseDto.remark || null
-          ]
-        );
-      }
-
-      await connection.commit();
-      return await this.getScheduleWithCourses(scheduleId) as Schedule;
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
     }
+
+    // 构建带文件元数据的 DTO
+    const scheduleDto: CreateScheduleDto = {
+      ...dto,
+      filename: fileMetadata?.filename || dto.filename,
+      file_data: fileMetadata?.fileData ? fileMetadata.fileData.toString('base64') : dto.file_data,
+      file_type: fileMetadata?.fileType || dto.file_type
+    };
+
+    return scheduleRepository.create(scheduleDto);
   }
 
   async updateSchedule(id: number, dto: UpdateScheduleDto): Promise<Schedule | null> {
-    const updates: string[] = [];
-    const params: any[] = [];
-
-    if (dto.name !== undefined) {
-      updates.push('name = ?');
-      params.push(dto.name);
-    }
-
-    if (dto.department !== undefined) {
-      updates.push('department = ?');
-      params.push(dto.department);
-    }
-
-    if (dto.filename !== undefined) {
-      updates.push('filename = ?');
-      params.push(dto.filename);
-    }
-
-    if (updates.length === 0) {
-      return await this.getScheduleById(id);
-    }
-
-    params.push(id);
-    await pool.execute(
-      `UPDATE schedules SET ${updates.join(', ')} WHERE id = ?`,
-      params
-    );
-
-    return await this.getScheduleById(id);
+    return scheduleRepository.update(id, dto);
   }
 
   async deleteSchedule(id: number): Promise<boolean> {
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
+    // 先获取文件信息，用于后续清理
+    const fileInfo = await scheduleRepository.getFileInfo(id);
+    const deleted = await scheduleRepository.delete(id);
 
-      // 先获取文件信息
-      const [rows] = await connection.execute(
-        'SELECT filename, file_type, storage_type, file_path, file_hash FROM schedules WHERE id = ?',
-        [id]
-      );
-      const schedule = (rows as any[])[0];
+    // 如果删除成功，清理文件
+    if (deleted && fileInfo) {
+      const fileMetadata: FileMetadata = {
+        filename: fileInfo.filename || '',
+        fileType: fileInfo.file_type || '',
+        fileSize: 0,
+        fileHash: fileInfo.file_hash || '',
+        storageType: fileInfo.storage_type as 'database' | 'filesystem' | 'object_storage',
+        filePath: fileInfo.file_path || ''
+      };
 
-      // 删除相关课程
-      await connection.execute('DELETE FROM courses WHERE schedule_id = ?', [id]);
-      const [result] = await connection.execute('DELETE FROM schedules WHERE id = ?', [id]);
-
-      await connection.commit();
-
-      // 如果删除成功，清理文件
-      if ((result as any).affectedRows > 0 && schedule) {
-        const fileMetadata: FileMetadata = {
-          filename: schedule.filename,
-          fileType: schedule.file_type,
-          fileSize: 0,
-          fileHash: schedule.file_hash,
-          storageType: schedule.storage_type,
-          filePath: schedule.file_path
-        };
-        
-        await fileStorageService.deleteFile(fileMetadata).catch(error => {
-          console.error(`Error deleting file for schedule ${id}:`, error);
-        });
-      }
-
-      return (result as any).affectedRows > 0;
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
+      await fileStorageService.deleteFile(fileMetadata).catch(error => {
+        console.error(`Error deleting file for schedule ${id}:`, error);
+      });
     }
+
+    return deleted;
   }
 
   async getScheduleFile(id: number): Promise<{ file_data: Buffer; file_type: string; filename: string } | null> {
-    const [rows] = await pool.execute(
-      'SELECT filename, file_type, storage_type, file_path, file_data, file_hash FROM schedules WHERE id = ?',
-      [id]
-    );
-    const schedules = rows as any[];
-    if (schedules.length === 0) {
+    const fileInfo = await scheduleRepository.getFileInfo(id);
+    if (!fileInfo) {
       return null;
     }
 
-    const schedule = schedules[0];
-    
-    // 构建文件元数据
     const fileMetadata: FileMetadata = {
-      filename: schedule.filename,
-      fileType: schedule.file_type,
+      filename: fileInfo.filename || '',
+      fileType: fileInfo.file_type || '',
       fileSize: 0,
-      fileHash: schedule.file_hash,
-      storageType: schedule.storage_type,
-      filePath: schedule.file_path,
-      fileData: schedule.file_data ? Buffer.from(schedule.file_data) : undefined
+      fileHash: fileInfo.file_hash || '',
+      storageType: fileInfo.storage_type as 'database' | 'filesystem' | 'object_storage',
+      filePath: fileInfo.file_path || '',
+      fileData: fileInfo.file_data || undefined
     };
 
     try {
-      // 使用文件存储服务获取文件内容
       const fileBuffer = await fileStorageService.getFile(fileMetadata);
-      
+
       return {
         file_data: fileBuffer,
-        file_type: schedule.file_type || 'application/octet-stream',
-        filename: schedule.filename || 'schedule_file'
+        file_type: fileInfo.file_type || 'application/octet-stream',
+        filename: fileInfo.filename || 'schedule_file'
       };
     } catch (error) {
       console.error(`Error getting file for schedule ${id}:`, error);
@@ -246,100 +123,22 @@ export class ScheduleService {
     }
   }
 
-  async createCourse(scheduleId: number, dto: CreateCourseDto): Promise<Course> {
-    const [result] = await pool.execute(
-      `INSERT INTO courses (schedule_id, course_name, weekday, sections, weeks, teacher, location, remark)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        scheduleId,
-        dto.course_name,
-        dto.weekday,
-        JSON.stringify(dto.sections),
-        JSON.stringify(dto.weeks),
-        dto.teacher || null,
-        dto.location || null,
-        dto.remark || null
-      ]
-    );
+  // ==================== Course Operations (delegated to Repository) ====================
 
-    const courseId = (result as any).insertId;
-    const [rows] = await pool.execute(
-      'SELECT * FROM courses WHERE id = ?',
-      [courseId]
-    );
-    return (rows as Course[])[0];
+  async createCourse(scheduleId: number, dto: CreateCourseDto): Promise<Course> {
+    return scheduleRepository.createCourse(scheduleId, dto);
   }
 
   async updateCourse(id: number, dto: UpdateCourseDto): Promise<Course | null> {
-    const updates: string[] = [];
-    const params: any[] = [];
-
-    if (dto.course_name !== undefined) {
-      updates.push('course_name = ?');
-      params.push(dto.course_name);
-    }
-
-    if (dto.weekday !== undefined) {
-      updates.push('weekday = ?');
-      params.push(dto.weekday);
-    }
-
-    if (dto.sections !== undefined) {
-      updates.push('sections = ?');
-      params.push(JSON.stringify(dto.sections));
-    }
-
-    if (dto.weeks !== undefined) {
-      updates.push('weeks = ?');
-      params.push(JSON.stringify(dto.weeks));
-    }
-
-    if (dto.teacher !== undefined) {
-      updates.push('teacher = ?');
-      params.push(dto.teacher);
-    }
-
-    if (dto.location !== undefined) {
-      updates.push('location = ?');
-      params.push(dto.location);
-    }
-
-    if (dto.remark !== undefined) {
-      updates.push('remark = ?');
-      params.push(dto.remark);
-    }
-
-    if (updates.length === 0) {
-      const [rows] = await pool.execute('SELECT * FROM courses WHERE id = ?', [id]);
-      const courses = rows as Course[];
-      return courses.length > 0 ? courses[0] : null;
-    }
-
-    params.push(id);
-    await pool.execute(
-      `UPDATE courses SET ${updates.join(', ')} WHERE id = ?`,
-      params
-    );
-
-    const [rows] = await pool.execute('SELECT * FROM courses WHERE id = ?', [id]);
-    const courses = rows as Course[];
-    return courses.length > 0 ? courses[0] : null;
+    return scheduleRepository.updateCourse(id, dto);
   }
 
   async deleteCourse(id: number): Promise<boolean> {
-    const [result] = await pool.execute(
-      'DELETE FROM courses WHERE id = ?',
-      [id]
-    );
-    return (result as any).affectedRows > 0;
+    return scheduleRepository.deleteCourse(id);
   }
 
   async getCoursesByScheduleId(scheduleId: number): Promise<Course[]> {
-    const [rows] = await pool.execute(
-      'SELECT * FROM courses WHERE schedule_id = ? ORDER BY weekday ASC, sections ASC',
-      [scheduleId]
-    );
-    return rows as Course[];
+    return scheduleRepository.findCoursesByScheduleId(scheduleId);
   }
 }
 

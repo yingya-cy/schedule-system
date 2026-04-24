@@ -1,4 +1,5 @@
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
+import type { TextItem as PDFTextItem } from 'pdfjs-dist/types/src/display/api';
 
 // 使用 CDN 方式加载 PDF.js worker，避免本地文件的 MIME 类型问题
 GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.5.207/build/pdf.worker.mjs';
@@ -13,29 +14,29 @@ export interface TextItem {
 
 export async function extractTextWithCoords(file: File): Promise<TextItem[]> {
   const arrayBuffer = await file.arrayBuffer();
-  const loadingTask = getDocument({ 
+  const loadingTask = getDocument({
     data: arrayBuffer,
     cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.5.207/cmaps/',
     cMapPacked: true,
   });
-  
+
   const pdf = await loadingTask.promise;
   let allItems: TextItem[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
-    
+
     const pageItems: TextItem[] = textContent.items
-      .filter((item: any) => typeof item.str === 'string' && item.str.trim())
-      .map((item: any) => ({
+      .filter((item): item is PDFTextItem => 'str' in item && typeof item.str === 'string' && item.str.trim() !== '')
+      .map((item) => ({
         str: item.str,
         x: item.transform[4],
         y: item.transform[5],
         w: item.width,
         page: i
       }));
-    
+
     allItems = [...allItems, ...pageItems];
   }
   return allItems;
