@@ -75,8 +75,8 @@ router.post('/templates', async (req, res) => {
       for (let i = 0; i < dimensions.length; i++) {
         const dim = dimensions[i];
         const [dimResult] = await connection.query(
-          'INSERT INTO scoring_dimensions (template_id, name, max_score, sort_order, is_optional) VALUES (?, ?, ?, ?, ?)',
-          [templateId, dim.name, dim.max_score, i, dim.is_optional ? 1 : 0]
+          'INSERT INTO scoring_dimensions (template_id, name, max_score, sort_order, is_optional, description) VALUES (?, ?, ?, ?, ?, ?)',
+          [templateId, dim.name, dim.max_score, i, dim.is_optional ? 1 : 0, dim.description || '']
         );
         const dimensionId = (dimResult as any).insertId;
 

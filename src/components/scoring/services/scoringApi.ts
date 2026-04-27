@@ -44,6 +44,7 @@ export const templateApi = {
       name: string;
       max_score: number;
       is_optional?: boolean;
+      description?: string;
       subdimensions?: { name: string; max_score: number; description?: string }[];
     }[];
   }) =>
@@ -63,6 +64,7 @@ export const templateApi = {
         name: string;
         max_score: number;
         is_optional?: boolean;
+        description?: string;
         subdimensions?: { name: string; max_score: number; description?: string }[];
       }[];
     }
