@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, X, FileSpreadsheet, CheckCircle, AlertCircle, ArrowRight, Loader } from 'lucide-react';
+import { Upload, X, FileSpreadsheet, AlertCircle, ArrowRight, Loader } from 'lucide-react';
 import { importExportApi } from '../services/scoringApi.ts';
 
 interface ParsedTemplate {
@@ -40,26 +40,20 @@ export default function ImportExcelModal({
   competitions = [],
 }: ImportExcelModalProps) {
   const [step, setStep] = useState<Step>('choose');
-  const [templateFile, setTemplateFile] = useState<File | null>(null);
-  const [contestantsFile, setContestantsFile] = useState<File | null>(null);
   const [selectedCompetitionId, setSelectedCompetitionId] = useState<number>(competitionId || 0);
   const [parsedTemplate, setParsedTemplate] = useState<ParsedTemplate | null>(null);
   const [parsedContestants, setParsedContestants] = useState<ParsedContestant[]>([]);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const templateInputRef = useRef<HTMLInputElement>(null);
   const contestantsInputRef = useRef<HTMLInputElement>(null);
 
   function reset() {
     setStep('choose');
-    setTemplateFile(null);
-    setContestantsFile(null);
     setSelectedCompetitionId(competitionId || 0);
     setParsedTemplate(null);
     setParsedContestants([]);
     setError('');
-    setLoading(false);
   }
 
   function handleClose() {
@@ -68,8 +62,6 @@ export default function ImportExcelModal({
   }
 
   async function handleParseTemplate(file: File) {
-    setTemplateFile(file);
-    setLoading(true);
     setError('');
     setStep('loading');
     try {
@@ -84,14 +76,10 @@ export default function ImportExcelModal({
     } catch (e) {
       setError((e as Error).message);
       setStep('choose');
-    } finally {
-      setLoading(false);
     }
   }
 
   async function handleParseContestants(file: File) {
-    setContestantsFile(file);
-    setLoading(true);
     setError('');
     setStep('loading');
     try {
@@ -104,8 +92,6 @@ export default function ImportExcelModal({
       }
     } catch (e) {
       setError((e as Error).message);
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -305,7 +291,7 @@ export default function ImportExcelModal({
               {step === 'template-preview' && (
                 <>
                   <button
-                    onClick={() => { setStep('choose'); setTemplateFile(null); setParsedTemplate(null); }}
+                    onClick={() => { setStep('choose'); setParsedTemplate(null); }}
                     className="px-5 py-2.5 bg-surface-container-low text-on-surface-variant font-medium rounded-xl hover:bg-surface-container transition-all"
                   >
                     返回
@@ -323,7 +309,7 @@ export default function ImportExcelModal({
               {step === 'contestants-preview' && (
                 <>
                   <button
-                    onClick={() => { setStep('choose'); setContestantsFile(null); setParsedContestants([]); }}
+                    onClick={() => { setStep('choose'); setParsedContestants([]); }}
                     className="px-5 py-2.5 bg-surface-container-low text-on-surface-variant font-medium rounded-xl hover:bg-surface-container transition-all"
                   >
                     返回

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, X, FileSpreadsheet, AlertCircle, ArrowRight, Loader, CheckCircle } from 'lucide-react';
+import { Download, X, FileSpreadsheet, AlertCircle, Loader, CheckCircle } from 'lucide-react';
 import { importExportApi } from '../services/scoringApi.ts';
 import type { Competition } from '../types/scoring.ts';
 

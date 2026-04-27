@@ -22,7 +22,6 @@ export default function CompetitionList({ onSelect, onBack }: Props) {
   // Dialogs
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [deleteName, setDeleteName] = useState('');
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const [messageDialog, setMessageDialog] = useState<{ open: boolean; type: 'success' | 'error' | 'info'; title: string; message?: string }>({ open: false, type: 'info', title: '' });
 
   useEffect(() => {
@@ -72,15 +71,12 @@ export default function CompetitionList({ onSelect, onBack }: Props) {
 
   async function confirmDelete() {
     if (deleteTarget === null) return;
-    setDeleteLoading(true);
     try {
       await competitionApi.delete(deleteTarget);
       setCompetitions((prev) => prev.filter((c) => c.id !== deleteTarget));
       setDeleteTarget(null);
     } catch (e: unknown) {
       setMessageDialog({ open: true, type: 'error', title: '删除失败', message: (e as Error).message });
-    } finally {
-      setDeleteLoading(false);
     }
   }
 

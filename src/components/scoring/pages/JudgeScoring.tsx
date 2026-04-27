@@ -192,16 +192,6 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
     return { scored, total, percentage: total > 0 ? (scored / total) * 100 : 0 };
   }
 
-  // 检查当前选手是否所有维度都已评分
-  function isCurrentContestantFullyScored() {
-    for (const dim of dimensions) {
-      for (const sub of dim.subdimensions) {
-        if (currentScores[sub.id] === undefined) return false;
-      }
-    }
-    return true;
-  }
-
   // 提交当前选手评分
   function handleSubmit() {
     if (!activeContestant) return;
