@@ -29,7 +29,8 @@ export interface ScoringTemplate {
   total_score: number;
   category: string;
   is_active: number;
-  dimensions: ScoringDimension[];
+  dimensions?: ScoringDimension[];
+  dimension_count?: number;
   created_at: string;
   updated_at: string;
 }

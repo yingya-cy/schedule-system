@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { templateApi } from '../services/scoringApi.ts';
 import type { ScoringTemplate, EditorDimension, EditorSubdimension } from '../types/scoring.ts';
@@ -6,7 +6,7 @@ import MessageDialog from '../../MessageDialog.tsx';
 import ConfirmDialog from '../../ConfirmDialog.tsx';
 import ImportExcelModal from './ImportExcelModal.tsx';
 import { motion } from 'motion/react';
-import { BookTemplate, Plus, Pencil, Trash2, ArrowLeft, Save, X as XIcon, GripVertical, Upload } from 'lucide-react';
+import { BookTemplate, Plus, Pencil, Trash2, ArrowLeft, Upload, GripVertical } from 'lucide-react';
 
 interface Props {
   onBack: () => void;
@@ -15,9 +15,13 @@ interface Props {
 export default function TemplateList({ onBack }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [templates, setTemplates] = useState<ScoringTemplate[]>([]);
-  const [showEditor, setShowEditor] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<ScoringTemplate | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // 编辑状态：编辑中的模板 ID，null 表示不在编辑状态
+  const [editingId, setEditingId] = useState<number | 'new' | null>(null);
+
+  // 加载现有模板时的 loading 状态
+  const [templateLoading, setTemplateLoading] = useState(false);
 
   // Dialogs
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
@@ -26,64 +30,38 @@ export default function TemplateList({ onBack }: Props) {
   const [messageDialog, setMessageDialog] = useState<{ open: boolean; type: 'success' | 'error' | 'info'; title: string; message?: string }>({ open: false, type: 'info', title: '' });
   const [showImportModal, setShowImportModal] = useState(false);
 
-  // 未保存更改提醒
-  const [unsavedDialog, setUnsavedDialog] = useState<{ open: boolean; onConfirm?: () => void }>({ open: false });
-  const [originalTemplate, setOriginalTemplate] = useState<ScoringTemplate | null>(null);
+  // 正在编辑的模板（从列表中查找或服务器获取）
+  const [editingTemplate, setEditingTemplate] = useState<ScoringTemplate | null>(null);
 
-  // 追踪未保存状态
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-
-  // 从 URL 参数恢复编辑状态
-  useEffect(() => {
-    const editId = searchParams.get('edit');
-    if (editId) {
-      if (editId === 'new') {
-        // 新建模板
-        setEditingTemplate(null);
-        setOriginalTemplate(null);
-        setHasUnsavedChanges(false);
-        setShowEditor(true);
-      } else {
-        // 编辑现有模板
-        const id = parseInt(editId, 10);
-        const existing = templates.find((t) => t.id === id);
-        if (existing) {
-          setEditingTemplate(existing);
-          setOriginalTemplate(existing); // 保存原始状态用于取消时恢复
-          setHasUnsavedChanges(false);
-          setShowEditor(true);
-        } else {
-          // 从服务器加载
-          templateApi.get(id).then((t) => {
-            setEditingTemplate(t);
-            setOriginalTemplate(t);
-            setHasUnsavedChanges(false);
-            setShowEditor(true);
-          }).catch(() => {
-            // 加载失败，清除 URL 参数
-            setSearchParams({});
-          });
-        }
-      }
-    }
-  }, [searchParams, templates]);
-
-  // 页面离开时提醒未保存
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = '有未保存的更改，确定要离开吗？';
-        return e.returnValue;
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
-
+  // 加载模板数据
   useEffect(() => {
     loadTemplates();
   }, []);
+
+  // 当 editingId 变化时，加载对应的模板
+  useEffect(() => {
+    if (editingId === null) {
+      setEditingTemplate(null);
+      setTemplateLoading(false);
+      return;
+    }
+    if (editingId === 'new') {
+      // 不覆盖 editingTemplate，让 handleImportTemplate 设置的数据保持
+      setTemplateLoading(false);
+      return;
+    }
+    // 编辑现有模板 - 总是从服务器加载以获取完整数据（包括维度）
+    setTemplateLoading(true);
+    const id = Number(editingId);
+    templateApi.get(id).then((t) => {
+      setEditingTemplate(t);
+      setTemplateLoading(false);
+    }).catch(() => {
+      setEditingId(null);
+      setSearchParams({});
+      setTemplateLoading(false);
+    });
+  }, [editingId]);
 
   async function loadTemplates() {
     try {
@@ -116,24 +94,47 @@ export default function TemplateList({ onBack }: Props) {
     }
   }
 
-  function handleEdit(template: ScoringTemplate) {
-    setEditingTemplate(template);
-    setOriginalTemplate(template); // 保存原始状态
-    setHasUnsavedChanges(false);
-    setShowEditor(true);
-    setSearchParams({ edit: String(template.id) });
-  }
+  // 打开编辑器的统一方法
+  const openEditor = useCallback((id: number | 'new') => {
+    setEditingId(id);
+    if (id === 'new') {
+      setSearchParams({ edit: 'new' });
+    } else {
+      setSearchParams({ edit: String(id) });
+    }
+  }, [setSearchParams]);
 
-  function handleCreateNew() {
+  // 关闭编辑器
+  const closeEditor = useCallback(() => {
+    setEditingId(null);
     setEditingTemplate(null);
-    setOriginalTemplate(null);
-    setHasUnsavedChanges(false);
-    setShowEditor(true);
-    setSearchParams({ edit: 'new' });
-  }
+    setSearchParams({});
+  }, [setSearchParams]);
 
+  // 保存成功后的回调
+  const handleSaved = useCallback((template: ScoringTemplate) => {
+    // 添加 dimension_count 用于列表显示
+    const templateWithCount = {
+      ...template,
+      dimension_count: template.dimensions?.length || 0
+    };
+    // 更新列表
+    setTemplates((prev) => {
+      const existingIndex = prev.findIndex((t) => t.id === template.id);
+      if (existingIndex >= 0) {
+        return prev.map((t) => (t.id === template.id ? templateWithCount : t));
+      }
+      return [templateWithCount, ...prev];
+    });
+    // 保存成功，直接关闭编辑器
+    setEditingId(null);
+    setEditingTemplate(null);
+    setSearchParams({});
+  }, [setSearchParams]);
+
+  // 导入模板
   function handleImportTemplate(parsed: { name: string; total_score: number; dimensions: Array<{ name: string; max_score: number; description?: string; subdimensions: Array<{ name: string; max_score: number; description: string }> }> }) {
-    // 将解析结果转换为 ScoringTemplate 格式并打开编辑器
+    // 将解析结果转换为模板格式
     const newTemplate: ScoringTemplate = {
       id: 0,
       name: parsed.name,
@@ -160,30 +161,30 @@ export default function TemplateList({ onBack }: Props) {
           description: s.description,
         })),
       })),
+      dimension_count: parsed.dimensions.length,
     };
     setEditingTemplate(newTemplate);
-    setOriginalTemplate(null); // 导入的是新模板，没有原始状态
-    setHasUnsavedChanges(false); // 导入后暂不标记为未保存，等用户编辑后再标记
-    setShowEditor(true);
+    setEditingId('new');
     setSearchParams({ edit: 'new' });
   }
 
-  function handleSaved(template: ScoringTemplate) {
-    // 检查模板是否已存在于列表中
-    const existingIndex = templates.findIndex((t) => t.id === template.id);
-    if (existingIndex >= 0) {
-      // 更新现有模板
-      setTemplates((prev) => prev.map((t) => (t.id === template.id ? template : t)));
-    } else {
-      // 添加新模板
-      setTemplates((prev) => [template, ...prev]);
+  // 处理从 URL 恢复编辑状态
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId === null) {
+      setEditingId(null);
+    } else if (editingId === null) {
+      // 只有在没有在编辑状态时才设置
+      if (editId === 'new') {
+        setEditingId('new');
+      } else {
+        const id = parseInt(editId, 10);
+        if (!isNaN(id)) {
+          setEditingId(id);
+        }
+      }
     }
-    setShowEditor(false);
-    setEditingTemplate(null);
-    setOriginalTemplate(null);
-    setHasUnsavedChanges(false);
-    setSearchParams({});
-  }
+  }, [searchParams]);
 
   if (loading) {
     return (
@@ -193,40 +194,24 @@ export default function TemplateList({ onBack }: Props) {
     );
   }
 
-  // 处理从编辑器返回
-  function handleBackFromEditor() {
-    // 判断是新建模板(id=0)还是编辑现有模板(id>0)
-    const isNewTemplate = !editingTemplate?.id || editingTemplate.id === 0;
-
-    if (hasUnsavedChanges) {
-      // 有未保存更改，弹出确认框
-      setUnsavedDialog({
-        open: true,
-        onConfirm: () => {
-          // 用户确认放弃更改
-          setHasUnsavedChanges(false);
-          setShowEditor(false);
-          setEditingTemplate(null);
-          setOriginalTemplate(null);
-          setSearchParams({});
-        },
-      });
-    } else {
-      setShowEditor(false);
-      setEditingTemplate(null);
-      setOriginalTemplate(null);
-      setSearchParams({});
-    }
+  // 加载现有模板时显示 loading
+  if (editingId !== null && editingId !== 'new' && templateLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-outline">加载模板中...</div>
+      </div>
+    );
   }
 
-  if (showEditor) {
+  // 渲染编辑器
+  if (editingId !== null) {
     return (
       <TemplateEditor
+        key={editingId === 'new' ? 'new' : `edit-${editingId}`}
         template={editingTemplate}
-        onBack={handleBackFromEditor}
+        onClose={closeEditor}
         onSaved={handleSaved}
         onError={(msg) => setMessageDialog({ open: true, type: 'error', title: '操作失败', message: msg })}
-        onChanges={() => setHasUnsavedChanges(true)}
       />
     );
   }
@@ -263,7 +248,7 @@ export default function TemplateList({ onBack }: Props) {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={handleCreateNew}
+            onClick={() => openEditor('new')}
             className="px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-on-primary font-semibold rounded-xl shadow-lg shadow-primary/25 flex items-center gap-2 focus-ring touch-target"
           >
             <Plus size={18} />
@@ -289,13 +274,13 @@ export default function TemplateList({ onBack }: Props) {
               <p className="text-sm text-outline mb-3 line-clamp-2">{t.description}</p>
             )}
             <div className="text-xs text-outline mb-4">
-              {t.category || 'general'} · {t.dimensions?.length || 0} 个维度
+              {t.category || 'general'} · {t.dimension_count || 0} 个维度
             </div>
             <div className="flex gap-2">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => handleEdit(t)}
+                onClick={() => openEditor(t.id)}
                 className="px-4 py-2 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20 transition-colors flex items-center gap-1.5 focus-ring"
               >
                 <Pencil size={14} />
@@ -332,21 +317,6 @@ export default function TemplateList({ onBack }: Props) {
         onCancel={() => setDeleteTarget(null)}
       />
 
-      {/* 未保存更改确认 */}
-      <ConfirmDialog
-        isOpen={unsavedDialog.open}
-        title="有未保存的更改"
-        message="确定要离开吗？您的更改将不会被保存。"
-        confirmText="离开"
-        cancelText="继续编辑"
-        type="warning"
-        onConfirm={() => {
-          unsavedDialog.onConfirm?.();
-          setUnsavedDialog({ open: false });
-        }}
-        onCancel={() => setUnsavedDialog({ open: false })}
-      />
-
       {/* Message Dialog */}
       <MessageDialog
         isOpen={messageDialog.open}
@@ -372,13 +342,12 @@ export default function TemplateList({ onBack }: Props) {
 
 interface TemplateEditorProps {
   template: ScoringTemplate | null;
-  onBack: () => void;
+  onClose: () => void;
   onSaved: (template: ScoringTemplate) => void;
   onError: (message: string) => void;
-  onChanges?: () => void; // 通知父组件有未保存的更改
 }
 
-function TemplateEditor({ template, onBack, onSaved, onError, onChanges }: TemplateEditorProps) {
+function TemplateEditor({ template, onClose, onSaved, onError }: TemplateEditorProps) {
   const [name, setName] = useState(template?.name || '');
   const [description, setDescription] = useState(template?.description || '');
   const [category, setCategory] = useState(template?.category || 'general');
@@ -402,11 +371,6 @@ function TemplateEditor({ template, onBack, onSaved, onError, onChanges }: Templ
     }))
   );
   const [saving, setSaving] = useState(false);
-
-  // 监听更改，通知父组件有未保存的更改
-  useEffect(() => {
-    onChanges?.();
-  }, [name, description, dimensions]);
 
   // Auto-calculate total from dimensions
   const calculatedTotalScore = dimensions.reduce((sum, d) => sum + (d.max_score || 0), 0);
@@ -458,18 +422,25 @@ function TemplateEditor({ template, onBack, onSaved, onError, onChanges }: Templ
   }
 
   async function handleSave() {
-    if (!name.trim() || dimensions.length === 0) {
-      onError('请填写模板名称并至少添加一个维度');
+    if (!name.trim()) {
+      onError('请填写模板名称');
+      return;
+    }
+    // 检查是否至少有一个有效维度（有空名称的维度视为无效）
+    const validDimensions = dimensions.filter(d => d.name.trim());
+    if (validDimensions.length === 0) {
+      onError('请至少添加一个有效的维度（维度名称不能为空）');
       return;
     }
     setSaving(true);
     try {
+      // 只发送有效维度（名称不为空）
       const data = {
         name: name.trim(),
         description: description.trim(),
         total_score: Number(calculatedTotalScore) || 0,
         category,
-        dimensions: dimensions.map((d) => ({
+        dimensions: validDimensions.map((d) => ({
           name: d.name,
           max_score: Number(d.max_score) || 0,
           is_optional: d.is_optional,
@@ -482,7 +453,6 @@ function TemplateEditor({ template, onBack, onSaved, onError, onChanges }: Templ
         })),
       };
 
-      // 判断是新建还是更新：editingTemplate?.id 为 0 或 undefined 表示新建
       const isNewTemplate = !template?.id;
 
       if (isNewTemplate) {
@@ -506,13 +476,13 @@ function TemplateEditor({ template, onBack, onSaved, onError, onChanges }: Templ
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={onBack}
+          onClick={() => onClose()}
           className="p-2 rounded-xl hover:bg-surface-container-low transition-colors focus-ring"
         >
           <ArrowLeft size={20} className="text-on-surface-variant" />
         </button>
         <h1 className="text-2xl font-bold text-on-surface tracking-tight font-headline">
-          {template ? '编辑模板' : '新建模板'}
+          {template?.id ? '编辑模板' : '新建模板'}
         </h1>
       </div>
 
@@ -686,9 +656,9 @@ function TemplateEditor({ template, onBack, onSaved, onError, onChanges }: Templ
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => removeSubdimension(dimIndex, subIndex)}
-                    className="p-1.5 text-error hover:bg-error/10 rounded-lg transition-colors shrink-0 focus-ring"
+                    className="p-1.5 text-error hover:bg-error/10 rounded-lg transition-colors focus-ring"
                   >
-                    <XIcon size={14} />
+                    <Trash2 size={14} />
                   </motion.button>
                 </div>
               ))}
@@ -714,19 +684,21 @@ function TemplateEditor({ template, onBack, onSaved, onError, onChanges }: Templ
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
+          onClick={() => onClose()}
+          disabled={saving}
+          className="px-6 py-3 bg-surface-container-low text-on-surface-variant font-medium rounded-xl hover:bg-surface-container transition-all disabled:opacity-50 flex items-center gap-2 focus-ring"
+        >
+          取消
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={handleSave}
           disabled={saving}
           className="px-6 py-3 bg-gradient-to-r from-primary to-primary/80 text-on-primary font-semibold rounded-xl shadow-lg shadow-primary/25 disabled:opacity-50 flex items-center gap-2 focus-ring"
         >
-          <Save size={18} />
           {saving ? '保存中...' : '保存模板'}
         </motion.button>
-        <button
-          onClick={onBack}
-          className="px-6 py-3 bg-surface border border-surface-container-high text-on-surface rounded-xl hover:bg-surface-container-low transition-colors focus-ring"
-        >
-          取消
-        </button>
       </div>
     </div>
   );

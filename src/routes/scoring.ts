@@ -1,9 +1,28 @@
-import { Router } from 'express';
+import { Router, Request } from 'express';
 import pool from '../config/database.ts';
 import multer from 'multer';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Multer adds file property to request
+interface MulterRequest extends Request {
+  file?: {
+    buffer: Buffer;
+    mimetype: string;
+    originalname: string;
+    size: number;
+  };
+  files?: Record<string, MulterFile[]>;
+}
+
+interface MulterFile {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+  size: number;
+  fieldname: string;
+}
 
 // =============================================
 // 模板管理 API
@@ -12,9 +31,13 @@ const upload = multer({ storage: multer.memoryStorage() });
 // 获取所有模板
 router.get('/templates', async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM scoring_templates WHERE is_active = 1 ORDER BY created_at DESC'
-    );
+    const [rows] = await pool.query(`
+      SELECT t.*,
+        (SELECT COUNT(*) FROM scoring_dimensions d WHERE d.template_id = t.id) as dimension_count
+      FROM scoring_templates t
+      WHERE t.is_active = 1
+      ORDER BY t.created_at DESC
+    `);
     res.json({ success: true, data: rows });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -905,7 +928,7 @@ router.get('/competitions/:id/live-results', async (req, res) => {
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:5002';
 
 // 解析评分模板
-router.post('/parse-template', upload.single('file'), async (req, res) => {
+router.post('/parse-template', upload.single('file'), async (req: MulterRequest, res) => {
   try {
     // 重新构建 FormData，因为 req.body 已被解析成对象，req.file 包含文件buffer
     const formData = new FormData();
@@ -935,7 +958,7 @@ router.post('/parse-template', upload.single('file'), async (req, res) => {
 });
 
 // 解析选手名单
-router.post('/parse-contestants', upload.single('file'), async (req, res) => {
+router.post('/parse-contestants', upload.single('file'), async (req: MulterRequest, res) => {
   try {
     // 重新构建 FormData
     const formData = new FormData();
@@ -965,7 +988,7 @@ router.post('/parse-contestants', upload.single('file'), async (req, res) => {
 });
 
 // 导出评分结果
-router.post('/export-results', upload.fields([{ name: 'template_file' }, { name: 'result_data' }]), async (req, res) => {
+router.post('/export-results', upload.fields([{ name: 'template_file' }, { name: 'result_data' }]), async (req: MulterRequest, res) => {
   try {
     const response = await fetch(`${AI_SERVICE_URL}/api/export/scoring-results`, {
       method: 'POST',
