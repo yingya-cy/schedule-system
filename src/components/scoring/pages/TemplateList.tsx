@@ -26,6 +26,13 @@ export default function TemplateList({ onBack }: Props) {
   const [messageDialog, setMessageDialog] = useState<{ open: boolean; type: 'success' | 'error' | 'info'; title: string; message?: string }>({ open: false, type: 'info', title: '' });
   const [showImportModal, setShowImportModal] = useState(false);
 
+  // 未保存更改提醒
+  const [unsavedDialog, setUnsavedDialog] = useState<{ open: boolean; onConfirm?: () => void }>({ open: false });
+  const [originalTemplate, setOriginalTemplate] = useState<ScoringTemplate | null>(null);
+
+  // 追踪未保存状态
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   // 从 URL 参数恢复编辑状态
   useEffect(() => {
     const editId = searchParams.get('edit');
@@ -33,6 +40,8 @@ export default function TemplateList({ onBack }: Props) {
       if (editId === 'new') {
         // 新建模板
         setEditingTemplate(null);
+        setOriginalTemplate(null);
+        setHasUnsavedChanges(false);
         setShowEditor(true);
       } else {
         // 编辑现有模板
@@ -40,11 +49,15 @@ export default function TemplateList({ onBack }: Props) {
         const existing = templates.find((t) => t.id === id);
         if (existing) {
           setEditingTemplate(existing);
+          setOriginalTemplate(existing); // 保存原始状态用于取消时恢复
+          setHasUnsavedChanges(false);
           setShowEditor(true);
         } else {
           // 从服务器加载
           templateApi.get(id).then((t) => {
             setEditingTemplate(t);
+            setOriginalTemplate(t);
+            setHasUnsavedChanges(false);
             setShowEditor(true);
           }).catch(() => {
             // 加载失败，清除 URL 参数
@@ -54,6 +67,19 @@ export default function TemplateList({ onBack }: Props) {
       }
     }
   }, [searchParams, templates]);
+
+  // 页面离开时提醒未保存
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '有未保存的更改，确定要离开吗？';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   useEffect(() => {
     loadTemplates();
@@ -92,12 +118,16 @@ export default function TemplateList({ onBack }: Props) {
 
   function handleEdit(template: ScoringTemplate) {
     setEditingTemplate(template);
+    setOriginalTemplate(template); // 保存原始状态
+    setHasUnsavedChanges(false);
     setShowEditor(true);
     setSearchParams({ edit: String(template.id) });
   }
 
   function handleCreateNew() {
     setEditingTemplate(null);
+    setOriginalTemplate(null);
+    setHasUnsavedChanges(false);
     setShowEditor(true);
     setSearchParams({ edit: 'new' });
   }
@@ -132,6 +162,8 @@ export default function TemplateList({ onBack }: Props) {
       })),
     };
     setEditingTemplate(newTemplate);
+    setOriginalTemplate(null); // 导入的是新模板，没有原始状态
+    setHasUnsavedChanges(true);
     setShowEditor(true);
     setSearchParams({ edit: 'new' });
   }
@@ -148,6 +180,8 @@ export default function TemplateList({ onBack }: Props) {
     }
     setShowEditor(false);
     setEditingTemplate(null);
+    setOriginalTemplate(null);
+    setHasUnsavedChanges(false);
     setSearchParams({});
   }
 
@@ -159,16 +193,34 @@ export default function TemplateList({ onBack }: Props) {
     );
   }
 
+  // 处理从编辑器返回
+  function handleBackFromEditor() {
+    if (hasUnsavedChanges) {
+      // 有未保存更改，弹出确认框
+      setUnsavedDialog({
+        open: true,
+        onConfirm: () => {
+          // 用户确认放弃更改，恢复到原始状态
+          setEditingTemplate(originalTemplate);
+          setHasUnsavedChanges(false);
+          setShowEditor(false);
+          setSearchParams({});
+        },
+      });
+    } else {
+      setShowEditor(false);
+      setSearchParams({});
+    }
+  }
+
   if (showEditor) {
     return (
       <TemplateEditor
         template={editingTemplate}
-        onBack={() => {
-          setShowEditor(false);
-          setSearchParams({});
-        }}
+        onBack={handleBackFromEditor}
         onSaved={handleSaved}
         onError={(msg) => setMessageDialog({ open: true, type: 'error', title: '操作失败', message: msg })}
+        onChanges={() => setHasUnsavedChanges(true)}
       />
     );
   }
@@ -274,6 +326,21 @@ export default function TemplateList({ onBack }: Props) {
         onCancel={() => setDeleteTarget(null)}
       />
 
+      {/* 未保存更改确认 */}
+      <ConfirmDialog
+        isOpen={unsavedDialog.open}
+        title="有未保存的更改"
+        message="确定要离开吗？您的更改将不会被保存。"
+        confirmText="离开"
+        cancelText="继续编辑"
+        type="warning"
+        onConfirm={() => {
+          unsavedDialog.onConfirm?.();
+          setUnsavedDialog({ open: false });
+        }}
+        onCancel={() => setUnsavedDialog({ open: false })}
+      />
+
       {/* Message Dialog */}
       <MessageDialog
         isOpen={messageDialog.open}
@@ -302,9 +369,10 @@ interface TemplateEditorProps {
   onBack: () => void;
   onSaved: (template: ScoringTemplate) => void;
   onError: (message: string) => void;
+  onChanges?: () => void; // 通知父组件有未保存的更改
 }
 
-function TemplateEditor({ template, onBack, onSaved, onError }: TemplateEditorProps) {
+function TemplateEditor({ template, onBack, onSaved, onError, onChanges }: TemplateEditorProps) {
   const [name, setName] = useState(template?.name || '');
   const [description, setDescription] = useState(template?.description || '');
   const [category, setCategory] = useState(template?.category || 'general');
@@ -328,6 +396,11 @@ function TemplateEditor({ template, onBack, onSaved, onError }: TemplateEditorPr
     }))
   );
   const [saving, setSaving] = useState(false);
+
+  // 监听更改，通知父组件有未保存的更改
+  useEffect(() => {
+    onChanges?.();
+  }, [name, description, dimensions]);
 
   // Auto-calculate total from dimensions
   const calculatedTotalScore = dimensions.reduce((sum, d) => sum + (d.max_score || 0), 0);
