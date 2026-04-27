@@ -3,8 +3,9 @@ import { templateApi } from '../services/scoringApi.ts';
 import type { ScoringTemplate, EditorDimension, EditorSubdimension } from '../types/scoring.ts';
 import MessageDialog from '../../MessageDialog.tsx';
 import ConfirmDialog from '../../ConfirmDialog.tsx';
+import ImportExcelModal from './ImportExcelModal.tsx';
 import { motion } from 'motion/react';
-import { BookTemplate, Plus, Pencil, Trash2, ArrowLeft, Save, X as XIcon, GripVertical } from 'lucide-react';
+import { BookTemplate, Plus, Pencil, Trash2, ArrowLeft, Save, X as XIcon, GripVertical, Upload } from 'lucide-react';
 
 interface Props {
   onBack: () => void;
@@ -21,6 +22,7 @@ export default function TemplateList({ onBack }: Props) {
   const [deleteName, setDeleteName] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [messageDialog, setMessageDialog] = useState<{ open: boolean; type: 'success' | 'error' | 'info'; title: string; message?: string }>({ open: false, type: 'info', title: '' });
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     loadTemplates();
@@ -64,6 +66,39 @@ export default function TemplateList({ onBack }: Props) {
 
   function handleCreateNew() {
     setEditingTemplate(null);
+    setShowEditor(true);
+  }
+
+  function handleImportTemplate(parsed: { name: string; total_score: number; dimensions: Array<{ name: string; max_score: number; description?: string; subdimensions: Array<{ name: string; max_score: number; description: string }> }> }) {
+    // 将解析结果转换为 ScoringTemplate 格式并打开编辑器
+    const newTemplate: ScoringTemplate = {
+      id: 0,
+      name: parsed.name,
+      total_score: parsed.total_score,
+      description: '',
+      category: 'general',
+      is_active: 1,
+      created_at: '',
+      updated_at: '',
+      dimensions: parsed.dimensions.map((d, di) => ({
+        id: 0,
+        template_id: 0,
+        name: d.name,
+        max_score: d.max_score,
+        sort_order: di,
+        description: d.description || '',
+        is_optional: 0,
+        subdimensions: d.subdimensions.map((s, si) => ({
+          id: 0,
+          dimension_id: 0,
+          name: s.name,
+          max_score: s.max_score,
+          sort_order: si,
+          description: s.description,
+        })),
+      })),
+    };
+    setEditingTemplate(newTemplate);
     setShowEditor(true);
   }
 
@@ -115,15 +150,26 @@ export default function TemplateList({ onBack }: Props) {
             <p className="text-sm text-outline hidden sm:block">创建和管理评分维度</p>
           </div>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={handleCreateNew}
-          className="self-end sm:self-auto px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-on-primary font-semibold rounded-xl shadow-lg shadow-primary/25 flex items-center gap-2 focus-ring touch-target"
-        >
-          <Plus size={18} />
-          <span className="whitespace-nowrap">新建模板</span>
-        </motion.button>
+        <div className="flex gap-2 self-end sm:self-auto">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowImportModal(true)}
+            className="px-5 py-2.5 bg-surface-container-high text-on-surface font-medium rounded-xl hover:bg-surface-container-high/80 transition-colors flex items-center gap-2 focus-ring touch-target border border-surface-container-high"
+          >
+            <Upload size={18} />
+            <span className="whitespace-nowrap">导入 Excel</span>
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleCreateNew}
+            className="px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-on-primary font-semibold rounded-xl shadow-lg shadow-primary/25 flex items-center gap-2 focus-ring touch-target"
+          >
+            <Plus size={18} />
+            <span className="whitespace-nowrap">新建模板</span>
+          </motion.button>
+        </div>
       </div>
 
       {/* Grid */}
@@ -193,6 +239,13 @@ export default function TemplateList({ onBack }: Props) {
         title={messageDialog.title}
         message={messageDialog.message}
         onClose={() => setMessageDialog((p) => ({ ...p, open: false }))}
+      />
+
+      {/* Import Excel Modal */}
+      <ImportExcelModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportTemplate={handleImportTemplate}
       />
     </div>
   );

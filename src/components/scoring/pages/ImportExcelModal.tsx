@@ -9,6 +9,7 @@ interface ParsedTemplate {
   dimensions: Array<{
     name: string;
     max_score: number;
+    description?: string;
     subdimensions: Array<{ name: string; max_score: number; description: string }>;
   }>;
 }
@@ -224,16 +225,24 @@ export default function ImportExcelModal({
                   <div className="space-y-3 max-h-60 overflow-y-auto">
                     {parsedTemplate.dimensions.map((dim, i) => (
                       <div key={i} className="p-3 bg-surface-container-lowest border border-surface-container-high rounded-xl">
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-1">
                           <span className="font-medium">{dim.name}</span>
                           <span className="text-sm text-primary font-medium">{dim.max_score}分</span>
                         </div>
+                        {dim.description && (
+                          <p className="text-xs text-on-surface-variant mb-2 line-clamp-2">{dim.description}</p>
+                        )}
                         {dim.subdimensions.length > 0 && (
-                          <div className="space-y-1 pl-3 border-l-2 border-primary/20">
+                          <div className="space-y-2 pl-3 border-l-2 border-primary/20">
                             {dim.subdimensions.map((sub, j) => (
-                              <div key={j} className="flex items-center justify-between text-sm">
-                                <span className="text-on-surface-variant">{sub.name}</span>
-                                <span className="text-outline">{sub.max_score}分</span>
+                              <div key={j} className="text-sm">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-on-surface-variant font-medium">{sub.name}</span>
+                                  <span className="text-primary text-xs">{sub.max_score}分</span>
+                                </div>
+                                {sub.description && (
+                                  <p className="text-xs text-outline mt-0.5 line-clamp-2">{sub.description}</p>
+                                )}
                               </div>
                             ))}
                           </div>
