@@ -25,11 +25,11 @@ export default function CourseListSidebar({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ opacity: 0, x: 450 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 450 }}
+          initial={{ opacity: 0, y: '100%' }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="absolute right-0 top-0 w-[450px] h-full max-h-[calc(100vh-320px)] bg-surface-container-lowest border-l border-surface-container-high shadow-2xl z-30"
+          className="fixed lg:absolute right-0 bottom-0 w-full lg:w-[450px] h-full lg:h-full max-h-[70vh] lg:max-h-[calc(100vh-320px)] bg-surface-container-lowest lg:border-l border-t lg:border-t-0 border-surface-container-high shadow-2xl z-30 rounded-t-2xl lg:rounded-none"
         >
           <div className="h-full flex flex-col">
             <div className="p-4 border-b border-surface-container-high flex items-center justify-between flex-shrink-0">

@@ -132,7 +132,10 @@ export class FileStorageService {
     switch (fileMetadata.storageType) {
       case 'database':
         if (fileMetadata.fileData) {
-          return fileMetadata.fileData;
+          // fileData from MySQL LONGBLOB is a Buffer containing base64 string bytes
+          // Convert to string first, then decode base64 to get actual PDF binary
+          const base64String = fileMetadata.fileData.toString('utf8');
+          return Buffer.from(base64String, 'base64');
         }
         throw new Error('File data not found in database');
 

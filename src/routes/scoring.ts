@@ -907,9 +907,25 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:5002';
 // 解析评分模板
 router.post('/parse-template', upload.single('file'), async (req, res) => {
   try {
+    // 重新构建 FormData，因为 req.body 已被解析成对象，req.file 包含文件buffer
+    const formData = new FormData();
+
+    // 添加其他字段
+    if (req.body) {
+      for (const key in req.body) {
+        formData.append(key, req.body[key]);
+      }
+    }
+
+    // 添加文件 - 需要将 Buffer 转换为 Blob
+    if (req.file) {
+      const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+      formData.append('file', blob, req.file.originalname);
+    }
+
     const response = await fetch(`${AI_SERVICE_URL}/api/parse/scoring-template`, {
       method: 'POST',
-      body: req.body,
+      body: formData,
     });
     const data = await response.json();
     res.json(data);
@@ -921,9 +937,25 @@ router.post('/parse-template', upload.single('file'), async (req, res) => {
 // 解析选手名单
 router.post('/parse-contestants', upload.single('file'), async (req, res) => {
   try {
+    // 重新构建 FormData
+    const formData = new FormData();
+
+    // 添加其他字段
+    if (req.body) {
+      for (const key in req.body) {
+        formData.append(key, req.body[key]);
+      }
+    }
+
+    // 添加文件 - 需要将 Buffer 转换为 Blob
+    if (req.file) {
+      const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+      formData.append('file', blob, req.file.originalname);
+    }
+
     const response = await fetch(`${AI_SERVICE_URL}/api/parse/contestants`, {
       method: 'POST',
-      body: req.body,
+      body: formData,
     });
     const data = await response.json();
     res.json(data);

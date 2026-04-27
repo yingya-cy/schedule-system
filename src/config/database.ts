@@ -26,10 +26,10 @@ const dbConfig = {
 // 创建连接池
 const pool = mysql.createPool(dbConfig);
 
-// ✅ 终极强制方案：每次获取连接都强制设置 utf8mb4
+// ✅ 每次获取连接时强制设置 utf8mb4
 pool.on('connection', (connection) => {
-  connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
-  console.log('🔗 新连接已强制设置为 utf8mb4');
+  // connection.promise() returns a promisified connection wrapper (mysql2)
+  (connection as any).promise().query('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci').catch(() => {});
 });
 
 /**
@@ -190,7 +190,7 @@ export async function initializeDatabase() {
 
     if (deptCount === 0) {
       await connection.query(`
-        INSERT INTO departments (name, sort_order) VALUES 
+        INSERT INTO departments (name, sort_order) VALUES
         ('主任团', 1),
         ('网编部', 2),
         ('秘书部', 3),
@@ -201,6 +201,170 @@ export async function initializeDatabase() {
       `);
       console.log('✅ Default departments inserted');
     }
+
+    // =============================================
+    // 评分系统表
+    // =============================================
+
+    // 评分模板表
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS scoring_templates (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        description TEXT,
+        total_score DECIMAL(10,2) NOT NULL DEFAULT 100,
+        category VARCHAR(100) DEFAULT 'general',
+        is_active TINYINT(1) DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    // 评分维度表（主维度）
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS scoring_dimensions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        template_id INT NOT NULL,
+        name VARCHAR(200) NOT NULL,
+        max_score DECIMAL(10,2) NOT NULL,
+        sort_order INT DEFAULT 0,
+        is_optional TINYINT(1) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (template_id) REFERENCES scoring_templates(id) ON DELETE CASCADE,
+        INDEX idx_template_sort (template_id, sort_order)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    // 评分子维度表（二级指标）
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS scoring_subdimensions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        dimension_id INT NOT NULL,
+        name VARCHAR(200) NOT NULL,
+        max_score DECIMAL(10,2) NOT NULL,
+        sort_order INT DEFAULT 0,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (dimension_id) REFERENCES scoring_dimensions(id) ON DELETE CASCADE,
+        INDEX idx_dimension_sort (dimension_id, sort_order)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    // 比赛会话表
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS competitions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        template_id INT NOT NULL,
+        name VARCHAR(200) NOT NULL,
+        description TEXT,
+        status ENUM('preparing', 'scoring', 'completed', 'archived') DEFAULT 'preparing',
+        judging_mode ENUM('offline', 'realtime') DEFAULT 'offline',
+        result_published TINYINT(1) DEFAULT 0,
+        start_time DATETIME,
+        end_time DATETIME,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (template_id) REFERENCES scoring_templates(id),
+        INDEX idx_template_status (template_id, status),
+        INDEX idx_status_time (status, start_time)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    // 选手表
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS contestants (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        competition_id INT NOT NULL,
+        number VARCHAR(50),
+        name VARCHAR(200) NOT NULL,
+        group_name VARCHAR(200),
+        description TEXT,
+        extra_data JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (competition_id) REFERENCES competitions(id) ON DELETE CASCADE,
+        INDEX idx_competition_number (competition_id, number),
+        INDEX idx_competition_name (competition_id, name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    // 评委表
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS judges (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        code VARCHAR(50) UNIQUE NOT NULL,
+        competition_id INT NOT NULL,
+        is_active TINYINT(1) DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (competition_id) REFERENCES competitions(id) ON DELETE CASCADE,
+        INDEX idx_competition_active (competition_id, is_active)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    // 评分记录表
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS scores (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        competition_id INT NOT NULL,
+        contestant_id INT NOT NULL,
+        judge_id INT NOT NULL,
+        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        total_score DECIMAL(10,2),
+        is_valid TINYINT(1) DEFAULT 1,
+        ip_address VARCHAR(50),
+        FOREIGN KEY (competition_id) REFERENCES competitions(id),
+        FOREIGN KEY (contestant_id) REFERENCES contestants(id),
+        FOREIGN KEY (judge_id) REFERENCES judges(id),
+        UNIQUE KEY uk_competition_contestant_judge (competition_id, contestant_id, judge_id),
+        INDEX idx_competition_submitted (competition_id, submitted_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    // 评分详情表（二级维度评分）
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS score_details (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        score_id INT NOT NULL,
+        subdimension_id INT NOT NULL,
+        score DECIMAL(10,2) NOT NULL,
+        FOREIGN KEY (score_id) REFERENCES scores(id) ON DELETE CASCADE,
+        FOREIGN KEY (subdimension_id) REFERENCES scoring_subdimensions(id),
+        UNIQUE KEY uk_score_subdimension (score_id, subdimension_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    // 计算结果表（最终排名）
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS competition_results (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        competition_id INT NOT NULL,
+        contestant_id INT NOT NULL,
+        total_score DECIMAL(10,2),
+        \`rank\` INT,
+        avg_scores JSON,
+        score_count INT,
+        calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (competition_id) REFERENCES competitions(id),
+        FOREIGN KEY (contestant_id) REFERENCES contestants(id),
+        UNIQUE KEY uk_competition_contestant (competition_id, contestant_id),
+        INDEX idx_competition_rank (competition_id, \`rank\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    // 操作日志表
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS scoring_audit_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        competition_id INT NOT NULL,
+        action VARCHAR(50) NOT NULL,
+        operator_type ENUM('admin', 'judge') NOT NULL,
+        operator_id VARCHAR(50),
+        details JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_competition_action (competition_id, action),
+        INDEX idx_created_at (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
 
     connection.release();
     console.log('✅ Database initialized successfully');

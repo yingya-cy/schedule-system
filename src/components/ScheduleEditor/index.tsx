@@ -165,16 +165,16 @@ export default function ScheduleEditor({
   };
 
   return (
-    <div className="bg-surface-container-lowest rounded-2xl shadow-lg border border-surface-container-high overflow-hidden">
+    <div className="bg-surface-container-lowest rounded-2xl shadow-lg border border-surface-container-high overflow-hidden p-4 lg:p-6">
       {/* Header */}
-      <div className="p-4 border-b border-surface-container-high flex flex-col gap-4">
-        <div className="flex justify-between items-center">
+      <div className="border-b border-surface-container-high flex flex-col gap-4 pb-4">
+        <div className="flex flex-wrap justify-between items-center gap-3">
           <h3 className="font-bold text-lg text-on-surface font-headline">课表编辑</h3>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
               className={cn(
-                "px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold",
+                "px-4 py-2 rounded-lg transition-all flex items-center gap-2 text-sm font-semibold touch-target",
                 showSidebar
                   ? "bg-primary text-on-primary"
                   : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
@@ -185,7 +185,7 @@ export default function ScheduleEditor({
             </button>
             <button
               onClick={() => setShowAddModal(true)}
-              className="px-4 py-2 bg-primary text-on-primary text-sm font-semibold rounded-lg hover:scale-[0.98] transition-all flex items-center gap-2"
+              className="px-4 py-2 bg-primary text-on-primary text-sm font-semibold rounded-lg hover:scale-[0.98] transition-all flex items-center gap-2 touch-target"
             >
               <Plus size={16} />
               添加课程
@@ -193,7 +193,7 @@ export default function ScheduleEditor({
             {onCancel && (
               <button
                 onClick={onCancel}
-                className="px-4 py-2 bg-surface-container-low text-on-surface-variant text-sm font-semibold rounded-lg hover:bg-surface-container transition-all"
+                className="px-4 py-2 bg-surface-container-low text-on-surface-variant text-sm font-semibold rounded-lg hover:bg-surface-container transition-all touch-target"
               >
                 取消
               </button>
@@ -202,7 +202,7 @@ export default function ScheduleEditor({
               <button
                 onClick={onSave}
                 disabled={isSaving}
-                className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg hover:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg hover:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50 touch-target"
               >
                 {isSaving ? '保存中...' : '保存课表'}
               </button>

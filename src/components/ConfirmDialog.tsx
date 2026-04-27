@@ -63,14 +63,14 @@ export default function ConfirmDialog({
             <div className="p-4 border-t border-surface-container-high bg-surface-container-low/30 flex justify-end gap-3">
               <button
                 onClick={onCancel}
-                className="px-5 py-2.5 bg-surface-container-low text-on-surface-variant font-medium rounded-xl hover:bg-surface-container transition-all"
+                className="px-5 py-2.5 bg-surface-container-low text-on-surface-variant font-medium rounded-xl hover:bg-surface-container transition-all focus-ring"
               >
                 {cancelText}
               </button>
               <button
                 onClick={onConfirm}
                 className={cn(
-                  "px-5 py-2.5 font-semibold rounded-xl shadow-lg transition-all flex items-center gap-2",
+                  "px-5 py-2.5 font-semibold rounded-xl shadow-lg transition-all flex items-center gap-2 focus-ring",
                   type === 'danger'
                     ? "bg-red-500 text-white hover:bg-red-600 shadow-red-500/20"
                     : "bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20"

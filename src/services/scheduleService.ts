@@ -110,7 +110,12 @@ export class ScheduleService {
     };
 
     try {
-      const fileBuffer = await fileStorageService.getFile(fileMetadata);
+      let fileBuffer = await fileStorageService.getFile(fileMetadata);
+
+      // If fileData is a string (base64), decode it to binary Buffer
+      if (typeof fileBuffer === 'string') {
+        fileBuffer = Buffer.from(fileBuffer, 'base64');
+      }
 
       return {
         file_data: fileBuffer,

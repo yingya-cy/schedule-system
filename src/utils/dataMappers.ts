@@ -16,7 +16,6 @@ export function parsePeriod(section: any): number[] {
 }
 
 export function mapBackendDataToArray(data: BackendCourseData[]): UnifiedCourse[] {
-  console.log('[DEBUG] AI OCR result:', JSON.stringify(data.slice(0, 2), null, 2));
   return data.map(item => {
     const dayStr = getWeekdayName(item.weekday || item.day);
 

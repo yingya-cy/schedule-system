@@ -34,8 +34,8 @@ export default function ScheduleGrid({
   };
 
   return (
-    <div className="flex-1 overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)]" id="schedule-table-container">
-      <div className="min-w-[800px]">
+    <div className="flex-1 overflow-x-auto overflow-y-auto momentum-scroll" id="schedule-table-container" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+      <div className="min-w-[700px] md:min-w-[800px]">
         <div className="grid grid-cols-[60px_repeat(7,1fr)] gap-px bg-surface-container-high">
           {/* Header row */}
           <div className="bg-surface-container-low p-2 text-center text-xs font-bold text-outline sticky left-0 top-0 z-20">

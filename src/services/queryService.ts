@@ -43,7 +43,7 @@ export class QueryService {
 
     if (query.name) {
       conditions.push('name LIKE ?');
-      params.push(`%${query.name}%`);
+      params.push(`%${query.name.replace(/[%_]/g, '\\$&')}%`);
     }
 
     if (conditions.length > 0) {

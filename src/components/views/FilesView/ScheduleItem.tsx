@@ -1,10 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { FileSpreadsheet, Building2, Clock, FileImage, ExternalLink, Download, Eye, Trash2 } from 'lucide-react';
+import { FileSpreadsheet, Building2, Clock, FileImage, ExternalLink, Download, Eye, Trash2, MoreHorizontal } from 'lucide-react';
 import { ScheduleData } from '@/types';
 import { api } from '@/services/api';
 import { formatRelativeTime } from './utils';
-import { cn } from '@/lib/utils';
 
 interface ScheduleItemProps {
   schedule: ScheduleData;
@@ -13,70 +12,100 @@ interface ScheduleItemProps {
 }
 
 export default function ScheduleItem({ schedule, onView, onDelete }: ScheduleItemProps) {
+  const [showFileMenu, setShowFileMenu] = useState(false);
+
   return (
     <motion.div
-      className="p-4 hover:bg-surface-container-low/50 transition-colors group"
+      whileHover={{ y: -4, scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      className="bg-surface-container-lowest rounded-2xl border border-surface-container-high/80 shadow-sm p-5 hover:shadow-lg hover:border-primary/20 transition-all duration-200 group flex flex-col min-w-0"
     >
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0">
-          <FileSpreadsheet className="text-primary" size={22} />
+      <div className="flex-1 space-y-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center group-hover:from-primary/25 group-hover:to-primary/10 transition-all">
+            <FileSpreadsheet className="text-primary" size={22} />
+          </div>
+          {schedule.filename && (
+            <span className="badge badge-primary">
+              <FileImage size={10} />
+              源文件
+            </span>
+          )}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h4 className="font-semibold text-on-surface truncate">{schedule.name}</h4>
-            {schedule.filename && (
-              <span className="px-2 py-0.5 bg-purple-500/10 text-purple-600 text-xs font-medium rounded-full flex items-center gap-1">
-                <FileImage size={10} />
-                源文件
-              </span>
+
+        {/* Info */}
+        <div className="space-y-2.5">
+          <h4 className="font-semibold text-on-surface text-lg leading-tight truncate pr-2">{schedule.name}</h4>
+          <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+            <Building2 size={13} className="text-outline flex-shrink-0" />
+            <span className="truncate">{schedule.department}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+            <Clock size={13} className="text-outline flex-shrink-0" />
+            <span>{formatRelativeTime(schedule.created_at)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1.5 pt-4 mt-4 border-t border-surface-container-high/60">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onView(schedule)}
+          className="focus-ring min-w-0 flex-1 py-2 px-3 bg-primary text-on-primary text-sm font-semibold rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap"
+        >
+          <Eye size={14} />
+          <span>查看课表</span>
+        </motion.button>
+
+        {schedule.filename && (
+          <div className="relative">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowFileMenu(!showFileMenu)}
+              className="focus-ring p-2 bg-surface-container-low text-on-surface-variant rounded-lg hover:bg-surface-container transition-all"
+              title="更多操作"
+            >
+              <MoreHorizontal size={14} />
+            </motion.button>
+            {showFileMenu && (
+              <div className="absolute right-0 bottom-full mb-1 z-20">
+                <div className="bg-surface border border-surface-container-high rounded-lg shadow-lg py-1 min-w-[120px]">
+                  <button
+                    onClick={() => { window.open(api.getScheduleFileUrl(schedule.id), '_blank'); setShowFileMenu(false); }}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-surface-container-low flex items-center gap-2"
+                  >
+                    <ExternalLink size={13} />
+                    查看源文件
+                  </button>
+                  <a
+                    href={api.getScheduleFileUrl(schedule.id, true)}
+                    download={schedule.filename}
+                    onClick={() => setShowFileMenu(false)}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-surface-container-low flex items-center gap-2"
+                  >
+                    <Download size={13} />
+                    下载源文件
+                  </a>
+                </div>
+              </div>
             )}
           </div>
-          <div className="flex items-center gap-3 text-sm text-on-surface-variant">
-            <span className="flex items-center gap-1">
-              <Building2 size={12} />
-              {schedule.department}
-            </span>
-            <span className="text-outline">·</span>
-            <span className="flex items-center gap-1">
-              <Clock size={12} />
-              {formatRelativeTime(schedule.created_at)}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          {schedule.filename && (
-            <>
-              <button
-                onClick={() => window.open(api.getScheduleFileUrl(schedule.id), '_blank')}
-                className="p-2 bg-surface-container-low text-on-surface-variant rounded-lg hover:bg-purple-500 hover:text-white transition-all"
-                title="查看源文件"
-              >
-                <ExternalLink size={16} />
-              </button>
-              <a
-                href={api.getScheduleFileUrl(schedule.id, true)}
-                download={schedule.filename}
-                className="p-2 bg-surface-container-low text-on-surface-variant rounded-lg hover:bg-primary hover:text-on-primary transition-all"
-                title="下载源文件"
-              >
-                <Download size={16} />
-              </a>
-            </>
-          )}
-          <button
-            onClick={() => onView(schedule)}
-            className="px-3 py-2 bg-primary text-on-primary text-sm font-medium rounded-lg hover:bg-primary/90 transition-all flex items-center gap-1.5"
-          >
-            <Eye size={14} />
-            查看
-          </button>
-          <button
-            onClick={() => onDelete(schedule.id)}
-            className="p-2 text-outline hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
+        )}
+
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => onDelete(schedule.id)}
+          className="focus-ring p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all flex-shrink-0"
+          title="删除"
+        >
+          <Trash2 size={14} />
+        </motion.button>
       </div>
     </motion.div>
   );

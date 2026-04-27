@@ -82,7 +82,7 @@ export default function CourseEditModal({
           <h3 className="font-bold text-lg text-on-surface font-headline">
             {isNew ? '添加新课程' : '编辑课程'}
           </h3>
-          <button onClick={onClose} className="p-2 hover:bg-surface-container-low rounded-lg transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-surface-container-low rounded-lg transition-colors focus-ring">
             <X size={20} className="text-outline" />
           </button>
         </div>
@@ -97,17 +97,17 @@ export default function CourseEditModal({
               value={editingCourse.course_name}
               onChange={(e) => setEditingCourse({ ...editingCourse, course_name: e.target.value })}
               placeholder="请输入课程名称"
-              className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+              className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none focus-ring"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-on-surface-variant mb-1">星期</label>
               <select
                 value={editingCourse.weekday}
                 onChange={(e) => setEditingCourse({ ...editingCourse, weekday: parseInt(e.target.value) })}
-                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none focus-ring"
               >
                 {WEEKDAYS.map((day, index) => (
                   <option key={day} value={index + 1}>{day}</option>
@@ -121,7 +121,7 @@ export default function CourseEditModal({
                 value={sectionInput}
                 onChange={(e) => handleSectionInputChange(e.target.value)}
                 placeholder="例如: 1-2 或 3-4"
-                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none focus-ring"
               />
               <div className="flex flex-wrap gap-1 mt-2">
                 {SECTION_TIMES.map(s => (
@@ -138,7 +138,7 @@ export default function CourseEditModal({
                       }
                     }}
                     className={cn(
-                      "px-2 py-1 text-xs font-medium rounded transition-colors",
+                      "px-2 py-1 text-xs font-medium rounded transition-colors focus-ring touch-target",
                       editingCourse.sections.includes(s.section)
                         ? "bg-primary text-on-primary"
                         : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
@@ -157,7 +157,7 @@ export default function CourseEditModal({
               <button
                 type="button"
                 onClick={addWeekRange}
-                className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+                className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 focus-ring"
               >
                 <Plus size={14} />
                 添加周数范围
@@ -179,7 +179,7 @@ export default function CourseEditModal({
                       value={range.start ?? ''}
                       onChange={(e) => updateWeekRange(range.id, 'start', e.target.value ? parseInt(e.target.value) : null)}
                       placeholder="起始"
-                      className="w-16 px-2 py-1.5 text-sm border border-surface-container-high rounded focus:ring-2 focus:ring-primary outline-none text-center"
+                      className="w-16 px-2 py-1.5 text-sm border border-surface-container-high rounded focus:ring-2 focus:ring-primary outline-none text-center focus-ring"
                     />
                     <span className="text-on-surface-variant">—</span>
                     <input
@@ -189,13 +189,13 @@ export default function CourseEditModal({
                       value={range.end ?? ''}
                       onChange={(e) => updateWeekRange(range.id, 'end', e.target.value ? parseInt(e.target.value) : null)}
                       placeholder="结束"
-                      className="w-16 px-2 py-1.5 text-sm border border-surface-container-high rounded focus:ring-2 focus:ring-primary outline-none text-center"
+                      className="w-16 px-2 py-1.5 text-sm border border-surface-container-high rounded focus:ring-2 focus:ring-primary outline-none text-center focus-ring"
                     />
                     <span className="text-on-surface-variant">周</span>
                     <select
                       value={range.type}
                       onChange={(e) => updateWeekRange(range.id, 'type', e.target.value)}
-                      className="px-2 py-1.5 text-sm border border-surface-container-high rounded focus:ring-2 focus:ring-primary outline-none"
+                      className="px-2 py-1.5 text-sm border border-surface-container-high rounded focus:ring-2 focus:ring-primary outline-none focus-ring"
                     >
                       <option value="all">无</option>
                       <option value="odd">单周</option>
@@ -204,7 +204,7 @@ export default function CourseEditModal({
                     <button
                       type="button"
                       onClick={() => removeWeekRange(range.id)}
-                      className="p-1 text-on-surface-variant hover:text-red-500 transition-colors"
+                      className="p-1 text-on-surface-variant hover:text-red-500 transition-colors focus-ring"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -220,14 +220,14 @@ export default function CourseEditModal({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-on-surface-variant mb-1">教师</label>
               <input
                 type="text"
                 value={editingCourse.teacher}
                 onChange={(e) => setEditingCourse({ ...editingCourse, teacher: e.target.value })}
-                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none focus-ring"
               />
             </div>
             <div>
@@ -236,7 +236,7 @@ export default function CourseEditModal({
                 type="text"
                 value={editingCourse.location}
                 onChange={(e) => setEditingCourse({ ...editingCourse, location: e.target.value })}
-                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none focus-ring"
               />
             </div>
           </div>
@@ -246,7 +246,7 @@ export default function CourseEditModal({
             <textarea
               value={editingCourse.remark}
               onChange={(e) => setEditingCourse({ ...editingCourse, remark: e.target.value })}
-              className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none"
+              className="w-full px-4 py-2.5 border border-surface-container-high rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none focus-ring"
               rows={2}
             />
           </div>
@@ -255,14 +255,14 @@ export default function CourseEditModal({
         <div className="p-6 border-t border-surface-container-high flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-surface-container-low text-on-surface-variant font-medium rounded-lg hover:bg-surface-container transition-all"
+            className="px-4 py-2 bg-surface-container-low text-on-surface-variant font-medium rounded-lg hover:bg-surface-container transition-all focus-ring"
           >
             取消
           </button>
           <button
             onClick={handleSave}
             disabled={!editingCourse.course_name}
-            className="px-4 py-2 bg-primary text-on-primary font-semibold rounded-lg hover:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-2 bg-primary text-on-primary font-semibold rounded-lg hover:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50 focus-ring"
           >
             <Check size={16} />
             {isNew ? '添加课程' : '保存修改'}

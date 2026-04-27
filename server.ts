@@ -10,6 +10,7 @@ import { testConnection, initializeDatabase } from "./src/config/database.ts";
 import scheduleService from "./src/services/scheduleService.ts";
 import queryService from "./src/services/queryService.ts";
 import excelExportService from "./src/services/excelExportService.ts";
+import scoringRouter from "./src/routes/scoring.ts";
 import pool from './src/config/database.ts';
 
 dotenv.config();
@@ -355,6 +356,9 @@ app.get("/api/reset-departments", async (req, res) => {
       res.status(500).json({ success: false, error: error.message });
     }
   });
+
+  // 评分系统 API
+  app.use('/api/scoring', scoringRouter);
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });

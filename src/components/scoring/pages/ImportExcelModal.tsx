@@ -71,6 +71,7 @@ export default function ImportExcelModal({
     setTemplateFile(file);
     setLoading(true);
     setError('');
+    setStep('loading');
     try {
       const result = await importExportApi.parseTemplate(file) as { success: boolean; data?: ParsedTemplate; error?: string };
       if (!result.success || !result.data) {
@@ -92,6 +93,7 @@ export default function ImportExcelModal({
     setContestantsFile(file);
     setLoading(true);
     setError('');
+    setStep('loading');
     try {
       const result = await importExportApi.parseContestants(file) as { success: boolean; data?: { contestants: ParsedContestant[] }; error?: string };
       if (!result.success || !result.data) {
