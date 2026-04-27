@@ -126,9 +126,9 @@ def parse_excel_for_template(file_path: str) -> dict[str, Any]:
             {
                 "name": "形象",
                 "max_score": 20,
+                "description": "维度描述",
                 "subdimensions": [
-                    {"name": "仪容仪表", "max_score": 10, "description": ""},
-                    {"name": "台风", "max_score": 10, "description": ""}
+                    {"name": "仪容仪表", "max_score": 10, "description": "子维度描述"}
                 ]
             }
         ]
