@@ -103,9 +103,13 @@ export default function TemplateList({ onBack }: Props) {
   }
 
   function handleSaved(template: ScoringTemplate) {
-    if (editingTemplate) {
+    // 检查模板是否已存在于列表中
+    const existingIndex = templates.findIndex((t) => t.id === template.id);
+    if (existingIndex >= 0) {
+      // 更新现有模板
       setTemplates((prev) => prev.map((t) => (t.id === template.id ? template : t)));
     } else {
+      // 添加新模板
       setTemplates((prev) => [template, ...prev]);
     }
     setShowEditor(false);
@@ -361,14 +365,17 @@ function TemplateEditor({ template, onBack, onSaved, onError }: TemplateEditorPr
         })),
       };
 
-      if (template?.id) {
-        await templateApi.update(template.id, data);
-        const updated = await templateApi.get(template.id);
-        onSaved(updated);
-      } else {
+      // 判断是新建还是更新：editingTemplate?.id 为 0 或 undefined 表示新建
+      const isNewTemplate = !template?.id;
+
+      if (isNewTemplate) {
         const result = await templateApi.create(data);
         const created = await templateApi.get(result.id);
         onSaved(created);
+      } else {
+        await templateApi.update(template.id, data);
+        const updated = await templateApi.get(template.id);
+        onSaved(updated);
       }
     } catch (e: unknown) {
       onError('保存失败：' + (e as Error).message);
