@@ -274,6 +274,7 @@ function TemplateEditor({ template, onBack, onSaved, onError }: TemplateEditorPr
       max_score: d.max_score,
       sort_order: d.sort_order,
       is_optional: !!d.is_optional,
+      description: d.description || '',
       subdimensions: d.subdimensions.map((s) => ({
         id: s.id,
         dimension_id: s.dimension_id,
@@ -299,6 +300,7 @@ function TemplateEditor({ template, onBack, onSaved, onError }: TemplateEditorPr
         max_score: 0,
         sort_order: prev.length,
         is_optional: false,
+        description: '',
         subdimensions: [],
       },
     ]);
@@ -350,6 +352,7 @@ function TemplateEditor({ template, onBack, onSaved, onError }: TemplateEditorPr
           name: d.name,
           max_score: d.max_score,
           is_optional: d.is_optional,
+          description: d.description,
           subdimensions: d.subdimensions.map((s) => ({
             name: s.name,
             max_score: s.max_score,
@@ -495,6 +498,20 @@ function TemplateEditor({ template, onBack, onSaved, onError }: TemplateEditorPr
               >
                 <Trash2 size={16} />
               </motion.button>
+            </div>
+
+            {/* 维度描述 */}
+            <div className="ml-6 pl-4 border-l-2 border-primary/20">
+              <input
+                value={dim.description}
+                onChange={(e) => setDimensions((prev) => {
+                  const u = [...prev];
+                  u[dimIndex] = { ...u[dimIndex], description: e.target.value };
+                  return u;
+                })}
+                placeholder="维度评分标准说明（可选）"
+                className="w-full px-3 py-2 bg-surface-container-low border border-surface-container-high rounded-lg text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm focus-ring"
+              />
             </div>
 
             {/* 子维度 */}

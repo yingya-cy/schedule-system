@@ -9,6 +9,7 @@ export interface ScoringDimension {
   max_score: number;
   sort_order: number;
   is_optional: number;
+  description: string;
   subdimensions: ScoringSubdimension[];
 }
 
@@ -41,6 +42,7 @@ export interface EditorDimension {
   max_score: number;
   sort_order: number;
   is_optional: boolean;
+  description: string;
   subdimensions: EditorSubdimension[];
 }
 
