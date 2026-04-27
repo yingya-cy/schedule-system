@@ -1,0 +1,637 @@
+import { useState, useEffect } from 'react';
+import { judgeApi, competitionApi } from '../services/scoringApi.ts';
+import type { Contestant, ScoringDimension } from '../types/scoring.ts';
+import MessageDialog from '../../MessageDialog.tsx';
+import ConfirmDialog from '../../ConfirmDialog.tsx';
+import { motion, AnimatePresence } from 'motion/react';
+import { CheckCircle2, ChevronRight, ClipboardList, ArrowLeft, AlertTriangle, ChevronDown } from 'lucide-react';
+
+// Dimension colors for visual distinction
+const DIMENSION_COLORS = [
+  'border-l-primary',
+  'border-l-purple-500',
+  'border-l-orange-500',
+  'border-l-green-500',
+  'border-l-pink-500',
+  'border-l-cyan-500',
+  'border-l-amber-500',
+  'border-l-indigo-500',
+];
+
+interface JudgeScoringProps {
+  competitionId: number;
+  judgeId: number;
+  judgeName: string;
+  onBack: () => void;
+}
+
+export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack }: JudgeScoringProps) {
+  const [contestants, setContestants] = useState<Contestant[]>([]);
+  const [activeContestant, setActiveContestant] = useState<Contestant | null>(null);
+  // 所有选手的评分 { contestantId: { subId: score } }
+  const [contestantScores, setContestantScores] = useState<Record<number, Record<number, number>>>({});
+  // 当前选手的评分 { subId: score }
+  const [currentScores, setCurrentScores] = useState<Record<number, number>>({});
+  // 已提交的选手ID集合
+  const [submittedIds, setSubmittedIds] = useState<Set<number>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
+  const [submittingAll, setSubmittingAll] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [competitionName, setCompetitionName] = useState('');
+
+  // Template dimensions for scoring form
+  const [dimensions, setDimensions] = useState<ScoringDimension[]>([]);
+
+  // Track expanded dimensions (all expanded by default)
+  const [expandedDims, setExpandedDims] = useState<Record<number, boolean>>({});
+
+  // Dialogs
+  const [messageDialog, setMessageDialog] = useState<{ open: boolean; type: 'success' | 'error' | 'info'; title: string; message?: string }>({ open: false, type: 'info', title: '' });
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
+
+  // 是否正在切换选手（防止重复保存）
+  const [switchingContestant, setSwitchingContestant] = useState(false);
+
+  useEffect(() => {
+    loadData();
+  }, [competitionId, judgeId]);
+
+  async function loadData() {
+    try {
+      // Load competition to get template with dimensions
+      const comp = await competitionApi.get(competitionId);
+      setCompetitionName(comp.name);
+      if (comp.template?.dimensions?.length) {
+        setDimensions(comp.template.dimensions);
+        // Initialize all dimensions as expanded
+        const initialExpanded: Record<number, boolean> = {};
+        comp.template.dimensions.forEach((d: ScoringDimension) => {
+          initialExpanded[d.id] = true;
+        });
+        setExpandedDims(initialExpanded);
+      }
+
+      const data = await competitionApi.getJudgeContestants(judgeId);
+      setContestants(data);
+
+      if (data.length > 0) {
+        setActiveContestant(data[0]);
+        // 加载第一个选手的已有评分
+        const loaded = await loadContestantScores(data[0].id);
+        setCurrentScores(loaded);
+        // 标记已加载的选手
+        setContestantScores({ [data[0].id]: loaded });
+      }
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    }
+  }
+
+  // 加载指定选手的已有评分
+  async function loadContestantScores(contestantId: number) {
+    try {
+      const rows = await judgeApi.getScoresByContestant(String(contestantId), String(judgeId));
+      const loaded: Record<number, number> = {};
+      for (const row of rows) {
+        if (row.subdimension_id) {
+          loaded[Number(row.subdimension_id)] = parseFloat(String(row.score));
+        }
+      }
+      return loaded;
+    } catch {
+      return {};
+    }
+  }
+
+  // 保存当前选手评分（内部方法）
+  async function saveCurrentScores(silent = false): Promise<boolean> {
+    if (!activeContestant) return true;
+    // 如果没有任何评分，不发送请求
+    if (Object.keys(currentScores).length === 0) return true;
+    const scoreList: { subdimension_id: number; score: number }[] = [];
+    for (const [subId, scoreVal] of Object.entries(currentScores)) {
+      scoreList.push({ subdimension_id: parseInt(subId), score: scoreVal });
+    }
+    try {
+      await judgeApi.submitScore({
+        judge_id: judgeId,
+        contestant_id: activeContestant.id,
+        scores: scoreList,
+      });
+      // 更新本地记录
+      setContestantScores(prev => ({ ...prev, [activeContestant.id]: { ...currentScores } }));
+      return true;
+    } catch (e: unknown) {
+      if (!silent) {
+        setMessageDialog({
+          open: true, type: 'error', title: '保存失败',
+          message: (e as Error).message,
+        });
+      }
+      return false;
+    }
+  }
+
+  // 切换到指定选手
+  async function switchToContestant(c: Contestant) {
+    if (!activeContestant || switchingContestant) return;
+    if (activeContestant.id === c.id) return;
+
+    // 保存当前选手的评分
+    setSwitchingContestant(true);
+    const saved = await saveCurrentScores(true);
+    if (!saved) {
+      setSwitchingContestant(false);
+      return;
+    }
+
+    // 加载新选手的已有评分
+    const loaded = await loadContestantScores(c.id);
+    setContestantScores(prev => ({ ...prev, [activeContestant.id]: { ...currentScores } }));
+    setActiveContestant(c);
+    setCurrentScores(loaded);
+    setSubmitted(false);
+    setSwitchingContestant(false);
+  }
+
+  function clamp(value: number, min: number, max: number): number {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function handleScoreChange(subId: number, maxScore: number, rawValue: string) {
+    if (rawValue === '') {
+      setCurrentScores((prev) => {
+        const next = { ...prev };
+        delete next[subId];
+        return next;
+      });
+      return;
+    }
+    const num = parseFloat(rawValue);
+    if (isNaN(num)) return;
+    // Clamp to valid range [0, maxScore]
+    const clamped = clamp(num, 0, maxScore);
+    setCurrentScores((prev) => ({ ...prev, [subId]: clamped }));
+  }
+
+  function toggleDimension(dimId: number) {
+    setExpandedDims((prev) => ({ ...prev, [dimId]: !prev[dimId] }));
+  }
+
+  // Calculate dimension progress
+  function getDimProgress(dim: ScoringDimension) {
+    let scored = 0;
+    let total = 0;
+    dim.subdimensions.forEach((sub) => {
+      total += Number(sub.max_score);
+      if (currentScores[sub.id] !== undefined) {
+        scored += currentScores[sub.id];
+      }
+    });
+    return { scored, total, percentage: total > 0 ? (scored / total) * 100 : 0 };
+  }
+
+  // 检查当前选手是否所有维度都已评分
+  function isCurrentContestantFullyScored() {
+    for (const dim of dimensions) {
+      for (const sub of dim.subdimensions) {
+        if (currentScores[sub.id] === undefined) return false;
+      }
+    }
+    return true;
+  }
+
+  // 提交当前选手评分
+  function handleSubmit() {
+    if (!activeContestant) return;
+
+    // Validate all subdimension scores
+    const scoreList: { subdimension_id: number; score: number }[] = [];
+    for (const dim of dimensions) {
+      for (const sub of dim.subdimensions) {
+        const scoreVal = currentScores[sub.id];
+        // Only include if explicitly set (not undefined)
+        if (scoreVal !== undefined) {
+          scoreList.push({
+            subdimension_id: sub.id,
+            score: scoreVal,
+          });
+        }
+      }
+    }
+
+    // Check for scores exceeding max
+    const overMax = scoreList.filter((s) => {
+      const sub = dimensions.flatMap((d) => d.subdimensions).find((sub) => sub.id === s.subdimension_id);
+      return sub && s.score > sub.max_score;
+    });
+
+    // Calculate total
+    const totalInput = scoreList.reduce((sum, s) => sum + s.score, 0);
+    const templateTotal = dimensions.reduce((sum, d) => sum + (parseFloat(String(d.max_score)) || 0), 0);
+
+    if (overMax.length > 0) {
+      setMessageDialog({
+        open: true,
+        type: 'error',
+        title: '分数超出范围',
+        message: `有 ${overMax.length} 个评分项分数超过了满分，请修正后再提交。`,
+      });
+      return;
+    }
+
+    if (totalInput > templateTotal) {
+      setMessageDialog({
+        open: true,
+        type: 'error',
+        title: '总分超出限制',
+        message: `当前总分 ${totalInput} 超过了模板满分 ${templateTotal}，请修正后再提交。`,
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    judgeApi.submitScore({
+      judge_id: judgeId,
+      contestant_id: activeContestant.id,
+      scores: scoreList,
+    })
+      .then(() => {
+        setContestantScores(prev => ({ ...prev, [activeContestant.id]: { ...currentScores }}));
+        setSubmittedIds(prev => new Set([...prev, activeContestant.id]));
+        setContestants((prev) =>
+          prev.map((c) => (c.id === activeContestant.id ? { ...c, scored: true } : c))
+        );
+        setSubmitted(true);
+        setCurrentScores({});
+      })
+      .catch((e: unknown) => {
+        setMessageDialog({ open: true, type: 'error', title: '提交失败', message: (e as Error).message });
+      })
+      .finally(() => {
+        setSubmitting(false);
+      });
+  }
+
+  // 一键提交所有未评分选手
+  function handleSubmitAll() {
+    const unscored = contestants.filter((c) => !c.scored && !submittedIds.has(c.id));
+    if (unscored.length > 0) {
+      setConfirmDialog({
+        open: true,
+        title: '还有未评分选手',
+        message: `还有 ${unscored.length} 个选手未评分，确定要一键提交吗？未评分选手将以 0 分计入。`,
+        onConfirm: () => {
+          setConfirmDialog(p => ({ ...p, open: false }));
+          submitAllContestants(unscored);
+        },
+      });
+      return;
+    }
+    submitAllContestants(contestants);
+  }
+
+  // 执行一键提交
+  async function submitAllContestants(toSubmit: Contestant[]) {
+    setSubmittingAll(true);
+    for (const c of toSubmit) {
+      const saved = contestantScores[c.id] || {};
+      const scoreList: { subdimension_id: number; score: number }[] = [];
+      for (const dim of dimensions) {
+        for (const sub of dim.subdimensions) {
+          const scoreVal = saved[sub.id];
+          if (scoreVal !== undefined) {
+            scoreList.push({ subdimension_id: sub.id, score: scoreVal });
+          }
+        }
+      }
+      try {
+        await judgeApi.submitScore({
+          judge_id: judgeId,
+          contestant_id: c.id,
+          scores: scoreList,
+        });
+        setContestants(prev => prev.map(cc => cc.id === c.id ? { ...cc, scored: true } : cc));
+        setSubmittedIds(prev => new Set([...prev, c.id]));
+      } catch (e: unknown) {
+        // skip failed ones
+      }
+    }
+    setSubmittingAll(false);
+    setMessageDialog({
+      open: true,
+      type: 'success',
+      title: '提交完成',
+      message: `已提交 ${toSubmit.length} 个选手的评分`,
+    });
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="bg-surface rounded-2xl border border-error/30 p-8 text-center max-w-sm">
+          <div className="text-error text-xl font-bold mb-2">加载失败</div>
+          <div className="text-sm text-outline mb-4">{error}</div>
+          <div className="text-xs text-outline">请联系比赛管理员</div>
+        </div>
+      </div>
+    );
+  }
+
+  const unscoredCount = contestants.filter((c) => !c.scored && !submittedIds.has(c.id)).length;
+
+  // Flatten all subdimensions for rendering
+  const allSubdimensions = dimensions.flatMap((d) =>
+    d.subdimensions.map((s) => ({ ...s, dimensionName: d.name, dimensionMaxScore: d.max_score }))
+  );
+
+  // Calculate current totals for display
+  const currentTotal = allSubdimensions.reduce((sum, sub) => {
+    const v = currentScores[sub.id];
+    return sum + (v !== undefined ? v : 0);
+  }, 0);
+  const templateTotal = dimensions.reduce((sum, d) => sum + (parseFloat(String(d.max_score)) || 0), 0);
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Top Bar */}
+      <header className="bg-gradient-to-r from-primary to-primary/80 text-on-primary px-6 py-4 flex justify-between items-center shadow-lg shadow-primary/20">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors focus-ring"
+          >
+            <ArrowLeft size={20} className="text-on-primary/80" />
+          </button>
+          <div>
+            <div className="text-lg font-bold font-headline">{competitionName}</div>
+            <div className="text-sm text-on-primary/80 mt-0.5">评委：{judgeName}</div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-3xl font-bold font-headline">{unscoredCount}</div>
+          <div className="text-xs text-on-primary/80">待评分</div>
+        </div>
+      </header>
+
+      {/* Contestant Tabs */}
+      {contestants.length > 0 && (
+        <div className="bg-surface border-b border-surface-container-high px-4 py-3 flex gap-2 overflow-x-auto">
+          {contestants.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => switchToContestant(c)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                activeContestant?.id === c.id
+                  ? 'bg-primary text-on-primary shadow-md'
+                  : c.scored
+                  ? 'bg-success/10 text-success'
+                  : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
+              }`}
+            >
+              {c.number || c.name}
+              {c.scored && <span className="ml-1">✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Scoring Area */}
+      <div className="flex-1 p-6 flex flex-col gap-6 max-w-2xl mx-auto w-full">
+        {/* No contestants message */}
+        {contestants.length === 0 && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
+            <div className="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center">
+              <ClipboardList size={32} className="text-outline" />
+            </div>
+            <div className="text-lg font-medium text-on-surface">暂无可评分选手</div>
+            <div className="text-sm text-outline">请等待管理员添加选手后再进行评分</div>
+          </div>
+        )}
+
+        {/* Active contestant scoring */}
+        {activeContestant && contestants.length > 0 && (
+          <AnimatePresence mode="wait">
+            {submitted ? (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="flex-1 flex flex-col items-center justify-center gap-4"
+              >
+                <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center">
+                  <CheckCircle2 size={48} className="text-success" />
+                </div>
+                <div className="text-2xl font-bold text-success font-headline">提交成功</div>
+                {contestants.find((c) => !c.scored && c.id !== activeContestant?.id) && (
+                  <div className="text-sm text-outline">即将切换到下一个选手...</div>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="scoring"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="flex-1 flex flex-col gap-6"
+              >
+                {/* Contestant Info */}
+                <div className="bg-surface rounded-2xl border border-surface-container-high p-5 shadow-sm">
+                  <h2 className="text-xl font-bold text-on-surface font-headline">{activeContestant.name}</h2>
+                  {activeContestant.group_name && (
+                    <div className="text-sm text-outline mt-1">组别：{activeContestant.group_name}</div>
+                  )}
+                </div>
+
+                                <div className="flex-1 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">请打分</h3>
+                    {allSubdimensions.length > 0 && (
+                      <div className={`text-sm font-medium ${currentTotal > templateTotal ? 'text-error' : 'text-on-surface-variant'}`}>
+                        当前总分：{currentTotal} / {templateTotal}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* No dimensions fallback */}
+                  {dimensions.length === 0 && (
+                    <div className="bg-surface rounded-2xl border border-surface-container-high p-5 space-y-3">
+                      <label className="text-sm font-medium text-on-surface-variant">总分（0-100）</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                        value={currentScores[0] ?? ''}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value);
+                          if (e.target.value === '') setCurrentScores({ 0: undefined as any });
+                          else setCurrentScores({ 0: clamp(v, 0, 100) });
+                        }}
+                        className="w-full px-4 py-3 bg-surface-container-low border border-surface-container-high rounded-xl text-on-surface text-lg placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all focus-ring"
+                        placeholder="请输入总分"
+                      />
+                    </div>
+                  )}
+
+                  {/* Dimension Groups with Collapsible */}
+                  <div className="space-y-3">
+                    {dimensions.map((dim, dimIndex) => {
+                      const colorClass = DIMENSION_COLORS[dimIndex % DIMENSION_COLORS.length];
+                      const progress = getDimProgress(dim);
+                      const isExpanded = expandedDims[dim.id] !== false;
+                      const hasAnyScore = dim.subdimensions.some(s => currentScores[s.id] !== undefined);
+                      const hasOverScore = dim.subdimensions.some(s => {
+                        const v = currentScores[s.id];
+                        return v !== undefined && v > s.max_score;
+                      });
+
+                      return (
+                        <div
+                          key={dim.id}
+                          className={`bg-surface rounded-2xl border border-surface-container-high border-l-4 ${colorClass} overflow-hidden`}
+                        >
+                          {/* Dimension Header */}
+                          <button
+                            onClick={() => toggleDimension(dim.id)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-surface-container-low/50 transition-colors focus-ring"
+                          >
+                            <div className="flex items-center gap-3">
+                              <ChevronDown
+                                size={18}
+                                className={`text-on-surface-variant transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`}
+                              />
+                              <div className="text-left">
+                                <div className="font-semibold text-on-surface font-headline">{dim.name}</div>
+                                <div className="text-xs text-outline">
+                                  满分 <span className="font-medium">{dim.max_score}</span> 分
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {hasOverScore && (
+                                <AlertTriangle size={16} className="text-error" />
+                              )}
+                              <div className="text-right">
+                                <div className={`text-sm font-semibold ${hasOverScore ? 'text-error' : hasAnyScore ? 'text-success' : 'text-on-surface-variant'}`}>
+                                  {progress.scored > 0 ? progress.scored.toFixed(1) : '—'} / {progress.total}
+                                </div>
+                                <div className="w-16 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${progress.percentage}%` }}
+                                    className={`h-full rounded-full ${hasOverScore ? 'bg-error' : hasAnyScore ? 'bg-success' : 'bg-surface-container-high'}`}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+
+                          {/* Subdimensions (Collapsible) */}
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="px-4 pb-4 space-y-3 border-t border-surface-container-high/50">
+                                  {dim.subdimensions.map((sub) => {
+                                    const currentVal = currentScores[sub.id];
+                                    const isOver = currentVal !== undefined && currentVal > sub.max_score;
+                                    return (
+                                      <div key={sub.id} className="pt-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <div className="flex-1 min-w-0">
+                                            <div className="font-medium text-on-surface text-sm">{sub.name}</div>
+                                            {sub.description && (
+                                              <div className="text-xs text-outline mt-0.5">{sub.description}</div>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                                            {isOver && <AlertTriangle size={12} className="text-error" />}
+                                            <span className={`text-xs ${isOver ? 'text-error font-bold' : 'text-outline'}`}>
+                                              满分 {sub.max_score}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max={sub.max_score}
+                                          step="0.5"
+                                          value={currentVal !== undefined ? currentVal : ''}
+                                          onChange={(e) => handleScoreChange(sub.id, sub.max_score, e.target.value)}
+                                          className={`w-full px-4 py-3 bg-surface-container-low border rounded-xl text-on-surface text-base placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${isOver ? 'border-error' : 'border-surface-container-high'} focus-ring`}
+                                          placeholder={`0 - ${sub.max_score}`}
+                                        />
+                                        {currentVal !== undefined && (
+                                          <div className={`text-xs mt-1 ${isOver ? 'text-error' : 'text-success'}`}>
+                                            {isOver ? `分数超出（${currentVal} > ${sub.max_score}）` : `当前：${currentVal} / ${sub.max_score}`}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="w-full py-4 bg-gradient-to-r from-primary to-primary/80 text-on-primary font-bold rounded-xl shadow-lg shadow-primary/25 text-lg flex items-center justify-center gap-2 disabled:opacity-50 focus-ring"
+                >
+                  {submitting ? '提交中...' : '提交评分'}
+                  {!submitting && <ChevronRight size={20} />}
+                </motion.button>
+
+                {/* 一键提交按钮 */}
+                {contestants.length > 1 && (
+                  <button
+                    onClick={handleSubmitAll}
+                    disabled={submittingAll}
+                    className="w-full py-3 bg-surface-container-high text-on-surface-variant font-medium rounded-xl border border-surface-container-high hover:bg-surface-container-low transition-colors disabled:opacity-50 focus-ring flex items-center justify-center gap-2"
+                  >
+                    {submittingAll ? '提交中...' : '一键提交全部'}
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+      </div>
+
+      {/* Message Dialog */}
+      <MessageDialog
+        isOpen={messageDialog.open}
+        type={messageDialog.type}
+        title={messageDialog.title}
+        message={messageDialog.message}
+        onClose={() => setMessageDialog((p) => ({ ...p, open: false }))}
+      />
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onCancel={() => setConfirmDialog((p) => ({ ...p, open: false }))}
+        onConfirm={confirmDialog.onConfirm}
+      />
+    </div>
+  );
+}

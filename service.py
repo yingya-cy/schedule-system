@@ -17,6 +17,7 @@ from utils.pdf_plumber_parser import parse_vertical_pdf_with_plumber
 from utils.rule_parser import parse_by_rules
 from utils.image_utils import calculate_dynamic_timeout, auto_detect_schedule_type, encode_image_to_base64
 from utils.ai_client import create_ark_client, DOUBAO_MODEL
+from utils.excel_parser import parse_excel_for_template, parse_excel_for_contestants, fill_template_with_results
 
 app = Flask(__name__)
 CORS(app)
@@ -380,6 +381,104 @@ def ocr_batch():
         return jsonify({'success': True, 'results': results})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ==========================================
+# 评分系统 Excel 导入导出
+# ==========================================
+
+@app.route('/api/parse/scoring-template', methods=['POST'])
+def parse_scoring_template():
+    """解析评分模板 Excel，AI 识别结构"""
+    try:
+        file = request.files.get('file')
+        if not file:
+            return jsonify({'success': False, 'error': '未上传文件'}), 400
+
+        # 保存到临时文件
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+            file.save(tmp.name)
+            tmp_path = tmp.name
+
+        try:
+            result = parse_excel_for_template(tmp_path)
+            return jsonify({'success': True, 'data': result})
+        finally:
+            import os
+            os.unlink(tmp_path)
+
+    except Exception as e:
+        logger.error(f"评分模板解析失败: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/parse/contestants', methods=['POST'])
+def parse_contestants():
+    """解析选手名单 Excel，AI 识别结构"""
+    try:
+        file = request.files.get('file')
+        if not file:
+            return jsonify({'success': False, 'error': '未上传文件'}), 400
+
+        # 保存到临时文件
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+            file.save(tmp.name)
+            tmp_path = tmp.name
+
+        try:
+            result = parse_excel_for_contestants(tmp_path)
+            return jsonify({'success': True, 'data': result})
+        finally:
+            import os
+            os.unlink(tmp_path)
+
+    except Exception as e:
+        logger.error(f"选手名单解析失败: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/export/scoring-results', methods=['POST'])
+def export_scoring_results():
+    """读取用户上传的 Excel 模板，AI 分析格式后填充结果并返回"""
+    try:
+        template_file = request.files.get('template_file')
+        result_json = request.form.get('result_data')
+
+        if not template_file:
+            return jsonify({'success': False, 'error': '未上传模板文件'}), 400
+        if not result_json:
+            return jsonify({'success': False, 'error': '未提供结果数据'}), 400
+
+        # 保存模板到临时文件
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+            template_file.save(tmp.name)
+            tmp_path = tmp.name
+
+        try:
+            import json
+            result_data = json.loads(result_json)
+
+            # 填充结果
+            file_bytes = fill_template_with_results(tmp_path, result_data)
+
+            from flask import Response
+            return Response(
+                file_bytes,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                headers={
+                    'Content-Disposition': 'attachment; filename=scoring_results.xlsx',
+                    'Content-Length': str(len(file_bytes))
+                }
+            )
+
+        finally:
+            import os
+            os.unlink(tmp_path)
+
+    except Exception as e:
+        logger.error(f"评分结果导出失败: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 # Gunicorn 入口点（生产环境使用）
 def create_app():
