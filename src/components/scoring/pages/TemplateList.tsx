@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { templateApi } from '../services/scoringApi.ts';
 import type { ScoringTemplate, EditorDimension, EditorSubdimension } from '../types/scoring.ts';
 import MessageDialog from '../../MessageDialog.tsx';
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function TemplateList({ onBack }: Props) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [templates, setTemplates] = useState<ScoringTemplate[]>([]);
   const [showEditor, setShowEditor] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ScoringTemplate | null>(null);
@@ -23,6 +25,35 @@ export default function TemplateList({ onBack }: Props) {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [messageDialog, setMessageDialog] = useState<{ open: boolean; type: 'success' | 'error' | 'info'; title: string; message?: string }>({ open: false, type: 'info', title: '' });
   const [showImportModal, setShowImportModal] = useState(false);
+
+  // 从 URL 参数恢复编辑状态
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId) {
+      if (editId === 'new') {
+        // 新建模板
+        setEditingTemplate(null);
+        setShowEditor(true);
+      } else {
+        // 编辑现有模板
+        const id = parseInt(editId, 10);
+        const existing = templates.find((t) => t.id === id);
+        if (existing) {
+          setEditingTemplate(existing);
+          setShowEditor(true);
+        } else {
+          // 从服务器加载
+          templateApi.get(id).then((t) => {
+            setEditingTemplate(t);
+            setShowEditor(true);
+          }).catch(() => {
+            // 加载失败，清除 URL 参数
+            setSearchParams({});
+          });
+        }
+      }
+    }
+  }, [searchParams, templates]);
 
   useEffect(() => {
     loadTemplates();
@@ -62,11 +93,13 @@ export default function TemplateList({ onBack }: Props) {
   function handleEdit(template: ScoringTemplate) {
     setEditingTemplate(template);
     setShowEditor(true);
+    setSearchParams({ edit: String(template.id) });
   }
 
   function handleCreateNew() {
     setEditingTemplate(null);
     setShowEditor(true);
+    setSearchParams({ edit: 'new' });
   }
 
   function handleImportTemplate(parsed: { name: string; total_score: number; dimensions: Array<{ name: string; max_score: number; description?: string; subdimensions: Array<{ name: string; max_score: number; description: string }> }> }) {
@@ -100,6 +133,7 @@ export default function TemplateList({ onBack }: Props) {
     };
     setEditingTemplate(newTemplate);
     setShowEditor(true);
+    setSearchParams({ edit: 'new' });
   }
 
   function handleSaved(template: ScoringTemplate) {
@@ -114,6 +148,7 @@ export default function TemplateList({ onBack }: Props) {
     }
     setShowEditor(false);
     setEditingTemplate(null);
+    setSearchParams({});
   }
 
   if (loading) {
@@ -128,7 +163,10 @@ export default function TemplateList({ onBack }: Props) {
     return (
       <TemplateEditor
         template={editingTemplate}
-        onBack={() => setShowEditor(false)}
+        onBack={() => {
+          setShowEditor(false);
+          setSearchParams({});
+        }}
         onSaved={handleSaved}
         onError={(msg) => setMessageDialog({ open: true, type: 'error', title: '操作失败', message: msg })}
       />
