@@ -163,7 +163,7 @@ export default function TemplateList({ onBack }: Props) {
     };
     setEditingTemplate(newTemplate);
     setOriginalTemplate(null); // 导入的是新模板，没有原始状态
-    setHasUnsavedChanges(true);
+    setHasUnsavedChanges(false); // 导入后暂不标记为未保存，等用户编辑后再标记
     setShowEditor(true);
     setSearchParams({ edit: 'new' });
   }
@@ -195,20 +195,26 @@ export default function TemplateList({ onBack }: Props) {
 
   // 处理从编辑器返回
   function handleBackFromEditor() {
+    // 判断是新建模板(id=0)还是编辑现有模板(id>0)
+    const isNewTemplate = !editingTemplate?.id || editingTemplate.id === 0;
+
     if (hasUnsavedChanges) {
       // 有未保存更改，弹出确认框
       setUnsavedDialog({
         open: true,
         onConfirm: () => {
-          // 用户确认放弃更改，恢复到原始状态
-          setEditingTemplate(originalTemplate);
+          // 用户确认放弃更改
           setHasUnsavedChanges(false);
           setShowEditor(false);
+          setEditingTemplate(null);
+          setOriginalTemplate(null);
           setSearchParams({});
         },
       });
     } else {
       setShowEditor(false);
+      setEditingTemplate(null);
+      setOriginalTemplate(null);
       setSearchParams({});
     }
   }
