@@ -442,11 +442,12 @@ def export_scoring_results():
     """读取用户上传的 Excel 模板，AI 分析格式后填充结果并返回"""
     try:
         template_file = request.files.get('template_file')
-        result_json = request.form.get('result_data')
+        # result_data 通过 multipart form 字段发送，是 JSON 字符串
+        result_json_str = request.form.get('result_data')
 
         if not template_file:
             return jsonify({'success': False, 'error': '未上传模板文件'}), 400
-        if not result_json:
+        if not result_json_str:
             return jsonify({'success': False, 'error': '未提供结果数据'}), 400
 
         # 保存模板到临时文件
@@ -456,7 +457,7 @@ def export_scoring_results():
 
         try:
             import json
-            result_data = json.loads(result_json)
+            result_data = json.loads(result_json_str)
 
             # 填充结果
             file_bytes = fill_template_with_results(tmp_path, result_data)

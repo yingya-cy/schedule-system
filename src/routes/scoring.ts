@@ -1,6 +1,8 @@
 import { Router, Request } from 'express';
 import pool from '../config/database.ts';
 import multer from 'multer';
+import axios from 'axios';
+import FormData from 'form-data';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -356,7 +358,7 @@ router.post('/competitions/:id/contestants', async (req, res) => {
   }
 });
 
-// 批量导入选手（Excel格式：number, name, group_name, description）
+// 批量导入选手（Excel格式：number, name, work_name, group_name, description）
 router.post('/competitions/:id/contestants/import', async (req, res) => {
   const connection = await pool.getConnection();
   try {
@@ -370,9 +372,12 @@ router.post('/competitions/:id/contestants/import', async (req, res) => {
 
     const insertedIds: number[] = [];
     for (const c of contestants) {
+      // 如果姓名为空但有作品名，则用作品名填充姓名
+      const name = c.name || c.work_name || '';
+      const workName = c.work_name || (c.name ? '' : ''); // 如果姓名本来就是作品名，work_name 也保留空
       const [result] = await connection.query(
-        'INSERT INTO contestants (competition_id, number, name, group_name, description, extra_data) VALUES (?, ?, ?, ?, ?, ?)',
-        [req.params.id, c.number || '', c.name, c.group_name || '', c.description || '', c.extra_data || null]
+        'INSERT INTO contestants (competition_id, number, name, work_name, group_name, description, extra_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [req.params.id, c.number || '', name, workName || null, c.group_name || '', c.description || '', c.extra_data || null]
       );
       insertedIds.push((result as any).insertId);
     }
@@ -543,7 +548,7 @@ router.get('/judge/scores/:contestantId/:judgeId', async (req, res) => {
   try {
     const { contestantId, judgeId } = req.params;
     const [scoreRows] = await pool.query(
-      `SELECT sd.subdimension_id, sd.score
+      `SELECT sd.subdimension_id, sd.dimension_id, sd.score
        FROM scores s
        LEFT JOIN score_details sd ON sd.score_id = s.id
        WHERE s.contestant_id = ? AND s.judge_id = ?`,
@@ -586,13 +591,14 @@ router.post('/judge/scores', async (req, res) => {
 
     // 计算总分
     let totalScore = 0;
-    const subdimensionScores: { subdimension_id: number; score: number }[] = [];
+    const scoreDetails: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
 
     if (scores && Array.isArray(scores)) {
       for (const s of scores) {
         totalScore += parseFloat(s.score || 0);
-        subdimensionScores.push({
-          subdimension_id: s.subdimension_id,
+        scoreDetails.push({
+          subdimension_id: s.subdimension_id || undefined,
+          dimension_id: s.dimension_id || undefined,
           score: parseFloat(s.score || 0)
         });
       }
@@ -622,11 +628,18 @@ router.post('/judge/scores', async (req, res) => {
     }
 
     // 插入评分详情
-    for (const s of subdimensionScores) {
-      await connection.query(
-        'INSERT INTO score_details (score_id, subdimension_id, score) VALUES (?, ?, ?)',
-        [scoreId, s.subdimension_id, s.score]
-      );
+    for (const s of scoreDetails) {
+      if (s.subdimension_id) {
+        await connection.query(
+          'INSERT INTO score_details (score_id, subdimension_id, score) VALUES (?, ?, ?)',
+          [scoreId, s.subdimension_id, s.score]
+        );
+      } else if (s.dimension_id) {
+        await connection.query(
+          'INSERT INTO score_details (score_id, dimension_id, score) VALUES (?, ?, ?)',
+          [scoreId, s.dimension_id, s.score]
+        );
+      }
     }
 
     await connection.commit();
@@ -813,7 +826,7 @@ router.get('/competitions/:id/score-details', async (req, res) => {
 
     // 获取选手
     const [contestantRows] = await connection.query(
-      'SELECT id, number, name, group_name FROM contestants WHERE competition_id = ? ORDER BY number',
+      'SELECT id, number, name, work_name, group_name FROM contestants WHERE competition_id = ? ORDER BY number',
       [competitionId]
     );
 
@@ -826,20 +839,22 @@ router.get('/competitions/:id/score-details', async (req, res) => {
     // 获取所有评分
     const [scoreRows] = await connection.query(
       `SELECT s.contestant_id, s.judge_id, s.total_score,
-              sd.subdimension_id, sd.score
+              sd.subdimension_id, sd.dimension_id, sd.score
        FROM scores s
        LEFT JOIN score_details sd ON sd.score_id = s.id
        WHERE s.competition_id = ?`,
       [competitionId]
     );
 
-    // 整理评分数据: contestant -> judge -> subdimension -> score
+    // 整理评分数据: contestant -> judge -> (subdimension|dimension) -> score
     const scoreMap: Record<number, Record<number, Record<number, number>>> = {};
     for (const s of scoreRows as any[]) {
       if (!scoreMap[s.contestant_id]) scoreMap[s.contestant_id] = {};
       if (!scoreMap[s.contestant_id][s.judge_id]) scoreMap[s.contestant_id][s.judge_id] = {};
       if (s.subdimension_id) {
         scoreMap[s.contestant_id][s.judge_id][s.subdimension_id] = parseFloat(s.score || 0);
+      } else if (s.dimension_id) {
+        scoreMap[s.contestant_id][s.judge_id][s.dimension_id] = parseFloat(s.score || 0);
       }
     }
 
@@ -877,7 +892,7 @@ router.post('/competitions/:id/publish', async (req, res) => {
 router.get('/competitions/:id/results', async (req, res) => {
   try {
     const [results] = await pool.query(
-      `SELECT cr.*, c.number, c.name as contestant_name, c.group_name
+      `SELECT cr.*, c.number, c.name as contestant_name, c.work_name, c.group_name
        FROM competition_results cr
        LEFT JOIN contestants c ON cr.contestant_id = c.id
        WHERE cr.competition_id = ?
@@ -930,28 +945,15 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:5002';
 // 解析评分模板
 router.post('/parse-template', upload.single('file'), async (req: MulterRequest, res) => {
   try {
-    // 重新构建 FormData，因为 req.body 已被解析成对象，req.file 包含文件buffer
     const formData = new FormData();
-
-    // 添加其他字段
-    if (req.body) {
-      for (const key in req.body) {
-        formData.append(key, req.body[key]);
-      }
-    }
-
-    // 添加文件 - 需要将 Buffer 转换为 Blob
     if (req.file) {
-      const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
-      formData.append('file', blob, req.file.originalname);
+      formData.append('file', req.file.buffer, req.file.originalname);
     }
 
-    const response = await fetch(`${AI_SERVICE_URL}/api/parse/scoring-template`, {
-      method: 'POST',
-      body: formData,
+    const response = await axios.post(`${AI_SERVICE_URL}/api/parse/scoring-template`, formData, {
+      headers: formData.getHeaders(),
     });
-    const data = await response.json();
-    res.json(data);
+    res.json(response.data);
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -960,28 +962,15 @@ router.post('/parse-template', upload.single('file'), async (req: MulterRequest,
 // 解析选手名单
 router.post('/parse-contestants', upload.single('file'), async (req: MulterRequest, res) => {
   try {
-    // 重新构建 FormData
     const formData = new FormData();
-
-    // 添加其他字段
-    if (req.body) {
-      for (const key in req.body) {
-        formData.append(key, req.body[key]);
-      }
-    }
-
-    // 添加文件 - 需要将 Buffer 转换为 Blob
     if (req.file) {
-      const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
-      formData.append('file', blob, req.file.originalname);
+      formData.append('file', req.file.buffer, req.file.originalname);
     }
 
-    const response = await fetch(`${AI_SERVICE_URL}/api/parse/contestants`, {
-      method: 'POST',
-      body: formData,
+    const response = await axios.post(`${AI_SERVICE_URL}/api/parse/contestants`, formData, {
+      headers: formData.getHeaders(),
     });
-    const data = await response.json();
-    res.json(data);
+    res.json(response.data);
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -990,11 +979,29 @@ router.post('/parse-contestants', upload.single('file'), async (req: MulterReque
 // 导出评分结果
 router.post('/export-results', upload.fields([{ name: 'template_file' }, { name: 'result_data' }]), async (req: MulterRequest, res) => {
   try {
-    const response = await fetch(`${AI_SERVICE_URL}/api/export/scoring-results`, {
-      method: 'POST',
-      body: req.body,
+    const resultDataStr = req.body.result_data;
+    let parsedResultData;
+    if (typeof resultDataStr === 'string') {
+      parsedResultData = JSON.parse(resultDataStr);
+    } else {
+      parsedResultData = resultDataStr;
+    }
+
+    // 构建 FormData 发送给 AI 服务
+    const formData = new FormData();
+    // upload.fields() puts files in req.files, not req.file
+    const files = req.files as { [fieldname: string]: MulterFile[] };
+    const templateFile = files?.['template_file']?.[0];
+    if (templateFile) {
+      formData.append('template_file', templateFile.buffer, templateFile.originalname);
+    }
+    formData.append('result_data', JSON.stringify(parsedResultData));
+
+    const response = await axios.post(`${AI_SERVICE_URL}/api/export/scoring-results`, formData, {
+      headers: formData.getHeaders(),
+      responseType: 'arraybuffer',
     });
-    const buffer = await response.arrayBuffer();
+    const buffer = response.data;
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': 'attachment; filename=scoring_results.xlsx',

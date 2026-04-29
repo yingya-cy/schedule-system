@@ -229,11 +229,23 @@ export async function initializeDatabase() {
         max_score DECIMAL(10,2) NOT NULL,
         sort_order INT DEFAULT 0,
         is_optional TINYINT(1) DEFAULT 0,
+        description TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (template_id) REFERENCES scoring_templates(id) ON DELETE CASCADE,
         INDEX idx_template_sort (template_id, sort_order)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
+
+    // 检查并添加 scoring_dimensions 表的新字段（如果不存在）
+    try {
+      const [descColumns] = await connection.query(`SHOW COLUMNS FROM scoring_dimensions LIKE "description"`);
+      if ((descColumns as any[]).length === 0) {
+        await connection.query(`ALTER TABLE scoring_dimensions ADD COLUMN description TEXT`);
+        console.log('✅ Added description column to scoring_dimensions table');
+      }
+    } catch (alterError) {
+      console.log('ℹ️  Column check/add note:', alterError.message);
+    }
 
     // 评分子维度表（二级指标）
     await connection.query(`
@@ -278,6 +290,7 @@ export async function initializeDatabase() {
         number VARCHAR(50),
         name VARCHAR(200) NOT NULL,
         group_name VARCHAR(200),
+        work_name VARCHAR(500),
         description TEXT,
         extra_data JSON,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -286,6 +299,17 @@ export async function initializeDatabase() {
         INDEX idx_competition_name (competition_id, name)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
+
+    // 检查并添加 contestants 表的新字段（如果不存在）
+    try {
+      const [workNameColumns] = await connection.query(`SHOW COLUMNS FROM contestants LIKE "work_name"`);
+      if ((workNameColumns as any[]).length === 0) {
+        await connection.query(`ALTER TABLE contestants ADD COLUMN work_name VARCHAR(500)`);
+        console.log('✅ Added work_name column to contestants table');
+      }
+    } catch (alterError) {
+      console.log('ℹ️  Column check/add note:', alterError.message);
+    }
 
     // 评委表
     await connection.query(`
@@ -320,18 +344,39 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
 
-    // 评分详情表（二级维度评分）
+    // 评分详情表（二级维度评分 + 主维度评分）
     await connection.query(`
       CREATE TABLE IF NOT EXISTS score_details (
         id INT AUTO_INCREMENT PRIMARY KEY,
         score_id INT NOT NULL,
-        subdimension_id INT NOT NULL,
+        subdimension_id INT DEFAULT NULL,
+        dimension_id INT DEFAULT NULL,
         score DECIMAL(10,2) NOT NULL,
         FOREIGN KEY (score_id) REFERENCES scores(id) ON DELETE CASCADE,
-        FOREIGN KEY (subdimension_id) REFERENCES scoring_subdimensions(id),
-        UNIQUE KEY uk_score_subdimension (score_id, subdimension_id)
+        FOREIGN KEY (subdimension_id) REFERENCES scoring_subdimensions(id) ON DELETE CASCADE,
+        FOREIGN KEY (dimension_id) REFERENCES scoring_dimensions(id) ON DELETE CASCADE,
+        UNIQUE KEY uk_score_subdimension (score_id, subdimension_id),
+        UNIQUE KEY uk_score_dimension (score_id, dimension_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
+
+    // 检查并添加 score_details 表的新字段（如果不存在）
+    try {
+      const [dimColumns] = await connection.query(`SHOW COLUMNS FROM score_details LIKE "dimension_id"`);
+      if ((dimColumns as any[]).length === 0) {
+        await connection.query(`ALTER TABLE score_details ADD COLUMN dimension_id INT DEFAULT NULL`);
+        console.log('✅ Added dimension_id column to score_details table');
+      }
+      // 修改 subdimension_id 为允许 NULL（支持主维度评分）
+      // 注意：如果表已存在且 subdimension_id 是 NOT NULL，需要先修改为 NULL 才能插入只有 dimension_id 的记录
+      const [subColumns] = await connection.query(`SHOW COLUMNS FROM score_details LIKE "subdimension_id"`);
+      if ((subColumns as any[]).length > 0 && (subColumns as any[])[0].Null === 'NO') {
+        await connection.query(`ALTER TABLE score_details MODIFY subdimension_id INT NULL`);
+        console.log('✅ Modified subdimension_id to allow NULL');
+      }
+    } catch (alterError) {
+      console.log('ℹ️  Column check/add note:', alterError.message);
+    }
 
     // 计算结果表（最终排名）
     await connection.query(`

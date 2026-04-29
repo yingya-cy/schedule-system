@@ -83,6 +83,7 @@ export interface Contestant {
   number: string;
   name: string;
   group_name: string;
+  work_name?: string;
   description: string;
   extra_data: Record<string, unknown> | null;
   scored?: boolean;
@@ -141,7 +142,8 @@ export interface SubmitScorePayload {
   judge_id: number;
   contestant_id: number;
   scores: {
-    subdimension_id: number;
+    subdimension_id?: number;
+    dimension_id?: number;
     score: number;
   }[];
 }

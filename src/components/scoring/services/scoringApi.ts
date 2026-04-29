@@ -163,7 +163,7 @@ export const contestantApi = {
       body: JSON.stringify(data),
     }),
 
-  import: (competitionId: number, contestants: { number: string; name: string; group_name?: string }[]) =>
+  import: (competitionId: number, contestants: { number: string; name: string; work_name?: string; group_name?: string }[]) =>
     request<{ inserted: number; ids: number[] }>(
       `/competitions/${competitionId}/contestants/import`,
       { method: 'POST', body: JSON.stringify({ contestants }) }
@@ -211,7 +211,7 @@ export const judgeApi = {
     request<Contestant[]>(`/judge/${judgeId}/contestants`),
 
   getScoresByContestant: (contestantId: string, judgeId: string) =>
-    request<{ subdimension_id: number; score: number }[]>(`/judge/scores/${contestantId}/${judgeId}`),
+    request<{ subdimension_id?: number; dimension_id?: number; score: number }[]>(`/judge/scores/${contestantId}/${judgeId}`),
 
   submitScore: (payload: SubmitScorePayload) =>
     request<{ total_score: number }>('/judge/scores', {

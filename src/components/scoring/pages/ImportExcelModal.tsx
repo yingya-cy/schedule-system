@@ -17,6 +17,7 @@ interface ParsedTemplate {
 interface ParsedContestant {
   number: string;
   name: string;
+  work_name?: string;
   group_name: string;
 }
 
@@ -92,6 +93,7 @@ export default function ImportExcelModal({
       }
     } catch (e) {
       setError((e as Error).message);
+      setStep('choose');
     }
   }
 
@@ -269,6 +271,9 @@ export default function ImportExcelModal({
                       <div key={i} className="flex items-center gap-3 p-2 bg-surface-container-lowest rounded-lg">
                         <span className="text-sm text-outline w-6">{i + 1}</span>
                         <span className="font-medium text-sm">{c.name}</span>
+                        {c.work_name && c.work_name !== c.name && (
+                          <span className="text-xs text-primary/70">({c.work_name})</span>
+                        )}
                         <span className="text-sm text-outline">{c.number && `(${c.number})`}</span>
                         <span className="text-sm text-outline ml-auto">{c.group_name}</span>
                       </div>

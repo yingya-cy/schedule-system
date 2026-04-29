@@ -1,16 +1,17 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, X, FileSpreadsheet, AlertCircle, Loader, CheckCircle } from 'lucide-react';
-import { importExportApi } from '../services/scoringApi.ts';
+import { importExportApi, resultApi } from '../services/scoringApi.ts';
 import type { Competition } from '../types/scoring.ts';
 
 interface ExportExcelModalProps {
   isOpen: boolean;
   onClose: () => void;
-  competitions: Competition[];
+  currentCompetition?: Competition;
 }
 
-export default function ExportExcelModal({ isOpen, onClose, competitions }: ExportExcelModalProps) {
+export default function ExportExcelModal({ isOpen, onClose, currentCompetition }: ExportExcelModalProps) {
+  const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [selectedCompetitionId, setSelectedCompetitionId] = useState<number>(0);
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,6 +19,24 @@ export default function ExportExcelModal({ isOpen, onClose, competitions }: Expo
   const [success, setSuccess] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // 加载历史比赛数据
+  useEffect(() => {
+    if (isOpen) {
+      resultApi.history().then((data) => {
+        // 如果有当前比赛，排在最前面
+        const list = currentCompetition
+          ? [currentCompetition, ...data.filter((c: Competition) => c.id !== currentCompetition.id)]
+          : data;
+        setCompetitions(list);
+      }).catch(() => {
+        // 如果 API 失败，使用当前比赛
+        if (currentCompetition) {
+          setCompetitions([currentCompetition]);
+        }
+      });
+    }
+  }, [isOpen, currentCompetition]);
 
   function reset() {
     setSelectedCompetitionId(0);
@@ -155,7 +174,7 @@ export default function ExportExcelModal({ isOpen, onClose, competitions }: Expo
                       className="w-full px-4 py-3 bg-surface-container-low border border-surface-container-high rounded-xl text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
                     >
                       <option value={0}>选择比赛...</option>
-                      {competitions.filter(c => c.status === 'completed').map((c) => (
+                      {competitions.map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>

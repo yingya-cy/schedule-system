@@ -35,7 +35,7 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
   // 评分明细
   const [detailsData, setDetailsData] = useState<{
     judges: { id: number; name: string }[];
-    contestants: { id: number; number: string; name: string; group_name: string }[];
+    contestants: { id: number; number: string; name: string; work_name?: string; group_name: string }[];
     dimensionGroups: Record<number, { name: string; max: number; subs: { id: number; name: string; max: number }[] }>;
     scoreMap: Record<number, Record<number, Record<number, number>>>;
   } | null>(null);
@@ -269,22 +269,32 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
     });
   }
 
-  function handleImportContestants(contestants: { number: string; name: string; group_name: string }[], compId: number) {
+  function handleImportContestants(contestants: { number: string; name: string; work_name?: string; group_name: string }[], compId: number) {
     if (compId !== competitionId) return;
-    const newContestants = contestants.map((c, i) => ({
-      id: Date.now() + i,
-      ...c,
-      competition_id: competitionId,
-      created_at: new Date().toISOString(),
-      description: '',
-      extra_data: null,
-    }));
-    setContestants((prev) => [...prev, ...newContestants]);
-    setMessageDialog({
-      open: true,
-      type: 'success',
-      title: '导入成功',
-      message: `成功导入 ${contestants.length} 位选手`,
+    // 调用 API 保存到数据库
+    contestantApi.import(compId, contestants).then((result) => {
+      const newContestants = contestants.map((c, i) => ({
+        id: result.ids[i],
+        ...c,
+        competition_id: compId,
+        created_at: new Date().toISOString(),
+        description: '',
+        extra_data: null,
+      }));
+      setContestants((prev) => [...prev, ...newContestants]);
+      setMessageDialog({
+        open: true,
+        type: 'success',
+        title: '导入成功',
+        message: `成功导入 ${contestants.length} 位选手`,
+      });
+    }).catch(() => {
+      setMessageDialog({
+        open: true,
+        type: 'error',
+        title: '导入失败',
+        message: '保存选手数据失败',
+      });
     });
   }
 
@@ -516,15 +526,6 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
             >
               <FileSpreadsheet size={16} />
               导入Excel
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setShowExportModal(true)}
-              className="px-4 py-2.5 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors flex items-center gap-2 touch-target focus-ring"
-            >
-              <Download size={16} />
-              导出Excel
             </motion.button>
           </div>
 
@@ -925,8 +926,12 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
                           ? (detailsData.scoreMap[activeContestantId]?.[judge.id] ?? {})
                           : {};
                         const judgeDimTotals = Object.entries(detailsData.dimensionGroups).map(([dimId, dim]) => {
-                          const dimTotal = dim.subs.reduce((sum, sub) => sum + (contestantScores[sub.id] ?? 0), 0);
-                          return dimTotal;
+                          if (dim.subs.length > 0) {
+                            return dim.subs.reduce((sum, sub) => sum + (contestantScores[sub.id] ?? 0), 0);
+                          } else {
+                            // 无子维度时，dimId 是字符串，scoreMap 的 key 也是字符串
+                            return contestantScores[dimId] ?? 0;
+                          }
                         });
                         const judgeGrandTotal = judgeDimTotals.reduce((a, b) => a + b, 0);
 
@@ -937,24 +942,41 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
                             </td>
                             {Object.entries(detailsData.dimensionGroups).map(([dimId, dim], dimIdx) => (
                               <td key={dimId} className="contents">
-                                {dim.subs.map((sub) => {
-                                  const score = contestantScores[sub.id];
-                                  const hasScore = score !== undefined && score > 0;
-                                  return (
-                                    <td
-                                      key={sub.id}
-                                      className={`px-2 py-3 text-center text-sm border-l border-surface-container-high/50 ${
-                                        hasScore ? 'text-on-surface font-medium' : 'text-outline'
-                                      }`}
-                                    >
-                                      {hasScore ? score.toFixed(1) : '-'}
+                                {dim.subs.length > 0 ? (
+                                  <>
+                                    {dim.subs.map((sub) => {
+                                      const score = contestantScores[sub.id];
+                                      const hasScore = score !== undefined && score > 0;
+                                      return (
+                                        <td
+                                          key={sub.id}
+                                          className={`px-2 py-3 text-center text-sm border-l border-surface-container-high/50 ${
+                                            hasScore ? 'text-on-surface font-medium' : 'text-outline'
+                                          }`}
+                                        >
+                                          {hasScore ? score.toFixed(1) : '-'}
+                                        </td>
+                                      );
+                                    })}
+                                    {/* 小计 */}
+                                    <td className="px-2 py-3 text-center text-sm font-semibold text-primary border-l border-surface-container-high/50 bg-primary/5">
+                                      {judgeDimTotals[dimIdx] > 0 ? judgeDimTotals[dimIdx].toFixed(1) : '-'}
                                     </td>
-                                  );
-                                })}
-                                {/* 小计 */}
-                                <td className="px-2 py-3 text-center text-sm font-semibold text-primary border-l border-surface-container-high/50 bg-primary/5">
-                                  {judgeDimTotals[dimIdx] > 0 ? judgeDimTotals[dimIdx].toFixed(1) : '-'}
-                                </td>
+                                  </>
+                                ) : (
+                                  /* 无子维度时，直接显示维度评分（无小计列） */
+                                  (() => {
+                                    const score = contestantScores[dimId];
+                                    const hasScore = score !== undefined && score > 0;
+                                    return (
+                                      <td className={`px-2 py-3 text-center text-sm border-l border-surface-container-high/50 ${
+                                        hasScore ? 'text-on-surface font-medium' : 'text-outline'
+                                      }`}>
+                                        {hasScore ? score.toFixed(1) : '-'}
+                                      </td>
+                                    );
+                                  })()
+                                )}
                               </td>
                             ))}
                             {/* 总分 */}
@@ -981,6 +1003,18 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
       {/* 结果 */}
       {activeTab === 'results' && (
         <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-sm text-outline">共 {results.length} 条结果</div>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowExportModal(true)}
+              className="px-4 py-2.5 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors flex items-center gap-2 touch-target focus-ring"
+            >
+              <Download size={16} />
+              导出Excel
+            </motion.button>
+          </div>
           {!resultsLoaded && results.length === 0 ? (
             <div className="py-16 text-center">
               <div className="flex flex-col items-center gap-2">
@@ -1016,7 +1050,7 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
                         </td>
                         <td className="px-4 py-3 text-sm text-on-surface">{r.number || '-'}</td>
                         <td className={`px-4 py-3 text-sm font-medium ${r.rank <= 3 ? 'text-primary' : 'text-on-surface'}`}>
-                          {r.contestant_name}
+                          {r.work_name || r.contestant_name}
                         </td>
                         <td className="px-4 py-3 text-sm text-outline">{r.group_name || '-'}</td>
                         <td className="px-4 py-3 text-center text-sm font-bold text-on-surface">{Number(r.total_score).toFixed(2)}</td>
@@ -1077,7 +1111,7 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
       <ExportExcelModal
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
-        competitions={[competition].filter(Boolean) as Competition[]}
+        currentCompetition={competition ?? undefined}
       />
     </div>
   );

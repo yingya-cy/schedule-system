@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { judgeApi, competitionApi } from '../services/scoringApi.ts';
 import type { Contestant, ScoringDimension } from '../types/scoring.ts';
 import MessageDialog from '../../MessageDialog.tsx';
 import ConfirmDialog from '../../ConfirmDialog.tsx';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2, ChevronRight, ClipboardList, ArrowLeft, AlertTriangle, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ClipboardList, ArrowLeft, AlertTriangle, ChevronDown } from 'lucide-react';
 
 // Dimension colors for visual distinction
 const DIMENSION_COLORS = [
@@ -36,7 +36,6 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   const [submittedIds, setSubmittedIds] = useState<Set<number>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [submittingAll, setSubmittingAll] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [competitionName, setCompetitionName] = useState('');
 
@@ -52,10 +51,17 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
 
   // 是否正在切换选手（防止重复保存）
   const [switchingContestant, setSwitchingContestant] = useState(false);
+  // 用于自动滚动到顶部
+  const scoringAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadData();
   }, [competitionId, judgeId]);
+
+  // 自动滚动到顶部当切换选手时
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [activeContestant?.id]);
 
   async function loadData() {
     try {
@@ -96,6 +102,8 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
       for (const row of rows) {
         if (row.subdimension_id) {
           loaded[Number(row.subdimension_id)] = parseFloat(String(row.score));
+        } else if (row.dimension_id) {
+          loaded[Number(row.dimension_id)] = parseFloat(String(row.score));
         }
       }
       return loaded;
@@ -109,9 +117,22 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
     if (!activeContestant) return true;
     // 如果没有任何评分，不发送请求
     if (Object.keys(currentScores).length === 0) return true;
-    const scoreList: { subdimension_id: number; score: number }[] = [];
+    const scoreList: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
     for (const [subId, scoreVal] of Object.entries(currentScores)) {
-      scoreList.push({ subdimension_id: parseInt(subId), score: scoreVal });
+      const id = parseInt(subId);
+      // 判断是子维度还是主维度
+      let isDimension = true;
+      for (const dim of dimensions) {
+        if (dim.subdimensions.some(sub => sub.id === id)) {
+          isDimension = false;
+          break;
+        }
+      }
+      if (isDimension) {
+        scoreList.push({ dimension_id: id, score: scoreVal });
+      } else {
+        scoreList.push({ subdimension_id: id, score: scoreVal });
+      }
     }
     try {
       await judgeApi.submitScore({
@@ -151,7 +172,6 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
     setContestantScores(prev => ({ ...prev, [activeContestant.id]: { ...currentScores } }));
     setActiveContestant(c);
     setCurrentScores(loaded);
-    setSubmitted(false);
     setSwitchingContestant(false);
   }
 
@@ -179,16 +199,42 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
     setExpandedDims((prev) => ({ ...prev, [dimId]: !prev[dimId] }));
   }
 
+  // 切换到上一个选手
+  function goToPrevContestant() {
+    if (!activeContestant || contestants.length === 0) return;
+    const idx = contestants.findIndex(c => c.id === activeContestant.id);
+    if (idx > 0) {
+      switchToContestant(contestants[idx - 1]);
+    }
+  }
+
+  // 切换到下一个选手
+  function goToNextContestant() {
+    if (!activeContestant || contestants.length === 0) return;
+    const idx = contestants.findIndex(c => c.id === activeContestant.id);
+    if (idx < contestants.length - 1) {
+      switchToContestant(contestants[idx + 1]);
+    }
+  }
+
   // Calculate dimension progress
   function getDimProgress(dim: ScoringDimension) {
     let scored = 0;
     let total = 0;
-    dim.subdimensions.forEach((sub) => {
-      total += Number(sub.max_score);
-      if (currentScores[sub.id] !== undefined) {
-        scored += currentScores[sub.id];
+    if (dim.subdimensions.length > 0) {
+      dim.subdimensions.forEach((sub) => {
+        total += Number(sub.max_score);
+        if (currentScores[sub.id] !== undefined) {
+          scored += currentScores[sub.id];
+        }
+      });
+    } else {
+      // 无子维度时，直接用维度本身计算
+      total = Number(dim.max_score) || 0;
+      if (currentScores[dim.id] !== undefined) {
+        scored = currentScores[dim.id];
       }
-    });
+    }
     return { scored, total, percentage: total > 0 ? (scored / total) * 100 : 0 };
   }
 
@@ -196,25 +242,42 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   function handleSubmit() {
     if (!activeContestant) return;
 
-    // Validate all subdimension scores
-    const scoreList: { subdimension_id: number; score: number }[] = [];
+    // Validate all scores (subdimensions + dimensions without subdimensions)
+    const scoreList: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
     for (const dim of dimensions) {
-      for (const sub of dim.subdimensions) {
-        const scoreVal = currentScores[sub.id];
-        // Only include if explicitly set (not undefined)
+      if (dim.subdimensions.length > 0) {
+        // 子维度评分
+        for (const sub of dim.subdimensions) {
+          const scoreVal = currentScores[sub.id];
+          if (scoreVal !== undefined) {
+            scoreList.push({ subdimension_id: sub.id, score: scoreVal });
+          }
+        }
+      } else {
+        // 无子维度时，维度本身就是评分项，用维度 id
+        const scoreVal = currentScores[dim.id];
         if (scoreVal !== undefined) {
-          scoreList.push({
-            subdimension_id: sub.id,
-            score: scoreVal,
-          });
+          scoreList.push({ dimension_id: dim.id, score: scoreVal });
         }
       }
     }
 
     // Check for scores exceeding max
     const overMax = scoreList.filter((s) => {
-      const sub = dimensions.flatMap((d) => d.subdimensions).find((sub) => sub.id === s.subdimension_id);
-      return sub && s.score > sub.max_score;
+      // 查找是子维度还是主维度
+      let maxScore = 0;
+      for (const dim of dimensions) {
+        if (dim.subdimensions.length > 0) {
+          if (s.subdimension_id) {
+            const sub = dim.subdimensions.find(sub => sub.id === s.subdimension_id);
+            if (sub) { maxScore = sub.max_score; break; }
+          }
+        } else if (s.dimension_id && dim.id === s.dimension_id) {
+          maxScore = dim.max_score;
+          break;
+        }
+      }
+      return s.score > maxScore;
     });
 
     // Calculate total
@@ -253,8 +316,24 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
         setContestants((prev) =>
           prev.map((c) => (c.id === activeContestant.id ? { ...c, scored: true } : c))
         );
-        setSubmitted(true);
         setCurrentScores({});
+        setMessageDialog({
+          open: true,
+          type: 'success',
+          title: '提交成功',
+          message: contestants.find(c => !c.scored && c.id !== activeContestant.id)
+            ? '即将切换到下一位选手'
+            : '已是最后一位选手',
+        });
+        // 延迟切换到下一位
+        setTimeout(() => {
+          setMessageDialog(p => ({ ...p, open: false }));
+          const currentIdx = contestants.findIndex(c => c.id === activeContestant.id);
+          const nextIdx = currentIdx + 1;
+          if (nextIdx < contestants.length) {
+            switchToContestant(contestants[nextIdx]);
+          }
+        }, 1200);
       })
       .catch((e: unknown) => {
         setMessageDialog({ open: true, type: 'error', title: '提交失败', message: (e as Error).message });
@@ -344,9 +423,9 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   const templateTotal = dimensions.reduce((sum, d) => sum + (parseFloat(String(d.max_score)) || 0), 0);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col overflow-hidden">
       {/* Top Bar */}
-      <header className="bg-gradient-to-r from-primary to-primary/80 text-on-primary px-6 py-4 flex justify-between items-center shadow-lg shadow-primary/20">
+      <header className="bg-gradient-to-r from-primary to-primary/80 text-on-primary px-6 py-4 flex justify-between items-center shadow-lg shadow-primary/20 flex-shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
@@ -355,11 +434,11 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
             <ArrowLeft size={20} className="text-on-primary/80" />
           </button>
           <div>
-            <div className="text-lg font-bold font-headline">{competitionName}</div>
+            <div className="text-lg font-bold font-headline truncate max-w-[50vw]">{competitionName}</div>
             <div className="text-sm text-on-primary/80 mt-0.5">评委：{judgeName}</div>
           </div>
         </div>
-        <div className="text-right">
+        <div className="text-right flex-shrink-0">
           <div className="text-3xl font-bold font-headline">{unscoredCount}</div>
           <div className="text-xs text-on-primary/80">待评分</div>
         </div>
@@ -367,31 +446,49 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
 
       {/* Contestant Tabs */}
       {contestants.length > 0 && (
-        <div className="bg-surface border-b border-surface-container-high px-4 py-3 flex gap-2 overflow-x-auto">
-          {contestants.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => switchToContestant(c)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
-                activeContestant?.id === c.id
-                  ? 'bg-primary text-on-primary shadow-md'
-                  : c.scored
-                  ? 'bg-success/10 text-success'
-                  : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
-              }`}
-            >
-              {c.number || c.name}
-              {c.scored && <span className="ml-1">✓</span>}
-            </button>
-          ))}
+        <div className="bg-surface border-b border-surface-container-high px-2 py-2 flex gap-2 items-center flex-shrink-0 overflow-hidden">
+          <button
+            onClick={goToPrevContestant}
+            disabled={!activeContestant || contestants.findIndex(c => c.id === activeContestant.id) === 0}
+            className="p-1 rounded bg-surface-container-low hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-ring flex-shrink-0 touch-target flex items-center justify-center"
+          >
+            <ChevronLeft size={14} className="text-on-surface-variant" />
+          </button>
+
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide flex-1 min-w-0 h-7 max-w-[calc(100vw-140px)]">
+            {contestants.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => switchToContestant(c)}
+                className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 h-full flex items-center justify-center ${
+                  activeContestant?.id === c.id
+                    ? 'bg-primary text-on-primary shadow-md'
+                    : c.scored
+                    ? 'bg-success/10 text-success'
+                    : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
+                }`}
+              >
+                {c.number || c.name}
+                {c.scored && <span className="ml-0.5">✓</span>}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={goToNextContestant}
+            disabled={!activeContestant || contestants.findIndex(c => c.id === activeContestant.id) >= contestants.length - 1}
+            className="p-1 rounded bg-surface-container-low hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-ring flex-shrink-0 touch-target flex items-center justify-center"
+          >
+            <ChevronRight size={14} className="text-on-surface-variant" />
+          </button>
         </div>
       )}
 
       {/* Scoring Area */}
-      <div className="flex-1 p-6 flex flex-col gap-6 max-w-2xl mx-auto w-full">
+      <div ref={scoringAreaRef} className="flex-1 p-4 md:p-6 flex flex-col gap-4 md:gap-6 overflow-y-auto">
         {/* No contestants message */}
         {contestants.length === 0 && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center max-w-2xl mx-auto w-full">
             <div className="w-16 h-16 rounded-full bg-surface-container-low flex items-center justify-center">
               <ClipboardList size={32} className="text-outline" />
             </div>
@@ -403,39 +500,24 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
         {/* Active contestant scoring */}
         {activeContestant && contestants.length > 0 && (
           <AnimatePresence mode="wait">
-            {submitted ? (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="flex-1 flex flex-col items-center justify-center gap-4"
-              >
-                <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center">
-                  <CheckCircle2 size={48} className="text-success" />
-                </div>
-                <div className="text-2xl font-bold text-success font-headline">提交成功</div>
-                {contestants.find((c) => !c.scored && c.id !== activeContestant?.id) && (
-                  <div className="text-sm text-outline">即将切换到下一个选手...</div>
-                )}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="scoring"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex-1 flex flex-col gap-6"
-              >
+            <motion.div
+              key="scoring"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="flex-1 flex flex-col gap-4 md:gap-6 max-w-2xl mx-auto w-full"
+            >
                 {/* Contestant Info */}
-                <div className="bg-surface rounded-2xl border border-surface-container-high p-5 shadow-sm">
-                  <h2 className="text-xl font-bold text-on-surface font-headline">{activeContestant.name}</h2>
+                <div className="bg-surface rounded-2xl border border-surface-container-high p-4 md:p-5 shadow-sm">
+                  <h2 className="text-lg md:text-xl font-bold text-on-surface font-headline truncate">
+                    {activeContestant.work_name || activeContestant.name}
+                  </h2>
                   {activeContestant.group_name && (
                     <div className="text-sm text-outline mt-1">组别：{activeContestant.group_name}</div>
                   )}
                 </div>
 
-                                <div className="flex-1 space-y-4">
+                                <div className="flex-1 space-y-3 md:space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">请打分</h3>
                     {allSubdimensions.length > 0 && (
@@ -472,11 +554,15 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
                       const colorClass = DIMENSION_COLORS[dimIndex % DIMENSION_COLORS.length];
                       const progress = getDimProgress(dim);
                       const isExpanded = expandedDims[dim.id] !== false;
-                      const hasAnyScore = dim.subdimensions.some(s => currentScores[s.id] !== undefined);
-                      const hasOverScore = dim.subdimensions.some(s => {
-                        const v = currentScores[s.id];
-                        return v !== undefined && v > s.max_score;
-                      });
+                      const hasAnyScore = dim.subdimensions.length > 0
+                        ? dim.subdimensions.some(s => currentScores[s.id] !== undefined)
+                        : currentScores[dim.id] !== undefined;
+                      const hasOverScore = dim.subdimensions.length > 0
+                        ? dim.subdimensions.some(s => {
+                            const v = currentScores[s.id];
+                            return v !== undefined && v > s.max_score;
+                          })
+                        : (currentScores[dim.id] !== undefined && currentScores[dim.id] > dim.max_score);
 
                       return (
                         <div
@@ -498,6 +584,9 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
                                 <div className="text-xs text-outline">
                                   满分 <span className="font-medium">{dim.max_score}</span> 分
                                 </div>
+                                {dim.description && dim.subdimensions.length > 0 && (
+                                  <div className="text-xs text-outline mt-0.5 line-clamp-2">{dim.description}</div>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -530,43 +619,88 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
                                 className="overflow-hidden"
                               >
                                 <div className="px-4 pb-4 space-y-3 border-t border-surface-container-high/50">
-                                  {dim.subdimensions.map((sub) => {
-                                    const currentVal = currentScores[sub.id];
-                                    const isOver = currentVal !== undefined && currentVal > sub.max_score;
-                                    return (
-                                      <div key={sub.id} className="pt-4">
-                                        <div className="flex items-center justify-between mb-2">
-                                          <div className="flex-1 min-w-0">
-                                            <div className="font-medium text-on-surface text-sm">{sub.name}</div>
-                                            {sub.description && (
-                                              <div className="text-xs text-outline mt-0.5">{sub.description}</div>
-                                            )}
-                                          </div>
-                                          <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                                            {isOver && <AlertTriangle size={12} className="text-error" />}
-                                            <span className={`text-xs ${isOver ? 'text-error font-bold' : 'text-outline'}`}>
-                                              满分 {sub.max_score}
-                                            </span>
-                                          </div>
+                                  {dim.subdimensions.length === 0 ||
+                                  (dim.subdimensions.length === 1 &&
+                                   dim.subdimensions[0].name === dim.name) ? (
+                                    /* 无子维度 或 子维度name与主维度相同（AI解析错误），视为无子维度 */
+                                    <div className="pt-4">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium text-on-surface text-sm">{dim.name}</div>
+                                          {dim.description && (
+                                            <div className="text-xs text-outline mt-0.5">{dim.description}</div>
+                                          )}
                                         </div>
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          max={sub.max_score}
-                                          step="0.5"
-                                          value={currentVal !== undefined ? currentVal : ''}
-                                          onChange={(e) => handleScoreChange(sub.id, sub.max_score, e.target.value)}
-                                          className={`w-full px-4 py-3 bg-surface-container-low border rounded-xl text-on-surface text-base placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${isOver ? 'border-error' : 'border-surface-container-high'} focus-ring`}
-                                          placeholder={`0 - ${sub.max_score}`}
-                                        />
-                                        {currentVal !== undefined && (
-                                          <div className={`text-xs mt-1 ${isOver ? 'text-error' : 'text-success'}`}>
-                                            {isOver ? `分数超出（${currentVal} > ${sub.max_score}）` : `当前：${currentVal} / ${sub.max_score}`}
-                                          </div>
-                                        )}
+                                        <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                                          <span className="text-xs text-outline">满分 {dim.max_score} 分</span>
+                                        </div>
                                       </div>
-                                    );
-                                  })}
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max={dim.max_score}
+                                        step="0.5"
+                                        value={currentScores[dim.id] !== undefined ? currentScores[dim.id] : ''}
+                                        onChange={(e) => {
+                                          const v = parseFloat(e.target.value);
+                                          if (e.target.value === '') {
+                                            const newScores = { ...currentScores };
+                                            delete newScores[dim.id];
+                                            setCurrentScores(newScores);
+                                          } else {
+                                            setCurrentScores({ ...currentScores, [dim.id]: clamp(v, 0, dim.max_score) });
+                                          }
+                                        }}
+                                        className="w-full px-4 py-3 bg-surface-container-low border border-surface-container-high rounded-xl text-on-surface text-base placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all focus-ring"
+                                        placeholder={`0 - ${dim.max_score}`}
+                                      />
+                                      {currentScores[dim.id] !== undefined && (
+                                        <div className={`text-xs mt-1 ${currentScores[dim.id] > dim.max_score ? 'text-error' : 'text-success'}`}>
+                                          {currentScores[dim.id] > dim.max_score
+                                            ? `分数超出（${currentScores[dim.id]} > ${dim.max_score}）`
+                                            : `当前：${currentScores[dim.id]} / ${dim.max_score}`}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    dim.subdimensions.map((sub) => {
+                                      const currentVal = currentScores[sub.id];
+                                      const isOver = currentVal !== undefined && currentVal > sub.max_score;
+                                      return (
+                                        <div key={sub.id} className="pt-4">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <div className="flex-1 min-w-0">
+                                              <div className="font-medium text-on-surface text-sm">{sub.name}</div>
+                                              {sub.description && (
+                                                <div className="text-xs text-outline mt-0.5">{sub.description}</div>
+                                              )}
+                                            </div>
+                                            <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                                              {isOver && <AlertTriangle size={12} className="text-error" />}
+                                              <span className={`text-xs ${isOver ? 'text-error font-bold' : 'text-outline'}`}>
+                                                满分 {sub.max_score}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max={sub.max_score}
+                                            step="0.5"
+                                            value={currentVal !== undefined ? currentVal : ''}
+                                            onChange={(e) => handleScoreChange(sub.id, sub.max_score, e.target.value)}
+                                            className={`w-full px-4 py-3 bg-surface-container-low border rounded-xl text-on-surface text-base placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${isOver ? 'border-error' : 'border-surface-container-high'} focus-ring`}
+                                            placeholder={`0 - ${sub.max_score}`}
+                                          />
+                                          {currentVal !== undefined && (
+                                            <div className={`text-xs mt-1 ${isOver ? 'text-error' : 'text-success'}`}>
+                                              {isOver ? `分数超出（${currentVal} > ${sub.max_score}）` : `当前：${currentVal} / ${sub.max_score}`}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })
+                                  )}
                                 </div>
                               </motion.div>
                             )}
@@ -600,7 +734,6 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
                   </button>
                 )}
               </motion.div>
-            )}
           </AnimatePresence>
         )}
       </div>
