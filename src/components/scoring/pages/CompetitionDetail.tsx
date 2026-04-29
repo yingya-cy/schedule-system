@@ -1028,14 +1028,15 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
             </div>
           ) : (
             <div className="bg-surface rounded-2xl border border-surface-container-high overflow-x-auto">
-                <table className="w-full min-w-[480px]">
+                <table className="w-full min-w-[560px]">
                   <thead>
                     <tr className="bg-surface-container-low">
                       <th className="px-4 py-3 text-center text-xs font-medium text-on-surface-variant uppercase tracking-wider w-16">排名</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">编号</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">姓名/名称</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">组别</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-on-surface-variant uppercase tracking-wider">总分</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-on-surface-variant uppercase tracking-wider">最终分</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-on-surface-variant uppercase tracking-wider">原始均分</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-on-surface-variant uppercase tracking-wider">评分人数</th>
                     </tr>
                   </thead>
@@ -1053,7 +1054,12 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
                           {r.work_name || r.contestant_name}
                         </td>
                         <td className="px-4 py-3 text-sm text-outline">{r.group_name || '-'}</td>
-                        <td className="px-4 py-3 text-center text-sm font-bold text-on-surface">{Number(r.total_score).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-center text-sm font-bold text-on-surface">
+                          {Number(r.final_score ?? r.total_score).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-outline">
+                          {Number(r.total_score).toFixed(2)}
+                        </td>
                         <td className="px-4 py-3 text-center text-sm text-outline">{r.score_count}</td>
                       </tr>
                     ))}

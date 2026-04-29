@@ -471,9 +471,16 @@ router.post('/competitions/:id/judges/import', async (req, res) => {
 // 删除评委
 router.delete('/competitions/:id/judges/:judgeId', async (req, res) => {
   try {
+    const { judgeId, id } = req.params;
+    // 先删除评委的评分记录(score_details会级联删除)
+    await pool.query(
+      'DELETE FROM scores WHERE judge_id = ? AND competition_id = ?',
+      [judgeId, id]
+    );
+    // 再删除评委
     await pool.query(
       'DELETE FROM judges WHERE id = ? AND competition_id = ?',
-      [req.params.judgeId, req.params.id]
+      [judgeId, id]
     );
     res.json({ success: true });
   } catch (error: any) {
@@ -692,6 +699,17 @@ router.post('/competitions/:id/calculate', async (req, res) => {
       );
       const avgScore = totalScore / (scores as any[]).length;
 
+      // 去掉一个最高分和一个最低分（至少需要3个评分才有效）
+      let finalScore = avgScore;
+      if ((scores as any[]).length >= 3) {
+        const sortedScores = (scores as any[])
+          .map(s => parseFloat(s.total_score || 0))
+          .sort((a, b) => a - b);
+        const count = sortedScores.length;
+        const trimmedSum = sortedScores.slice(1, count - 1).reduce((sum, s) => sum + s, 0);
+        finalScore = trimmedSum / (count - 2);
+      }
+
       // 计算各维度平均分
       const avgScores: Record<string, number> = {};
       for (const score of scores as any[]) {
@@ -712,20 +730,21 @@ router.post('/competitions/:id/calculate', async (req, res) => {
       }
 
       const [resultInsert] = await connection.query(
-        'INSERT INTO competition_results (competition_id, contestant_id, total_score, score_count, avg_scores) VALUES (?, ?, ?, ?, ?)',
-        [competitionId, contestant.id, avgScore, (scores as any[]).length, JSON.stringify(avgScores)]
+        'INSERT INTO competition_results (competition_id, contestant_id, total_score, final_score, score_count, avg_scores) VALUES (?, ?, ?, ?, ?, ?)',
+        [competitionId, contestant.id, avgScore, finalScore, (scores as any[]).length, JSON.stringify(avgScores)]
       );
 
       results.push({
         id: (resultInsert as any).insertId,
         contestant,
         total_score: avgScore,
+        final_score: finalScore,
         score_count: (scores as any[]).length
       });
     }
 
-    // 按总分排序并更新排名
-    results.sort((a, b) => b.total_score - a.total_score);
+    // 按去掉最高最低分排序并更新排名
+    results.sort((a, b) => b.final_score - a.final_score);
     for (let i = 0; i < results.length; i++) {
       await connection.query(
         'UPDATE competition_results SET `rank` = ? WHERE id = ?',
@@ -748,6 +767,7 @@ router.post('/competitions/:id/calculate', async (req, res) => {
           rank: i + 1,
           contestant: r.contestant,
           total_score: r.total_score,
+          final_score: r.final_score,
           score_count: r.score_count
         }))
       }

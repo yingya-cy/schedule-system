@@ -277,6 +277,7 @@ export const importExportApi = {
       name: string;
       group_name: string;
       total_score: number;
+      raw_score: number;
       dimension_scores: Record<string, number>;
       score_count: number;
     }>;

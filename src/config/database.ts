@@ -396,6 +396,16 @@ export async function initializeDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
 
+    // 检查并添加 competition_results 表的新字段（如果不存在）
+    try {
+      const [columns] = await connection.query(`SHOW COLUMNS FROM competition_results LIKE "final_score"`);
+      if ((columns as any[]).length === 0) {
+        await connection.query(`ALTER TABLE competition_results ADD COLUMN final_score DECIMAL(10,2) AFTER total_score`);
+      }
+    } catch (err) {
+      // 忽略错误
+    }
+
     // 操作日志表
     await connection.query(`
       CREATE TABLE IF NOT EXISTS scoring_audit_log (
