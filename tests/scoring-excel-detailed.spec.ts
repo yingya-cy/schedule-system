@@ -33,7 +33,7 @@ test.describe('评分系统 Excel 导入功能详细测试', () => {
     await page.screenshot({ path: 'test-results/d1-competition-list.png', fullPage: true });
 
     // 获取比赛列表中所有可点击的项目
-    const competitionItems = page.locator('[class*="card"], [class*="item"], [class*="list"]').all();
+    const competitionItems = await page.locator('[class*="card"], [class*="item"], [class*="list"]').all();
     console.log(`Found ${competitionItems.length} list items`);
 
     // 找到第一个比赛卡片并点击

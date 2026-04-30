@@ -91,13 +91,14 @@ export const competitionApi = {
     request<{
       competition: any;
       judges: { id: number; name: string }[];
-      contestants: { id: number; number: string; name: string; group_name: string }[];
+      contestants: { id: number; number: string; name: string; work_name?: string; group_name: string }[];
       dimensionGroups: Record<number, {
         name: string;
         max: number;
         subs: { id: number; name: string; max: number }[];
       }>;
       scoreMap: Record<number, Record<number, Record<number, number>>>;
+      totalScoreMap: Record<number, Record<number, number>>;
     }>(`/competitions/${competitionId}/score-details`),
 
   getJudgeByName: (competitionId: number, name: string) =>

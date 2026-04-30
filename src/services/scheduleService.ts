@@ -36,13 +36,6 @@ export class ScheduleService {
   }
 
   async createSchedule(dto: CreateScheduleDto): Promise<Schedule> {
-    console.log('📝 createSchedule received:', {
-      hasFileData: !!dto.file_data,
-      fileDataLength: dto.file_data?.length,
-      fileType: dto.file_type,
-      filename: dto.filename
-    });
-
     let fileMetadata: FileMetadata | null = null;
 
     if (dto.file_data && dto.filename) {

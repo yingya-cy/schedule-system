@@ -51,6 +51,8 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
 
   // 是否正在切换选手（防止重复保存）
   const [switchingContestant, setSwitchingContestant] = useState(false);
+  // 评分加载错误
+  const [loadScoreError, setLoadScoreError] = useState('');
   // 用于自动滚动到顶部
   const scoringAreaRef = useRef<HTMLDivElement>(null);
 
@@ -98,6 +100,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   async function loadContestantScores(contestantId: number) {
     try {
       const rows = await judgeApi.getScoresByContestant(String(contestantId), String(judgeId));
+      setLoadScoreError('');
       const loaded: Record<number, number> = {};
       for (const row of rows) {
         if (row.subdimension_id) {
@@ -107,7 +110,8 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
         }
       }
       return loaded;
-    } catch {
+    } catch (e: unknown) {
+      setLoadScoreError('加载已有评分失败，请检查网络连接');
       return {};
     }
   }
@@ -118,20 +122,15 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
     // 如果没有任何评分，不发送请求
     if (Object.keys(currentScores).length === 0) return true;
     const scoreList: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
-    for (const [subId, scoreVal] of Object.entries(currentScores)) {
-      const id = parseInt(subId);
-      // 判断是子维度还是主维度
-      let isDimension = true;
-      for (const dim of dimensions) {
-        if (dim.subdimensions.some(sub => sub.id === id)) {
-          isDimension = false;
-          break;
+    for (const dim of dimensions) {
+      if (dim.subdimensions.length > 0) {
+        for (const sub of dim.subdimensions) {
+          const scoreVal = currentScores[sub.id];
+          scoreList.push({ subdimension_id: sub.id, score: scoreVal !== undefined ? scoreVal : 0 });
         }
-      }
-      if (isDimension) {
-        scoreList.push({ dimension_id: id, score: scoreVal });
       } else {
-        scoreList.push({ subdimension_id: id, score: scoreVal });
+        const scoreVal = currentScores[dim.id];
+        scoreList.push({ dimension_id: dim.id, score: scoreVal !== undefined ? scoreVal : 0 });
       }
     }
     try {
@@ -142,6 +141,10 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
       });
       // 更新本地记录
       setContestantScores(prev => ({ ...prev, [activeContestant.id]: { ...currentScores } }));
+      // 同步更新 scored 状态，使 UI 标签正确显示已评分
+      setContestants(prev =>
+        prev.map(c => c.id === activeContestant.id ? { ...c, scored: true } : c)
+      );
       return true;
     } catch (e: unknown) {
       if (!silent) {
@@ -169,7 +172,8 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
 
     // 加载新选手的已有评分
     const loaded = await loadContestantScores(c.id);
-    setContestantScores(prev => ({ ...prev, [activeContestant.id]: { ...currentScores } }));
+    // 缓存到 contestantScores，便于一键提交时使用
+    setContestantScores(prev => ({ ...prev, [c.id]: { ...loaded } }));
     setActiveContestant(c);
     setCurrentScores(loaded);
     setSwitchingContestant(false);
@@ -242,23 +246,17 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   function handleSubmit() {
     if (!activeContestant) return;
 
-    // Validate all scores (subdimensions + dimensions without subdimensions)
+    // 构建完整评分列表：所有子维度必须包含，未填的补 0
     const scoreList: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
     for (const dim of dimensions) {
       if (dim.subdimensions.length > 0) {
-        // 子维度评分
         for (const sub of dim.subdimensions) {
           const scoreVal = currentScores[sub.id];
-          if (scoreVal !== undefined) {
-            scoreList.push({ subdimension_id: sub.id, score: scoreVal });
-          }
+          scoreList.push({ subdimension_id: sub.id, score: scoreVal !== undefined ? scoreVal : 0 });
         }
       } else {
-        // 无子维度时，维度本身就是评分项，用维度 id
         const scoreVal = currentScores[dim.id];
-        if (scoreVal !== undefined) {
-          scoreList.push({ dimension_id: dim.id, score: scoreVal });
-        }
+        scoreList.push({ dimension_id: dim.id, score: scoreVal !== undefined ? scoreVal : 0 });
       }
     }
 
@@ -364,25 +362,43 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   // 执行一键提交
   async function submitAllContestants(toSubmit: Contestant[]) {
     setSubmittingAll(true);
+    const templateTotal = dimensions.reduce((sum, d) => sum + (parseFloat(String(d.max_score)) || 0), 0);
+    let submitted = 0;
+    let skipped = 0;
+    let unchanged = 0;
     for (const c of toSubmit) {
-      const saved = contestantScores[c.id] || {};
+      // 获取该选手的评分数据：
+      // - 当前选手：用 currentScores（有数据时），否则回退到缓存（如个别提交后 currentScores 被清空）
+      // - 其他选手：用 contestantScores 缓存
+      const isCurrent = activeContestant?.id === c.id;
+      const rawScores: Record<number, number> | undefined = isCurrent
+        ? (Object.keys(currentScores).length > 0 ? currentScores : contestantScores[c.id])
+        : contestantScores[c.id];
+
+      // 选手已有评分但本地没有缓存（此次会话未修改过），跳过以免清空已有数据
+      if (!rawScores && c.scored) {
+        unchanged++;
+        continue;
+      }
+
+      const saved = rawScores || {};
       const scoreList: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
       for (const dim of dimensions) {
         if (dim.subdimensions.length > 0) {
-          // 有子维度
           for (const sub of dim.subdimensions) {
             const scoreVal = saved[sub.id];
-            if (scoreVal !== undefined) {
-              scoreList.push({ subdimension_id: sub.id, score: scoreVal });
-            }
+            scoreList.push({ subdimension_id: sub.id, score: scoreVal !== undefined ? scoreVal : 0 });
           }
         } else {
-          // 无子维度，用维度id
           const scoreVal = saved[dim.id];
-          if (scoreVal !== undefined) {
-            scoreList.push({ dimension_id: dim.id, score: scoreVal });
-          }
+          scoreList.push({ dimension_id: dim.id, score: scoreVal !== undefined ? scoreVal : 0 });
         }
+      }
+      // 检查总分是否超出模板满分
+      const totalInput = scoreList.reduce((sum, s) => sum + s.score, 0);
+      if (totalInput > templateTotal) {
+        skipped++;
+        continue;
       }
       try {
         await judgeApi.submitScore({
@@ -392,16 +408,22 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
         });
         setContestants(prev => prev.map(cc => cc.id === c.id ? { ...cc, scored: true } : cc));
         setSubmittedIds(prev => new Set([...prev, c.id]));
+        // 更新本地缓存
+        setContestantScores(prev => ({ ...prev, [c.id]: { ...saved } }));
+        submitted++;
       } catch (e: unknown) {
         // skip failed ones
       }
     }
     setSubmittingAll(false);
+    const parts: string[] = [`已提交 ${submitted} 个选手的评分`];
+    if (unchanged > 0) parts.push(`${unchanged} 个选手已有评分且未修改，已保持`);
+    if (skipped > 0) parts.push(`${skipped} 个选手因总分超出满分已跳过`);
     setMessageDialog({
       open: true,
       type: 'success',
       title: '提交完成',
-      message: `已提交 ${toSubmit.length} 个选手的评分`,
+      message: parts.join('，'),
     });
   }
 
@@ -526,7 +548,15 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
                   )}
                 </div>
 
-                                <div className="flex-1 space-y-3 md:space-y-4">
+                  {/* 评分加载错误提示 */}
+                  {loadScoreError && (
+                    <div className="p-3 bg-error/10 border border-error/20 rounded-xl flex items-center gap-2 text-error text-sm">
+                      <AlertTriangle size={16} />
+                      {loadScoreError}
+                    </div>
+                  )}
+
+                  <div className="flex-1 space-y-3 md:space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">请打分</h3>
                     {allSubdimensions.length > 0 && (

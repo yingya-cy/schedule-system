@@ -41,7 +41,7 @@ async function startServer() {
 
   const processOcrRequest = async (endpoint: string, req: any, res: any) => {
     try {
-      if (!req.file && !req.files) return res.status(400).json({ error: "No file provided" });
+      if (!req.file && (!req.files || (Array.isArray(req.files) && req.files.length === 0))) return res.status(400).json({ error: "No file provided" });
 
       const formData = new FormData();
       if (req.file) {

@@ -130,10 +130,13 @@ test.describe('评分系统 Excel 导入功能完整测试', () => {
         // 检查文件输入框的内容
         const fileValue = await page.evaluate(() => {
           const inputs = document.querySelectorAll('input[type="file"]');
-          return Array.from(inputs).map(i => ({
-            files: i.files ? i.files.length : 0,
-            value: i.value
-          }));
+          return Array.from(inputs).map(i => {
+            const input = i as HTMLInputElement;
+            return {
+              files: input.files ? input.files.length : 0,
+              value: input.value
+            };
+          });
         });
         console.log('文件输入框状态:', fileValue);
 
@@ -147,9 +150,12 @@ test.describe('评分系统 Excel 导入功能完整测试', () => {
         // 再次检查状态
         const fileValue2 = await page.evaluate(() => {
           const inputs = document.querySelectorAll('input[type="file"]');
-          return Array.from(inputs).map(i => ({
-            files: i.files ? i.files.length : 0
-          }));
+          return Array.from(inputs).map(i => {
+            const input = i as HTMLInputElement;
+            return {
+              files: input.files ? input.files.length : 0
+            };
+          });
         });
         console.log('文件输入框状态(之后):', fileValue2);
 

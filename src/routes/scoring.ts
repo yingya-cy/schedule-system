@@ -596,6 +596,15 @@ router.post('/judge/scores', async (req, res) => {
     }
     const contestant = (contestantRows as any[])[0];
 
+    // 检查比赛状态，已完成的比赛不允许提交评分
+    const [compRows] = await connection.query(
+      'SELECT status FROM competitions WHERE id = ?',
+      [contestant.competition_id]
+    );
+    if ((compRows as any[]).length > 0 && (compRows as any[])[0].status === 'completed') {
+      throw new Error('比赛已结束，无法提交评分');
+    }
+
     // 计算总分
     let totalScore = 0;
     const scoreDetails: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
