@@ -73,3 +73,7 @@ uploads/*
 .directory
 .Trash-*
 .nfs*
+
+# Playwright
+playwright-report/
+test-results/

@@ -38,6 +38,7 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
     contestants: { id: number; number: string; name: string; work_name?: string; group_name: string }[];
     dimensionGroups: Record<number, { name: string; max: number; subs: { id: number; name: string; max: number }[] }>;
     scoreMap: Record<number, Record<number, Record<number, number>>>;
+    totalScoreMap: Record<number, Record<number, number>>;
   } | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [activeContestantId, setActiveContestantId] = useState<number | null>(null);
@@ -925,6 +926,11 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
                         const contestantScores = activeContestantId != null
                           ? (detailsData.scoreMap[activeContestantId]?.[judge.id] ?? {})
                           : {};
+                        // 如果没有明细分数但有总分，使用总分
+                        const totalScore = activeContestantId != null
+                          ? (detailsData.totalScoreMap[activeContestantId]?.[judge.id] ?? 0)
+                          : 0;
+                        const hasDetails = Object.keys(contestantScores).length > 0;
                         const judgeDimTotals = Object.entries(detailsData.dimensionGroups).map(([dimId, dim]) => {
                           if (dim.subs.length > 0) {
                             return dim.subs.reduce((sum, sub) => sum + (contestantScores[sub.id] ?? 0), 0);
@@ -933,7 +939,7 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
                             return contestantScores[dimId] ?? 0;
                           }
                         });
-                        const judgeGrandTotal = judgeDimTotals.reduce((a, b) => a + b, 0);
+                        const judgeGrandTotal = hasDetails ? judgeDimTotals.reduce((a, b) => a + b, 0) : totalScore;
 
                         return (
                           <tr key={judge.id} className="hover:bg-surface-container-low/50">

@@ -868,9 +868,14 @@ router.get('/competitions/:id/score-details', async (req, res) => {
 
     // 整理评分数据: contestant -> judge -> (subdimension|dimension) -> score
     const scoreMap: Record<number, Record<number, Record<number, number>>> = {};
+    // 存储总分: contestant -> judge -> total_score
+    const totalScoreMap: Record<number, Record<number, number>> = {};
     for (const s of scoreRows as any[]) {
       if (!scoreMap[s.contestant_id]) scoreMap[s.contestant_id] = {};
       if (!scoreMap[s.contestant_id][s.judge_id]) scoreMap[s.contestant_id][s.judge_id] = {};
+      if (!totalScoreMap[s.contestant_id]) totalScoreMap[s.contestant_id] = {};
+      // 存储总分（从 scores 表的 total_score 字段）
+      totalScoreMap[s.contestant_id][s.judge_id] = parseFloat(s.total_score || 0);
       if (s.subdimension_id) {
         scoreMap[s.contestant_id][s.judge_id][s.subdimension_id] = parseFloat(s.score || 0);
       } else if (s.dimension_id) {
@@ -886,6 +891,7 @@ router.get('/competitions/:id/score-details', async (req, res) => {
         contestants: contestantRows,
         dimensionGroups,
         scoreMap,
+        totalScoreMap,
       }
     });
   } catch (error: any) {

@@ -366,12 +366,21 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
     setSubmittingAll(true);
     for (const c of toSubmit) {
       const saved = contestantScores[c.id] || {};
-      const scoreList: { subdimension_id: number; score: number }[] = [];
+      const scoreList: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
       for (const dim of dimensions) {
-        for (const sub of dim.subdimensions) {
-          const scoreVal = saved[sub.id];
+        if (dim.subdimensions.length > 0) {
+          // 有子维度
+          for (const sub of dim.subdimensions) {
+            const scoreVal = saved[sub.id];
+            if (scoreVal !== undefined) {
+              scoreList.push({ subdimension_id: sub.id, score: scoreVal });
+            }
+          }
+        } else {
+          // 无子维度，用维度id
+          const scoreVal = saved[dim.id];
           if (scoreVal !== undefined) {
-            scoreList.push({ subdimension_id: sub.id, score: scoreVal });
+            scoreList.push({ dimension_id: dim.id, score: scoreVal });
           }
         }
       }
