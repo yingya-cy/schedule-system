@@ -6,11 +6,14 @@ import axios from "axios";
 import FormData from "form-data";
 import fs from "fs";
 import dotenv from "dotenv";
+import rateLimit from "express-rate-limit";
 import { testConnection, initializeDatabase } from "./src/config/database.ts";
 import scheduleService from "./src/services/scheduleService.ts";
 import queryService from "./src/services/queryService.ts";
 import excelExportService from "./src/services/excelExportService.ts";
 import scoringRouter from "./src/routes/scoring.ts";
+import authRouter from "./src/routes/auth.ts";
+import fileCenterRouter from "./src/routes/file-center.ts";
 import pool from './src/config/database.ts';
 
 dotenv.config();
@@ -22,6 +25,26 @@ async function startServer() {
   const app = express();
   const PORT = 3001;
   app.use(express.json({ limit: '10mb' }));
+
+  // 全局 API 限流：15 分钟内最多 300 请求
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: '请求过于频繁，请稍后再试' },
+  });
+  app.use('/api', apiLimiter);
+
+  // 认证接口更严格限流：15 分钟内最多 20 次登录尝试
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: '登录尝试过于频繁，请15分钟后再试' },
+  });
+  app.use('/api/auth/login', authLimiter);
 
   // 仅为 JSON API 响应设置 UTF-8 编码，不干预文件下载
   app.use('/api', (req, res, next) => {
@@ -171,7 +194,20 @@ app.get("/api/reset-departments", async (req, res) => {
     }
   });
 
-  app.get("/api/schedules/:id/file", async (req, res) => {
+  app.get("/api/schedules/:id/files", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [rows] = await pool.query(
+        'SELECT * FROM file_items WHERE schedule_id = ? ORDER BY created_at DESC',
+        [id]
+      );
+      res.json({ success: true, data: rows });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+app.get("/api/schedules/:id/file", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const download = req.query.download === 'true';
@@ -364,8 +400,74 @@ app.get("/api/reset-departments", async (req, res) => {
     }
   });
 
+  // 仪表盘聚合统计 API
+  app.get("/api/dashboard/stats", async (req, res) => {
+    try {
+      const [[schedCount], [courseCount], [userCount], [deptCount], [fileCount]] = await Promise.all([
+        pool.query('SELECT COUNT(*) as total FROM schedules'),
+        pool.query('SELECT COUNT(*) as total FROM courses'),
+        pool.query('SELECT COUNT(*) as total FROM users WHERE is_active = 1'),
+        pool.query('SELECT COUNT(*) as total FROM departments'),
+        pool.query('SELECT COUNT(*) as total FROM file_items'),
+      ]);
+      res.json({
+        success: true,
+        data: {
+          schedules: (schedCount as any[])[0].total,
+          courses: (courseCount as any[])[0].total,
+          users: (userCount as any[])[0].total,
+          departments: (deptCount as any[])[0].total,
+          files: (fileCount as any[])[0].total,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // 课程目录 API（跨课表聚合）
+  app.get("/api/courses", async (req, res) => {
+    try {
+      const { category } = req.query;
+      let sql = `SELECT c.*, s.name as schedule_name, s.department
+                 FROM courses c JOIN schedules s ON c.schedule_id = s.id`;
+      const params: any[] = [];
+      if (category) {
+        sql += ' WHERE s.department = ?';
+        params.push(category);
+      }
+      sql += ' ORDER BY c.weekday ASC, c.id DESC LIMIT 200';
+      const [rows] = await pool.query(sql, params);
+      res.json({ success: true, data: rows });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // 联系人目录 API
+  app.get("/api/contacts", async (req, res) => {
+    try {
+      const { department } = req.query;
+      let sql = 'SELECT id, username, name, role, department, avatar_url, email FROM users WHERE is_active = 1';
+      const params: any[] = [];
+      if (department) {
+        sql += ' AND department = ?';
+        params.push(department);
+      }
+      sql += ' ORDER BY role, name LIMIT 200';
+      const [rows] = await pool.query(sql, params);
+      res.json({ success: true, data: rows });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // 用户认证 API
+  app.use('/api/auth', authRouter);
   // 评分系统 API
   app.use('/api/scoring', scoringRouter);
+  // 文件中心 API
+  app.use('/api/file-center', fileCenterRouter);
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });

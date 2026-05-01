@@ -13,7 +13,7 @@ interface Toast {
 
 interface ToastContextValue {
   toasts: Toast[];
-  addToast: (toast: Omit<Toast, 'id'>) => void;
+  addToast: (toast: Omit<Toast, 'id'> & { duration?: number }) => void;
   removeToast: (id: string) => void;
 }
 
@@ -22,14 +22,14 @@ const ToastContext = React.createContext<ToastContextValue | null>(null);
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = (toast: Omit<Toast, 'id'>) => {
+  const addToast = (toast: Omit<Toast, 'id'> & { duration?: number }) => {
     const id = Math.random().toString(36).slice(2);
     setToasts(prev => [...prev, { ...toast, id }]);
 
-    // Auto remove after 4 seconds
+    const timeout = toast.duration ?? 4000;
     setTimeout(() => {
       removeToast(id);
-    }, 4000);
+    }, timeout);
   };
 
   const removeToast = (id: string) => {
@@ -122,8 +122,8 @@ export function useSimpleToast() {
   const { addToast } = useToast();
 
   return {
-    success: (title: string, message?: string) => addToast({ type: 'success', title, message }),
-    error: (title: string, message?: string) => addToast({ type: 'error', title, message }),
-    info: (title: string, message?: string) => addToast({ type: 'info', title, message })
+    success: (title: string, message?: string, duration?: number) => addToast({ type: 'success', title, message, duration }),
+    error: (title: string, message?: string, duration?: number) => addToast({ type: 'error', title, message, duration }),
+    info: (title: string, message?: string, duration?: number) => addToast({ type: 'info', title, message, duration })
   };
 }

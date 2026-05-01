@@ -1,21 +1,29 @@
-import React from 'react';
-import { 
-  Search, 
-  Bell, 
-  Phone, 
-  Video, 
-  MoreVertical, 
-  Smile, 
-  Paperclip, 
-  Image as ImageIcon, 
-  History, 
+import { useState, useEffect } from 'react';
+import {
+  Phone,
+  Video,
+  MoreVertical,
+  Smile,
+  Paperclip,
+  Image as ImageIcon,
+  History,
   Send,
   Download,
   FileText,
-  School
+  School,
+  Users,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/authStore';
+
+interface ContactRow {
+  id: number;
+  username: string;
+  name: string;
+  role: string;
+  department: string | null;
+}
 
 const conversations = [
   {
@@ -46,13 +54,25 @@ const conversations = [
   },
 ];
 
-const onlineMembers = [
-  { name: '李教授', role: '导师', avatar: 'https://picsum.photos/seed/prof/100/100', status: 'online' },
-  { name: '王若冰', role: '正在输入...', avatar: 'https://picsum.photos/seed/student1/100/100', status: 'typing' },
-  { name: '张三 (我)', role: '在线', avatar: 'https://picsum.photos/seed/me/100/100', status: 'online' },
-];
-
 export default function ChatView() {
+  const token = useAuthStore((s) => s.token);
+  const currentUser = useAuthStore((s) => s.user);
+  const [contacts, setContacts] = useState<ContactRow[]>([]);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    fetch('/api/contacts?limit=10', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(json => { if (json.success) setContacts(json.data); })
+      .catch(() => {});
+  }, [token]);
+
+  function handleSend() {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    setMessage('');
+  }
+
   return (
     <div className="flex h-[calc(100vh-128px)] gap-6">
       {/* Left Sidebar: Conversations */}
@@ -149,7 +169,7 @@ export default function ChatView() {
               <img className="w-full h-full object-cover" src="https://picsum.photos/seed/me-chat/100/100" alt="me" />
             </div>
             <div className="space-y-1 text-right">
-              <span className="text-[10px] text-outline mr-1">我</span>
+              <span className="text-[10px] text-outline mr-1">{currentUser?.name || '我'}</span>
               <div className="bg-primary text-on-primary p-3 rounded-xl rounded-tr-none shadow-md shadow-primary/10 text-sm leading-relaxed">
                 收到，我下午测试一下参数灵敏度。
               </div>
@@ -189,13 +209,19 @@ export default function ChatView() {
           </div>
           <div className="flex items-end gap-4">
             <div className="flex-1 min-h-[44px] bg-surface-container-low rounded-xl px-4 py-3 border border-transparent focus-within:border-primary/20 focus-within:bg-white transition-all">
-              <textarea 
-                className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm resize-none leading-relaxed" 
-                placeholder="输入消息..." 
+              <textarea
+                className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm resize-none leading-relaxed"
+                placeholder="输入消息..."
                 rows={1}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               />
             </div>
-            <button className="h-[44px] px-6 bg-primary text-on-primary text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all">
+            <button
+              onClick={handleSend}
+              className="h-[44px] px-6 bg-primary text-on-primary text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            >
               <span>发送</span>
               <Send size={16} />
             </button>
@@ -206,26 +232,29 @@ export default function ChatView() {
       {/* Right Sidebar: Members */}
       <div className="w-64 hidden xl:flex flex-col gap-6">
         <div className="bg-white rounded-2xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-surface-container-high/30">
-          <h3 className="text-xs font-bold text-outline uppercase tracking-widest mb-4">在线成员 (4)</h3>
-          <div className="space-y-4">
-            {onlineMembers.map((member) => (
-              <div key={member.name} className="flex items-center gap-3">
-                <div className="relative">
-                  <img className="w-8 h-8 rounded-lg object-cover" src={member.avatar} alt={member.name} />
-                  <div className={cn(
-                    "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white",
-                    member.status === 'online' ? "bg-emerald-500" : "bg-amber-500 animate-pulse"
-                  )}></div>
+          <h3 className="text-xs font-bold text-outline uppercase tracking-widest mb-4">
+            <Users size={12} className="inline mr-1" />
+            团队成员 ({contacts.length})
+          </h3>
+          <div className="space-y-3 max-h-80 overflow-y-auto">
+            {contacts.length === 0 ? (
+              <p className="text-[10px] text-outline">暂无数据</p>
+            ) : (
+              contacts.map((c) => (
+                <div key={c.id} className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                      {c.name[0]}
+                    </div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-on-surface">{c.name}</p>
+                    <p className="text-[10px] text-outline">{c.department || c.role}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-on-surface">{member.name}</p>
-                  <p className={cn(
-                    "text-[10px]",
-                    member.status === 'online' ? "text-primary" : "text-outline"
-                  )}>{member.role}</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -233,8 +262,8 @@ export default function ChatView() {
           <h3 className="text-xs font-bold text-primary/60 uppercase tracking-widest mb-3">公告栏</h3>
           <div className="space-y-3">
             <div className="p-3 bg-white/60 rounded-xl border border-white">
-              <p className="text-[11px] font-bold text-primary mb-1">课题组会议</p>
-              <p className="text-[10px] text-primary/70 leading-relaxed">本周五下午2点于302会议室进行模型中期汇报，请准时参加。</p>
+              <p className="text-[11px] font-bold text-primary mb-1">系统通知</p>
+              <p className="text-[10px] text-primary/70 leading-relaxed">文件中心和权限系统已上线，欢迎使用文件共享功能。</p>
             </div>
           </div>
         </div>

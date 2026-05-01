@@ -16,6 +16,7 @@
   - `src/types/database.ts` — CreateScheduleDto 新增 storage_type/file_path/file_size/file_hash
   - `src/services/fileStorageService.ts` — `decodeDatabaseFile()` 自动检测 base64/原始二进制，兼容新旧数据
 - **待部署:** git push 到服务器，docker-compose build + up 后端容器
+- **部署完成:** 2026-05-01，git push → server pull → docker-compose build backend → docker-compose up -d backend → API 200 OK ✓
 
 ## Session: 2026-05-01
 

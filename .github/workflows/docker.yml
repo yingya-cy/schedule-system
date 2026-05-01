@@ -1,0 +1,22 @@
+name: Docker Build
+
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  build-backend:
+    name: Build Backend Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend Docker image
+        run: docker build -f docker/backend.Dockerfile -t academic-ether-backend .
+
+  build-ai-service:
+    name: Build AI Service Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build AI service Docker image
+        run: docker build -f docker/ai-service.Dockerfile -t academic-ether-ai-service .

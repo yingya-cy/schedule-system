@@ -3,6 +3,7 @@ import { judgeApi, competitionApi } from '../services/scoringApi.ts';
 import type { Contestant, ScoringDimension } from '../types/scoring.ts';
 import MessageDialog from '../../MessageDialog.tsx';
 import ConfirmDialog from '../../ConfirmDialog.tsx';
+import { useSimpleToast } from '../../Toast.tsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight, ClipboardList, ArrowLeft, AlertTriangle, ChevronDown } from 'lucide-react';
 
@@ -53,8 +54,15 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   const [switchingContestant, setSwitchingContestant] = useState(false);
   // 评分加载错误
   const [loadScoreError, setLoadScoreError] = useState('');
+  // Toast 反馈
+  const toast = useSimpleToast();
   // 用于自动滚动到顶部
   const scoringAreaRef = useRef<HTMLDivElement>(null);
+  // Ref 用于键盘快捷键触发
+  const submitBtnRef = useRef<HTMLButtonElement>(null);
+  const submitAllBtnRef = useRef<HTMLButtonElement>(null);
+  const prevBtnRef = useRef<HTMLButtonElement>(null);
+  const nextBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     loadData();
@@ -64,6 +72,34 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [activeContestant?.id]);
+
+  // 键盘快捷键
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Ctrl+Enter: 提交当前选手
+      if (e.ctrlKey && e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submitBtnRef.current?.click();
+      }
+      // Ctrl+Shift+Enter: 一键提交
+      if (e.ctrlKey && e.shiftKey && e.key === 'Enter') {
+        e.preventDefault();
+        submitAllBtnRef.current?.click();
+      }
+      // Ctrl+ArrowLeft: 上一个选手
+      if (e.ctrlKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        prevBtnRef.current?.click();
+      }
+      // Ctrl+ArrowRight: 下一个选手
+      if (e.ctrlKey && e.key === 'ArrowRight') {
+        e.preventDefault();
+        nextBtnRef.current?.click();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   async function loadData() {
     try {
@@ -145,6 +181,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
       setContestants(prev =>
         prev.map(c => c.id === activeContestant.id ? { ...c, scored: true } : c)
       );
+      toast.success('评分已保存', undefined, 1500);
       return true;
     } catch (e: unknown) {
       if (!silent) {
@@ -315,23 +352,16 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
           prev.map((c) => (c.id === activeContestant.id ? { ...c, scored: true } : c))
         );
         setCurrentScores({});
-        setMessageDialog({
-          open: true,
-          type: 'success',
-          title: '提交成功',
-          message: contestants.find(c => !c.scored && c.id !== activeContestant.id)
-            ? '即将切换到下一位选手'
-            : '已是最后一位选手',
-        });
-        // 延迟切换到下一位
+        const hasMore = contestants.some(c => !c.scored && c.id !== activeContestant.id);
+        toast.success('提交成功', hasMore ? '即将切换到下一位选手' : '已是最后一位选手', 2000);
+        // 短延迟后切换到下一位
         setTimeout(() => {
-          setMessageDialog(p => ({ ...p, open: false }));
           const currentIdx = contestants.findIndex(c => c.id === activeContestant.id);
           const nextIdx = currentIdx + 1;
           if (nextIdx < contestants.length) {
             switchToContestant(contestants[nextIdx]);
           }
-        }, 1200);
+        }, 400);
       })
       .catch((e: unknown) => {
         setMessageDialog({ open: true, type: 'error', title: '提交失败', message: (e as Error).message });
@@ -469,6 +499,12 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
             <div className="text-sm text-on-primary/80 mt-0.5">评委：{judgeName}</div>
           </div>
         </div>
+        <div className="hidden md:flex items-center gap-4">
+          <div className="flex gap-2 text-[10px] text-on-primary/60">
+            <span><kbd className="px-1 py-0.5 bg-white/10 rounded text-[10px] font-mono">Ctrl+Enter</kbd> 提交</span>
+            <span><kbd className="px-1 py-0.5 bg-white/10 rounded text-[10px] font-mono">Ctrl+←/→</kbd> 切换</span>
+          </div>
+        </div>
         <div className="text-right flex-shrink-0">
           <div className="text-3xl font-bold font-headline">{unscoredCount}</div>
           <div className="text-xs text-on-primary/80">待评分</div>
@@ -479,6 +515,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
       {contestants.length > 0 && (
         <div className="bg-surface border-b border-surface-container-high px-2 py-2 flex gap-2 items-center flex-shrink-0 overflow-hidden">
           <button
+            ref={prevBtnRef}
             onClick={goToPrevContestant}
             disabled={!activeContestant || contestants.findIndex(c => c.id === activeContestant.id) === 0}
             className="p-1 rounded bg-surface-container-low hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-ring flex-shrink-0 touch-target flex items-center justify-center"
@@ -506,6 +543,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
           </div>
 
           <button
+            ref={nextBtnRef}
             onClick={goToNextContestant}
             disabled={!activeContestant || contestants.findIndex(c => c.id === activeContestant.id) >= contestants.length - 1}
             className="p-1 rounded bg-surface-container-low hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-ring flex-shrink-0 touch-target flex items-center justify-center"
@@ -752,6 +790,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
 
                 {/* Submit Button */}
                 <motion.button
+                  ref={submitBtnRef}
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                   onClick={handleSubmit}
@@ -765,6 +804,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
                 {/* 一键提交按钮 */}
                 {contestants.length > 1 && (
                   <button
+                    ref={submitAllBtnRef}
                     onClick={handleSubmitAll}
                     disabled={submittingAll}
                     className="w-full py-3 bg-surface-container-high text-on-surface-variant font-medium rounded-xl border border-surface-container-high hover:bg-surface-container-low transition-colors disabled:opacity-50 focus-ring flex items-center justify-center gap-2"

@@ -3,6 +3,7 @@ import TemplateList from './pages/TemplateList.tsx';
 import CompetitionList from './pages/CompetitionList.tsx';
 import CompetitionDetail from './pages/CompetitionDetail.tsx';
 import JudgeScoring from './pages/JudgeScoring.tsx';
+import { ToastProvider } from '../Toast.tsx';
 import { Trophy, BookTemplate, UserCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { competitionApi } from './services/scoringApi.ts';
@@ -73,6 +74,7 @@ export default function ScoringDashboard() {
   }
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-background">
       {nav.view === 'home' && (
         <div className="p-6 lg:p-8">
@@ -191,6 +193,7 @@ export default function ScoringDashboard() {
         </div>
       )}
     </div>
+    </ToastProvider>
   );
 }
 

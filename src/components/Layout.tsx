@@ -12,18 +12,21 @@ import {
   HelpCircle,
   Search,
   Bell,
-  UserCircle,
   Menu,
   X,
-  Trophy
+  Trophy,
+  LogOut,
+  Shield
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NavItem, ROUTE_LABELS, RoutePath } from '@/types';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useAuthStore } from '@/stores/authStore';
 
 const navItems: NavItem[] = [
   { id: 'dashboard', label: '仪表盘', icon: 'dashboard' },
   { id: 'files', label: '课表中心', icon: 'calendar' },
+  { id: 'file-center', label: '文件中心', icon: 'folder' },
   { id: 'scoring', label: '比赛评分', icon: 'trophy' },
 ];
 
@@ -32,6 +35,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
 
   // Track mobile viewport
   useEffect(() => {
@@ -130,7 +137,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto space-y-1">
-          <button className="w-full bg-primary-container text-on-primary py-3 rounded-xl font-bold text-sm mb-6 flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all">
+          <button
+            onClick={() => { navigate('/files'); setMobileMenuOpen(false); }}
+            className="w-full bg-primary-container text-on-primary py-3 rounded-xl font-bold text-sm mb-6 flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all"
+          >
             <Plus size={18} />
             新建日程
           </button>
@@ -174,9 +184,52 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <button className="p-2 hover:bg-surface-container-low rounded-full transition-all active:opacity-80 text-on-surface-variant">
                 <Bell size={20} />
               </button>
-              <button className="p-2 hover:bg-surface-container-low rounded-full transition-all active:opacity-80 text-on-surface-variant">
-                <UserCircle size={20} />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2 p-1.5 hover:bg-surface-container-low rounded-xl transition-all active:opacity-80"
+                >
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                    {user?.name?.[0] || '?'}
+                  </div>
+                  <span className="hidden md:block text-sm font-medium text-on-surface max-w-[80px] truncate">
+                    {user?.name || ''}
+                  </span>
+                </button>
+                <AnimatePresence>
+                  {userMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute right-0 top-full mt-2 z-20 w-56 bg-surface border border-surface-container-high rounded-xl shadow-lg py-1"
+                      >
+                        <div className="px-4 py-3 border-b border-surface-container-high">
+                          <p className="text-sm font-semibold text-on-surface">{user?.name}</p>
+                          <p className="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1">
+                            <Shield size={10} />
+                            {user?.role === 'admin' ? '管理员' : user?.role === 'teacher' ? '教师' : '学生'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            logout();
+                            navigate('/login');
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                        >
+                          <LogOut size={16} />
+                          退出登录
+                        </button>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
         </header>

@@ -77,3 +77,9 @@ uploads/*
 # Playwright
 playwright-report/
 test-results/
+
+# Coverage
+coverage/
+
+# Claude plans
+.claude/plans/

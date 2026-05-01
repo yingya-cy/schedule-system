@@ -1,4 +1,5 @@
 import mysql from 'mysql2/promise';
+import bcrypt from 'bcryptjs';
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
@@ -318,12 +319,24 @@ export async function initializeDatabase() {
         name VARCHAR(100) NOT NULL,
         code VARCHAR(50) UNIQUE NOT NULL,
         competition_id INT NOT NULL,
+        user_id INT DEFAULT NULL,
         is_active TINYINT(1) DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (competition_id) REFERENCES competitions(id) ON DELETE CASCADE,
         INDEX idx_competition_active (competition_id, is_active)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
+
+    // 检查并添加 judges 表的 user_id 字段（兼容已有数据）
+    try {
+      const [userIdColumns] = await connection.query(`SHOW COLUMNS FROM judges LIKE "user_id"`);
+      if ((userIdColumns as any[]).length === 0) {
+        await connection.query(`ALTER TABLE judges ADD COLUMN user_id INT DEFAULT NULL`);
+        console.log('✅ Added user_id column to judges table');
+      }
+    } catch (alterError) {
+      console.log('ℹ️  Column check/add note:', (alterError as Error).message);
+    }
 
     // 评分记录表
     await connection.query(`
@@ -405,6 +418,153 @@ export async function initializeDatabase() {
     } catch (err) {
       // 忽略错误
     }
+
+    // =============================================
+    // 用户认证系统表
+    // =============================================
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(100) NOT NULL COMMENT '显示名称',
+        email VARCHAR(200) UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        role ENUM('admin', 'teacher', 'student') DEFAULT 'teacher',
+        department VARCHAR(100),
+        avatar_url VARCHAR(500),
+        is_active TINYINT(1) DEFAULT 1,
+        last_login TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_role (role),
+        INDEX idx_department (department),
+        INDEX idx_active (is_active)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    // 检查并创建默认管理员账号（admin/admin123）
+    const [adminRows] = await connection.query(
+      'SELECT COUNT(*) as count FROM users WHERE role = ?',
+      ['admin']
+    );
+    const adminCount = (adminRows as any)[0].count;
+    if (adminCount === 0) {
+      const defaultHash = await bcrypt.hash('admin123', 10);
+      await connection.query(
+        'INSERT INTO users (username, name, role, password_hash) VALUES (?, ?, ?, ?)',
+        ['admin', '系统管理员', 'admin', defaultHash]
+      );
+      console.log('✅ Default admin user created (admin/admin123)');
+    }
+
+    // =============================================
+    // 文件中心表
+    // =============================================
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS file_activities (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        description TEXT,
+        department VARCHAR(100) NOT NULL,
+        cover_url VARCHAR(500),
+        status ENUM('active', 'archived') DEFAULT 'active',
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_department (department),
+        INDEX idx_status (status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS file_folders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        activity_id INT NOT NULL,
+        parent_id INT DEFAULT NULL,
+        name VARCHAR(200) NOT NULL,
+        sort_order INT DEFAULT 0,
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (activity_id) REFERENCES file_activities(id) ON DELETE CASCADE,
+        FOREIGN KEY (parent_id) REFERENCES file_folders(id) ON DELETE SET NULL,
+        INDEX idx_activity_parent (activity_id, parent_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS file_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        activity_id INT NOT NULL,
+        folder_id INT DEFAULT NULL,
+        original_filename VARCHAR(255) NOT NULL,
+        stored_filename VARCHAR(255) NOT NULL,
+        file_size BIGINT DEFAULT 0,
+        mime_type VARCHAR(100),
+        file_category ENUM('video', 'image', 'document', 'tweet') NOT NULL DEFAULT 'document',
+        file_hash VARCHAR(64),
+        oss_object_key VARCHAR(500),
+        oss_url VARCHAR(1000),
+        thumbnail_url VARCHAR(1000),
+        description TEXT,
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (activity_id) REFERENCES file_activities(id) ON DELETE CASCADE,
+        FOREIGN KEY (folder_id) REFERENCES file_folders(id) ON DELETE SET NULL,
+        INDEX idx_activity_folder (activity_id, folder_id),
+        INDEX idx_category (file_category),
+        INDEX idx_created_at (created_at DESC)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    // 添加 file_items 表与课表中心的关联字段
+    try {
+      const [scheduleIdCols] = await connection.query(`SHOW COLUMNS FROM file_items LIKE "schedule_id"`);
+      if ((scheduleIdCols as any[]).length === 0) {
+        await connection.query(`ALTER TABLE file_items ADD COLUMN schedule_id INT DEFAULT NULL`);
+        await connection.query(`ALTER TABLE file_items ADD INDEX idx_schedule_id (schedule_id)`);
+        console.log('✅ Added schedule_id column to file_items table');
+      }
+    } catch (e: any) {
+      console.log('ℹ️  schedule_id column note:', e.message);
+    }
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS file_tweets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        activity_id INT NOT NULL,
+        folder_id INT DEFAULT NULL,
+        title VARCHAR(500) NOT NULL,
+        content TEXT,
+        summary VARCHAR(1000),
+        cover_image VARCHAR(500),
+        link_url VARCHAR(1000),
+        author VARCHAR(100),
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (activity_id) REFERENCES file_activities(id) ON DELETE CASCADE,
+        FOREIGN KEY (folder_id) REFERENCES file_folders(id) ON DELETE SET NULL,
+        INDEX idx_activity (activity_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS file_permissions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        activity_id INT NOT NULL,
+        file_id INT DEFAULT NULL,
+        folder_id INT DEFAULT NULL,
+        permission_type ENUM('view', 'upload', 'edit', 'admin') NOT NULL,
+        grantee_type ENUM('department', 'user') DEFAULT 'department',
+        grantee_name VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (activity_id) REFERENCES file_activities(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
+    `);
 
     // 操作日志表
     await connection.query(`

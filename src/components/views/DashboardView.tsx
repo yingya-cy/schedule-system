@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { RefreshCw, Calendar, Users, Clock } from 'lucide-react';
+import { RefreshCw, Calendar, Users, Clock, BookOpen, FolderOpen, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FreeTimeResult, TIME_SLOTS, WEEKDAYS } from '@/types';
 import { api } from '@/services/api';
 import { useAppStore } from '@/stores/appStore';
+import { useAuthStore } from '@/stores/authStore';
 import WeekSelector from '@/components/WeekSelector';
 import DaySelector from '@/components/DaySelector';
 import TimeSlotSelector from '@/components/TimeSlotSelector';
@@ -12,8 +13,17 @@ import FreeTimeGrid from '@/components/FreeTimeGrid';
 
 const CURRENT_WEEK_KEY = 'schedule_current_week';
 
+interface DashboardStats {
+  schedules: number;
+  courses: number;
+  users: number;
+  departments: number;
+  files: number;
+}
+
 export default function DashboardView() {
   const departments = useAppStore((s) => s.departments);
+  const token = useAuthStore((s) => s.token);
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [currentWeek, setCurrentWeek] = useState(1);
   const [actualCurrentWeek, setActualCurrentWeek] = useState<number | null>(null);
@@ -21,10 +31,18 @@ export default function DashboardView() {
   const [selectedTimeSlotIndex, setSelectedTimeSlotIndex] = useState(0);
   const [freeTimeData, setFreeTimeData] = useState<FreeTimeResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
 
   const [useCustomRange, setUseCustomRange] = useState(false);
   const [customStartSection, setCustomStartSection] = useState(1);
   const [customEndSection, setCustomEndSection] = useState(2);
+
+  useEffect(() => {
+    fetch('/api/dashboard/stats', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(json => { if (json.success) setStats(json.data); })
+      .catch(() => {});
+  }, [token]);
 
   useEffect(() => {
     const saved = localStorage.getItem(CURRENT_WEEK_KEY);
@@ -121,6 +139,29 @@ export default function DashboardView() {
           </button>
         </div>
       </section>
+
+      {/* Stats Banner */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {[
+            { icon: <Layers size={18} />, label: '课表总数', value: stats.schedules, color: 'text-blue-600 bg-blue-50' },
+            { icon: <BookOpen size={18} />, label: '课程总数', value: stats.courses, color: 'text-emerald-600 bg-emerald-50' },
+            { icon: <Users size={18} />, label: '活跃用户', value: stats.users, color: 'text-purple-600 bg-purple-50' },
+            { icon: <Calendar size={18} />, label: '部门数', value: stats.departments, color: 'text-orange-600 bg-orange-50' },
+            { icon: <FolderOpen size={18} />, label: '文件数', value: stats.files, color: 'text-pink-600 bg-pink-50' },
+          ].map(s => (
+            <div key={s.label} className="bg-surface-container-lowest rounded-2xl border border-surface-container-high p-4 flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${s.color}`}>
+                {s.icon}
+              </div>
+              <div>
+                <p className="text-2xl font-extrabold text-on-surface font-headline">{s.value}</p>
+                <p className="text-xs text-outline">{s.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Selector cards */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
