@@ -132,10 +132,7 @@ export class FileStorageService {
     switch (fileMetadata.storageType) {
       case 'database':
         if (fileMetadata.fileData) {
-          // fileData from MySQL LONGBLOB is a Buffer containing base64 string bytes
-          // Convert to string first, then decode base64 to get actual PDF binary
-          const base64String = fileMetadata.fileData.toString('utf8');
-          return Buffer.from(base64String, 'base64');
+          return this.decodeDatabaseFile(fileMetadata.fileData);
         }
         throw new Error('File data not found in database');
 
@@ -148,6 +145,19 @@ export class FileStorageService {
       default:
         throw new Error(`Unsupported storage type: ${fileMetadata.storageType}`);
     }
+  }
+
+  /**
+   * 解码数据库中的文件数据，自动检测 base64 编码或原始二进制
+   */
+  private decodeDatabaseFile(data: Buffer): Buffer {
+    // 检查前 200 字节是否为有效 base64（仅含 A-Za-z0-9+/= 和空白字符）
+    const sample = data.toString('utf8', 0, Math.min(data.length, 200));
+    if (/^[A-Za-z0-9+/=\r\n\s]+$/.test(sample)) {
+      return Buffer.from(data.toString('utf8'), 'base64');
+    }
+    // 原始二进制数据，直接返回
+    return data;
   }
 
   /**

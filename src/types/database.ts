@@ -38,6 +38,10 @@ export interface CreateScheduleDto {
   filename?: string;
   file_data?: string;
   file_type?: string;
+  storage_type?: string;
+  file_path?: string | null;
+  file_size?: number;
+  file_hash?: string | null;
   courses: CreateCourseDto[];
 }
 

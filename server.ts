@@ -21,12 +21,19 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:5002";
 async function startServer() {
   const app = express();
   const PORT = 3001;
-  // 设置响应的字符编码，确保中文显示正常
-  app.use((req, res, next) => {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  app.use(express.json({ limit: '10mb' }));
+
+  // 仅为 JSON API 响应设置 UTF-8 编码，不干预文件下载
+  app.use('/api', (req, res, next) => {
+    const origSend = res.send.bind(res);
+    res.send = function (body: unknown) {
+      if (typeof body === 'object' && !Buffer.isBuffer(body)) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      }
+      return origSend(body);
+    } as typeof res.send;
     next();
   });
-  app.use(express.json({ limit: '10mb' }));
 
 
   console.log('🔍 Testing database connection...');

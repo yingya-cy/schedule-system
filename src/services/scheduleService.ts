@@ -51,8 +51,12 @@ export class ScheduleService {
     const scheduleDto: CreateScheduleDto = {
       ...dto,
       filename: fileMetadata?.filename || dto.filename,
-      file_data: fileMetadata?.fileData ? fileMetadata.fileData.toString('base64') : dto.file_data,
-      file_type: fileMetadata?.fileType || dto.file_type
+      file_data: dto.file_data, // 保留原始 base64，避免二次编码
+      file_type: fileMetadata?.fileType || dto.file_type || 'application/octet-stream',
+      storage_type: fileMetadata?.storageType || 'database',
+      file_path: fileMetadata?.filePath || null,
+      file_size: fileMetadata?.fileSize || 0,
+      file_hash: fileMetadata?.fileHash || null
     };
 
     return scheduleRepository.create(scheduleDto);
@@ -103,12 +107,7 @@ export class ScheduleService {
     };
 
     try {
-      let fileBuffer = await fileStorageService.getFile(fileMetadata);
-
-      // If fileData is a string (base64), decode it to binary Buffer
-      if (typeof fileBuffer === 'string') {
-        fileBuffer = Buffer.from(fileBuffer, 'base64');
-      }
+      const fileBuffer = await fileStorageService.getFile(fileMetadata);
 
       return {
         file_data: fileBuffer,

@@ -64,10 +64,10 @@ export class ScheduleRepository {
         filename: dto.filename || null,
         file_data: dto.file_data || null,
         file_type: dto.file_type || null,
-        storage_type: 'database',
-        file_path: null,
-        file_size: 0,
-        file_hash: null
+        storage_type: dto.storage_type || 'database',
+        file_path: dto.file_path || null,
+        file_size: dto.file_size || 0,
+        file_hash: dto.file_hash || null
       };
 
       const { query, params } = buildInsertQuery('schedules', scheduleInsert);
