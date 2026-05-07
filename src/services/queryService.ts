@@ -169,63 +169,44 @@ export class QueryService {
   async getAllFreeTimeData(): Promise<{
     total_schedules: number;
     free_time_matrix: Record<string, Record<string, Record<string, string[]>>>;
+    departments: string[];
+    people: { name: string; department: string; courses: { weekday: number; sections: number[]; weeks: number[] }[] }[];
   }> {
-    // 1. 一次性获取所有 schedules 和 courses（JOIN 查询）
     const [rows] = await pool.execute(`
-      SELECT s.id as schedule_id, s.name, c.weekday, c.sections, c.weeks
+      SELECT s.id as schedule_id, s.name, s.department, c.weekday, c.sections, c.weeks
       FROM schedules s
       LEFT JOIN courses c ON s.id = c.schedule_id
     `);
 
-    // 2. 按 schedule 分组
-    const scheduleMap = new Map<string, { weekday: number; sections: number[]; weeks: number[] }[]>();
-    for (const row of rows as { schedule_id: number; name: string; weekday: number; sections: number[]; weeks: number[] }[]) {
-      const name = row.name;
-      if (!scheduleMap.has(name)) {
-        scheduleMap.set(name, []);
+    const personMap = new Map<string, { name: string; department: string; courses: { weekday: number; sections: number[]; weeks: number[] }[] }>();
+    for (const row of rows as { schedule_id: number; name: string; department: string; weekday: number; sections: number[]; weeks: number[] }[]) {
+      if (!personMap.has(row.name)) {
+        personMap.set(row.name, { name: row.name, department: row.department, courses: [] });
       }
       if (row.weekday != null) {
-        scheduleMap.get(name)!.push({
+        personMap.get(row.name)!.courses.push({
           weekday: row.weekday,
           sections: row.sections,
-          weeks: row.weeks
+          weeks: row.weeks,
         });
       }
     }
 
-    // 3. 构建空闲时间矩阵
-    const freeTimeMatrix: Record<string, Record<string, Record<string, string[]>>> = {};
-    const scheduleNames = Array.from(scheduleMap.keys());
+    const scheduleNames = Array.from(personMap.keys());
+    const departments = [...new Set(Array.from(personMap.values()).map(p => p.department))].sort();
 
+    const freeTimeMatrix: Record<string, Record<string, Record<string, string[]>>> = {};
     for (let week = 1; week <= 18; week++) {
       for (let day = 1; day <= 7; day++) {
         for (let section = 1; section <= 11; section++) {
-          const weekKey = week.toString();
-          const dayKey = day.toString();
-          const sectionKey = section.toString();
-
-          if (!freeTimeMatrix[weekKey]) {
-            freeTimeMatrix[weekKey] = {};
-          }
-          if (!freeTimeMatrix[weekKey][dayKey]) {
-            freeTimeMatrix[weekKey][dayKey] = {};
-          }
-          if (!freeTimeMatrix[weekKey][dayKey][sectionKey]) {
-            freeTimeMatrix[weekKey][dayKey][sectionKey] = [];
-          }
-
-          // 检查每个人的空闲时间
+          const wk = week.toString(), dk = day.toString(), sk = section.toString();
+          if (!freeTimeMatrix[wk]) freeTimeMatrix[wk] = {};
+          if (!freeTimeMatrix[wk][dk]) freeTimeMatrix[wk][dk] = {};
+          if (!freeTimeMatrix[wk][dk][sk]) freeTimeMatrix[wk][dk][sk] = [];
           for (const name of scheduleNames) {
-            const courses = scheduleMap.get(name) || [];
-            const isFree = !courses.some(course =>
-              course.weekday === day &&
-              course.sections.includes(section) &&
-              course.weeks.includes(week)
-            );
-
-            if (isFree) {
-              freeTimeMatrix[weekKey][dayKey][sectionKey].push(name);
-            }
+            const courses = personMap.get(name)!.courses;
+            const busy = courses.some(c => c.weekday === day && c.sections.includes(section) && c.weeks.includes(week));
+            if (!busy) freeTimeMatrix[wk][dk][sk].push(name);
           }
         }
       }
@@ -233,7 +214,9 @@ export class QueryService {
 
     return {
       total_schedules: scheduleNames.length,
-      free_time_matrix: freeTimeMatrix
+      free_time_matrix: freeTimeMatrix,
+      departments,
+      people: Array.from(personMap.values()),
     };
   }
 }

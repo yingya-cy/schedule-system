@@ -1,170 +1,211 @@
 import * as XLSX from 'xlsx';
 
-interface FreeTimeData {
-  total_schedules: number;
-  free_time_matrix: Record<string, Record<string, Record<string, string[]>>>;
+interface PersonData {
+  name: string;
+  department: string;
+  courses: { weekday: number; sections: number[]; weeks: number[] }[];
 }
 
-interface WeekRange {
-  start: number;
-  end: number;
-  rule?: 'odd' | 'even';
+interface AntiScheduleInput {
+  departments: string[];
+  people: PersonData[];
+}
+
+const TIME_PERIODS = [
+  { label: '1-2节', sections: [1, 2] },
+  { label: '3-4节', sections: [3, 4] },
+  { label: '5-6节', sections: [5, 6] },
+  { label: '7-8节', sections: [7, 8] },
+  { label: '9-11节', sections: [9, 10, 11] },
+];
+
+function hasCourse(person: PersonData, day: number, section: number, week: number): boolean {
+  return person.courses.some(c =>
+    c.weekday === day && c.sections.includes(section) && c.weeks.includes(week)
+  );
+}
+
+function isFree(person: PersonData, day: number, section: number, week: number): boolean {
+  return !hasCourse(person, day, section, week);
+}
+
+function consolidateWeeks(weeks: number[]): string {
+  if (weeks.length === 0) return '';
+  const sorted = [...weeks].sort((a, b) => a - b);
+  const ranges: string[] = [];
+  let start = sorted[0], prev = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === prev + 1) { prev = sorted[i]; }
+    else {
+      ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+      start = sorted[i]; prev = sorted[i];
+    }
+  }
+  ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+  return ranges.join(',');
+}
+
+function detectParity(weeks: number[]): '' | '单' | '双' {
+  const allOdd = weeks.every(w => w % 2 === 1);
+  const allEven = weeks.every(w => w % 2 === 0);
+  if (allOdd) return '单';
+  if (allEven) return '双';
+  return '';
+}
+
+function formatFreeTimeForPeriod(person: PersonData, day: number, periodSections: number[]): string {
+  const allWeeks = Array.from({ length: 18 }, (_, i) => i + 1);
+
+  const sectionFree: Map<number, number[]> = new Map();
+  for (const s of periodSections) {
+    sectionFree.set(s, allWeeks.filter(w => isFree(person, day, s, w)));
+  }
+
+  const allFree = allWeeks.filter(w => periodSections.every(s => isFree(person, day, s, w)));
+
+  const sectionOnly: Map<number, number[]> = new Map();
+  for (const s of periodSections) {
+    const only = sectionFree.get(s)!.filter(w => !allFree.includes(w));
+    if (only.length > 0) sectionOnly.set(s, only);
+  }
+
+  const parts: string[] = [];
+  for (const s of periodSections) {
+    const weeks = sectionOnly.get(s);
+    if (!weeks || weeks.length === 0) continue;
+    const parity = detectParity(weeks);
+    parts.push(`${s}${parity}(${consolidateWeeks(weeks)})`);
+  }
+
+  if (allFree.length > 0) {
+    parts.push(`(${consolidateWeeks(allFree)})`);
+  }
+
+  return parts.join('/');
 }
 
 export class ExcelExportService {
-  generateReverseScheduleExcel(data: FreeTimeData): Buffer {
-    const workbook = XLSX.utils.book_new();
-    const worksheetData: any[][] = [];
 
-    const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    const sections = Array.from({ length: 11 }, (_, i) => i + 1);
+  generateReverseScheduleForDay(
+    input: AntiScheduleInput,
+    day: number,
+    termName: string = '',
+  ): { data: any[][]; merges: XLSX.Range[]; cols: XLSX.ColInfo[] } {
+    const { departments, people } = input;
+    const activePeople = people.filter(p => p.courses.length > 0);
+    const peopleByDept = new Map<string, PersonData[]>();
+    for (const p of activePeople) {
+      if (!peopleByDept.has(p.department)) peopleByDept.set(p.department, []);
+      peopleByDept.get(p.department)!.push(p);
+    }
+    const deptOrder = departments.filter(d => peopleByDept.has(d));
 
-    worksheetData.push(['节', ...weekdays]);
+    let maxPeople = 0;
+    for (const deptPeople of peopleByDept.values()) {
+      if (deptPeople.length > maxPeople) maxPeople = deptPeople.length;
+    }
+    const subCols = Math.min(Math.max(maxPeople, 1), 5);
 
-    for (const section of sections) {
-      const row: any[] = [`${section}节`];
+    const sheetData: any[][] = [];
+    const titleName = termName ? `第${termName}届朋辈反课表` : '朋辈反课表';
+    sheetData.push([titleName]);
 
-      for (let day = 1; day <= 7; day++) {
-        const cellValue = this.generateCellContent(data, section, day);
-        row.push(cellValue);
-      }
+    const headerRow2: any[] = ['部门'];
+    for (const tp of TIME_PERIODS) {
+      headerRow2.push(tp.label);
+      for (let i = 1; i < subCols; i++) headerRow2.push('');
+    }
+    sheetData.push(headerRow2);
 
-      worksheetData.push(row);
+    const headerRow3: any[] = [''];
+    for (const tp of TIME_PERIODS) {
+      for (let i = 0; i < subCols; i++) headerRow3.push('');
+    }
+    sheetData.push(headerRow3);
+
+    const merges: XLSX.Range[] = [];
+    const totalCols = 1 + subCols * TIME_PERIODS.length;
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } });
+
+    let colIdx = 1;
+    for (const tp of TIME_PERIODS) {
+      merges.push({ s: { r: 1, c: colIdx }, e: { r: 1, c: colIdx + subCols - 1 } });
+      colIdx += subCols;
     }
 
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-    XLSX.utils.book_append_sheet(workbook, worksheet, '反课表');
+    let currentRow = 3;
+    for (const dept of deptOrder) {
+      const deptPeople = peopleByDept.get(dept)!;
+      const numRows = Math.ceil(deptPeople.length / subCols);
+      const deptStartRow = currentRow;
+      if (numRows > 1) {
+        merges.push({ s: { r: deptStartRow, c: 0 }, e: { r: deptStartRow + numRows - 1, c: 0 } });
+      }
 
-    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-    return excelBuffer as Buffer;
-  }
-
-  private generateCellContent(data: FreeTimeData, section: number, day: number): string {
-    const parts: string[] = [];
-
-    for (let week = 1; week <= 18; week++) {
-      const weekKey = week.toString();
-      const dayKey = day.toString();
-      const sectionKey = section.toString();
-
-      if (data.free_time_matrix[weekKey]?.[dayKey]?.[sectionKey]) {
-        const freePeople = data.free_time_matrix[weekKey][dayKey][sectionKey];
-        if (freePeople.length > 0) {
-          parts.push(`${section}(${week})`);
+      for (let r = 0; r < numRows; r++) {
+        const row: any[] = [r === 0 ? dept : ''];
+        for (const tp of TIME_PERIODS) {
+          for (let sc = 0; sc < subCols; sc++) {
+            const personIdx = r * subCols + sc;
+            if (personIdx < deptPeople.length) {
+              const person = deptPeople[personIdx];
+              const freeNotation = formatFreeTimeForPeriod(person, day, tp.sections);
+              row.push(`${person.name}${freeNotation}`);
+            } else {
+              row.push('');
+            }
+          }
         }
+        sheetData.push(row);
+        currentRow++;
       }
     }
 
-    if (parts.length === 0) {
-      return '';
-    }
-
-    return this.mergeWeekRanges(parts);
+    return {
+      data: sheetData,
+      merges,
+      cols: [{ wch: 12 }, ...Array(subCols * TIME_PERIODS.length).fill({ wch: 24 })],
+    };
   }
 
-  private mergeWeekRanges(parts: string[]): string {
-    const sectionMap = new Map<number, Set<number>>();
-
-    for (const part of parts) {
-      const match = part.match(/(\d+)\((\d+)\)/);
-      if (match) {
-        const section = parseInt(match[1]);
-        const week = parseInt(match[2]);
-
-        if (!sectionMap.has(section)) {
-          sectionMap.set(section, new Set());
-        }
-        sectionMap.get(section)!.add(week);
-      }
+  generateDepartmentStatsExcel(department: string, schedules: any[]): Buffer {
+    const wb = XLSX.utils.book_new();
+    const sheetData: any[][] = [];
+    sheetData.push(['姓名', '部门', '文件名', '课程数量', '创建时间']);
+    for (const schedule of schedules) {
+      sheetData.push([
+        schedule.name,
+        schedule.department,
+        schedule.filename || '',
+        schedule.courses?.length || 0,
+        new Date(schedule.created_at).toLocaleString('zh-CN'),
+      ]);
     }
-
-    const result: string[] = [];
-
-    for (const [section, weeks] of sectionMap.entries()) {
-      const sortedWeeks = Array.from(weeks).sort((a, b) => a - b);
-      const weekRanges = this.consolidateWeeks(sortedWeeks);
-      result.push(`${section}(${weekRanges})`);
-    }
-
-    return result.join('/');
-  }
-
-  private consolidateWeeks(weeks: number[]): string {
-    if (weeks.length === 0) return '';
-
-    const ranges: WeekRange[] = [];
-    let start = weeks[0];
-    let prev = weeks[0];
-
-    for (let i = 1; i < weeks.length; i++) {
-      const current = weeks[i];
-
-      if (current === prev + 1) {
-        prev = current;
-      } else {
-        ranges.push({ start, end: prev });
-        start = current;
-        prev = current;
-      }
-    }
-
-    ranges.push({ start, end: prev });
-
-    return ranges.map(r => `${r.start}-${r.end}`).join(',');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), department);
+    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
   }
 
   generatePersonScheduleExcel(personName: string, courses: any[]): Buffer {
-    const workbook = XLSX.utils.book_new();
-    const worksheetData: any[][] = [];
-
-    worksheetData.push(['课程名称', '星期', '节次', '周数', '教师', '地点', '备注']);
-
+    const wb = XLSX.utils.book_new();
+    const sheetData: string[][] = [];
+    sheetData.push(['课程名称', '星期', '节次', '周数', '教师', '地点', '备注']);
     const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-
     for (const course of courses) {
       const weekdayName = weekdays[course.weekday - 1] || '未知';
       const sections = Array.isArray(course.sections) ? course.sections.join('-') : course.sections;
       const weeks = Array.isArray(course.weeks) ? `${course.weeks[0]}-${course.weeks[course.weeks.length - 1]}` : course.weeks;
-
-      worksheetData.push([
+      sheetData.push([
         course.course_name,
         weekdayName,
         `${sections}节`,
         `${weeks}周`,
         course.teacher || '',
         course.location || '',
-        course.remark || ''
+        course.remark || '',
       ]);
     }
-
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-    XLSX.utils.book_append_sheet(workbook, worksheet, personName);
-
-    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-    return excelBuffer as Buffer;
-  }
-
-  generateDepartmentStatsExcel(department: string, schedules: any[]): Buffer {
-    const workbook = XLSX.utils.book_new();
-    const worksheetData: any[][] = [];
-
-    worksheetData.push(['姓名', '部门', '文件名', '课程数量', '创建时间']);
-
-    for (const schedule of schedules) {
-      worksheetData.push([
-        schedule.name,
-        schedule.department,
-        schedule.filename || '',
-        schedule.courses?.length || 0,
-        new Date(schedule.created_at).toLocaleString('zh-CN')
-      ]);
-    }
-
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-    XLSX.utils.book_append_sheet(workbook, worksheet, department);
-
-    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-    return excelBuffer as Buffer;
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), personName);
+    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
   }
 }
 

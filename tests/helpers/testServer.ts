@@ -210,11 +210,22 @@ function registerRoutes(app: express.Express) {
 
   app.post('/api/export/reverse-schedule', async (req, res) => {
     try {
+      const { term } = req.body as { term?: string };
       const data = await queryService.getAllFreeTimeData();
-      const excelBuffer = excelExportService.generateReverseScheduleExcel(data);
+      const XLSX = await import('xlsx');
+      const wb = XLSX.utils.book_new();
+      const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+      for (let day = 1; day <= 7; day++) {
+        const sheet = excelExportService.generateReverseScheduleForDay(data, day, term || '');
+        const ws = XLSX.utils.aoa_to_sheet(sheet.data);
+        ws['!merges'] = sheet.merges;
+        ws['!cols'] = sheet.cols;
+        XLSX.utils.book_append_sheet(wb, ws, dayNames[day - 1]);
+      }
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=reverse-schedule.xlsx');
-      res.send(excelBuffer);
+      res.send(Buffer.from(buf));
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
@@ -456,11 +467,22 @@ export function createAppWithAuth(): express.Express {
 
   app.post('/api/export/reverse-schedule', async (req, res) => {
     try {
+      const { term } = req.body as { term?: string };
       const data = await queryService.getAllFreeTimeData();
-      const excelBuffer = excelExportService.generateReverseScheduleExcel(data);
+      const XLSX = await import('xlsx');
+      const wb = XLSX.utils.book_new();
+      const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+      for (let day = 1; day <= 7; day++) {
+        const sheet = excelExportService.generateReverseScheduleForDay(data, day, term || '');
+        const ws = XLSX.utils.aoa_to_sheet(sheet.data);
+        ws['!merges'] = sheet.merges;
+        ws['!cols'] = sheet.cols;
+        XLSX.utils.book_append_sheet(wb, ws, dayNames[day - 1]);
+      }
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=reverse-schedule.xlsx');
-      res.send(excelBuffer);
+      res.send(Buffer.from(buf));
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
