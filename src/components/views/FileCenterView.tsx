@@ -505,7 +505,7 @@ export default function FileCenterView() {
       const isExpanded = expandedFolders.has(f.id);
       const isSelected = selectedFolderId === f.id;
       return (
-        <div key={f.id}>
+        <div key={f.id} className="group">
           <button
             onClick={() => {
               setSelectedFolderId(f.id);
@@ -779,6 +779,52 @@ export default function FileCenterView() {
 
               {loading ? (
                 <p className="text-sm text-on-surface-variant py-8 text-center">加载中...</p>
+              ) : !selectedFolderId ? (
+                /* Root level — show root folders from the tree */
+                (() => {
+                  const rootFolders = folders.filter(f => f.parent_id === null);
+                  return rootFolders.length > 0 ? (
+                    <div>
+                      <p className="text-xs font-bold text-outline uppercase tracking-wider mb-2">文件夹</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {rootFolders.map(sf => (
+                          <div key={sf.id} className="group relative bg-surface-container-lowest rounded-xl border border-surface-container-high p-3 hover:border-primary/30 transition-all cursor-pointer"
+                            onClick={() => setSelectedFolderId(sf.id)}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                                <FolderOpen size={16} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-on-surface truncate">{sf.name}</p>
+                                <p className="text-xs text-on-surface-variant mt-0.5">文件夹</p>
+                              </div>
+                            </div>
+                            <div className="absolute bottom-2 right-2 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-surface/80 backdrop-blur rounded-lg p-0.5">
+                              <button
+                                onClick={e => { e.stopPropagation(); setEditingFolder(sf); setFolderForm({ name: sf.name, parent_id: String(sf.parent_id || '') }); setFolderError(''); }}
+                                className="p-1 hover:bg-primary/10 rounded text-primary"
+                              >
+                                <Edit3 size={12} />
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); setDeleteTarget({ type: 'folder', id: sf.id, name: sf.name }); }}
+                                className="p-1 hover:bg-red-50 rounded text-red-400"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-on-surface-variant">
+                      <p className="text-sm">此活动还没有文件夹</p>
+                      <p className="text-xs mt-1">点击左侧「新建文件夹」创建</p>
+                    </div>
+                  );
+                })()
               ) : (
                 <>
                   {items.subfolders.length > 0 && (
