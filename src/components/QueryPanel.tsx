@@ -76,8 +76,10 @@ export default function QueryPanel() {
 
   const handleExportExcel = async () => {
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch('/api/export/reverse-schedule', {
-        method: 'POST'
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
       });
 
       if (!response.ok) {
