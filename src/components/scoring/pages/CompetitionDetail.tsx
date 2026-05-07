@@ -1030,7 +1030,9 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
                   const a = document.createElement('a'); a.href = url;
                   a.download = `${competition?.name || '比赛'}_统分表.xlsx`;
                   a.click(); URL.revokeObjectURL(url);
-                } catch { /* ignore */ }
+                } catch (e: unknown) {
+                  setMessageDialog({ open: true, type: 'error', title: '导出失败', message: (e as Error).message || '请检查网络和服务器' });
+                }
               }}
               className="px-3 py-2 bg-surface-container-low text-on-surface-variant rounded-xl text-sm font-medium hover:bg-surface-container-high transition-colors flex items-center gap-1.5 touch-target focus-ring"
             >
@@ -1047,7 +1049,9 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
                   const a = document.createElement('a'); a.href = url;
                   a.download = `${competition?.name || '比赛'}_评分表.xlsx`;
                   a.click(); URL.revokeObjectURL(url);
-                } catch { /* ignore */ }
+                } catch (e: unknown) {
+                  setMessageDialog({ open: true, type: 'error', title: '导出失败', message: (e as Error).message || '请检查网络和服务器' });
+                }
               }}
               className="px-3 py-2 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors flex items-center gap-1.5 touch-target focus-ring"
             >
