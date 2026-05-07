@@ -967,14 +967,14 @@ router.get('/competitions/:id/export', async (req, res) => {
     const exportType = (req.query.type as string) || 'summary';
 
     // 比赛信息
-    const [compRows] = await pool.query(
+    const [compRows] = await pool.execute(
       'SELECT * FROM competitions WHERE id = ?', [competitionId]
     );
     const competition = (compRows as any[])[0];
     if (!competition) { res.status(404).json({ success: false, error: '比赛不存在' }); return; }
 
     // 模板 + 维度 + 子维度
-    const [dimRows] = await pool.query(
+    const [dimRows] = await pool.execute(
       'SELECT d.*, sd.id as sub_id, sd.name as sub_name, sd.max_score as sub_max, sd.sort_order as sub_sort FROM scoring_dimensions d LEFT JOIN scoring_subdimensions sd ON d.id = sd.dimension_id WHERE d.template_id = ? ORDER BY d.sort_order, sd.sort_order',
       [competition.template_id]
     );
@@ -991,14 +991,14 @@ router.get('/competitions/:id/export', async (req, res) => {
     if (dimensions.length === 0) { res.status(400).json({ success: false, error: '模板无评分维度' }); return; }
 
     // 选手（按编号排序）
-    const [contestantRows] = await pool.query(
+    const [contestantRows] = await pool.execute(
       'SELECT id, number, name, group_name FROM contestants WHERE competition_id = ? ORDER BY number, id',
       [competitionId]
     );
     const contestants = contestantRows as any[];
 
     // 评委
-    const [judgeRows] = await pool.query(
+    const [judgeRows] = await pool.execute(
       'SELECT id, name FROM judges WHERE competition_id = ? ORDER BY name',
       [competitionId]
     );
@@ -1006,7 +1006,7 @@ router.get('/competitions/:id/export', async (req, res) => {
 
     if (exportType === 'judge_detail') {
       // ===== 评分表：每个评委一个 sheet，每行一个选手，列=所有子维度+总分 =====
-      const [detailRows] = await pool.query(
+      const [detailRows] = await pool.execute(
         'SELECT sd.subdimension_id, sd.score, s.judge_id, s.contestant_id FROM score_details sd JOIN scores s ON sd.score_id = s.id WHERE s.competition_id = ?',
         [competitionId]
       );
@@ -1070,14 +1070,15 @@ router.get('/competitions/:id/export', async (req, res) => {
       }
 
       const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const detailFn = encodeURIComponent(`${competition.name}_评分表.xlsx`);
       res.set({
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename=${encodeURIComponent(competition.name)}_评分表.xlsx`,
+        'Content-Disposition': `attachment; filename*=UTF-8''${detailFn}`,
       });
       res.send(Buffer.from(buf));
     } else {
       // ===== 统分表：选手×评委矩阵 + 平均分 + 排名 =====
-      const [scoreRows] = await pool.query(
+      const [scoreRows] = await pool.execute(
         'SELECT contestant_id, judge_id, total_score FROM scores WHERE competition_id = ?',
         [competitionId]
       );
@@ -1089,7 +1090,7 @@ router.get('/competitions/:id/export', async (req, res) => {
       }
 
       // 计算结果（排名/平均分）
-      const [resultRows] = await pool.query(
+      const [resultRows] = await pool.execute(
         'SELECT contestant_id, avg_scores, rank FROM competition_results WHERE competition_id = ?',
         [competitionId]
       );
@@ -1140,9 +1141,10 @@ router.get('/competitions/:id/export', async (req, res) => {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '统分表');
       const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const summaryFn = encodeURIComponent(`${competition.name}_统分表.xlsx`);
       res.set({
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename=${encodeURIComponent(competition.name)}_统分表.xlsx`,
+        'Content-Disposition': `attachment; filename*=UTF-8''${summaryFn}`,
       });
       res.send(Buffer.from(buf));
     }
