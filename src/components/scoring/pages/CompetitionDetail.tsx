@@ -1018,7 +1018,41 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
               className="px-4 py-2.5 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors flex items-center gap-2 touch-target focus-ring"
             >
               <Download size={16} />
-              导出Excel
+              上传模板导出
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={async () => {
+                try {
+                  const blob = await resultApi.exportResultsDirect(competitionId, 'summary');
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url;
+                  a.download = `${competition?.name || '比赛'}_统分表.xlsx`;
+                  a.click(); URL.revokeObjectURL(url);
+                } catch { /* ignore */ }
+              }}
+              className="px-3 py-2 bg-surface-container-low text-on-surface-variant rounded-xl text-sm font-medium hover:bg-surface-container-high transition-colors flex items-center gap-1.5 touch-target focus-ring"
+            >
+              <Download size={14} />
+              导出统分表
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={async () => {
+                try {
+                  const blob = await resultApi.exportResultsDirect(competitionId, 'judge_detail');
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url;
+                  a.download = `${competition?.name || '比赛'}_评分表.xlsx`;
+                  a.click(); URL.revokeObjectURL(url);
+                } catch { /* ignore */ }
+              }}
+              className="px-3 py-2 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors flex items-center gap-1.5 touch-target focus-ring"
+            >
+              <Download size={14} />
+              导出评分表
             </motion.button>
           </div>
           {!resultsLoaded && results.length === 0 ? (

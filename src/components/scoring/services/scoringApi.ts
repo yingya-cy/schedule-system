@@ -248,6 +248,17 @@ export const resultApi = {
     request<Competition[]>(
       '/history'
     ),
+  exportResultsDirect: (competitionId: number, type: "judge_detail" | "summary" = "summary") => {
+    const token = localStorage.getItem("auth_token");
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(`/api/scoring/competitions/${competitionId}/export?type=${type}`, {
+      headers,
+    }).then(r => {
+      if (!r.ok) throw new Error("导出失败");
+      return r.blob();
+    });
+  },
 };
 
 // =============================================

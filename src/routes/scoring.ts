@@ -4,6 +4,7 @@ import { authenticate, requireRole } from '../middleware/auth.ts';
 import multer from 'multer';
 import axios from 'axios';
 import FormData from 'form-data';
+import * as XLSX from 'xlsx';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -954,6 +955,197 @@ router.get('/competitions/:id/results', async (req, res) => {
       [req.params.id]
     );
     res.json({ success: true, data: results });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 导出评分结果（直接生成 xlsx，不依赖 AI）
+router.get('/competitions/:id/export', async (req, res) => {
+  try {
+    const competitionId = Number(req.params.id);
+    const exportType = (req.query.type as string) || 'summary';
+
+    // 比赛信息
+    const [compRows] = await pool.query(
+      'SELECT * FROM competitions WHERE id = ?', [competitionId]
+    );
+    const competition = (compRows as any[])[0];
+    if (!competition) { res.status(404).json({ success: false, error: '比赛不存在' }); return; }
+
+    // 模板 + 维度 + 子维度
+    const [dimRows] = await pool.query(
+      'SELECT d.*, sd.id as sub_id, sd.name as sub_name, sd.max_score as sub_max, sd.sort_order as sub_sort FROM scoring_dimensions d LEFT JOIN scoring_subdimensions sd ON d.id = sd.dimension_id WHERE d.template_id = ? ORDER BY d.sort_order, sd.sort_order',
+      [competition.template_id]
+    );
+    const dimensions: { id: number; name: string; max_score: number; subs: { id: number; name: string; max_score: number }[] }[] = [];
+    const dimMap = new Map<number, typeof dimensions[number]>();
+    for (const r of dimRows as any[]) {
+      if (!dimMap.has(r.id)) {
+        const d = { id: r.id, name: r.name, max_score: r.max_score, subs: [] as { id: number; name: string; max_score: number }[] };
+        dimMap.set(r.id, d);
+        dimensions.push(d);
+      }
+      if (r.sub_id) dimMap.get(r.id)!.subs.push({ id: r.sub_id, name: r.sub_name, max_score: r.sub_max });
+    }
+    if (dimensions.length === 0) { res.status(400).json({ success: false, error: '模板无评分维度' }); return; }
+
+    // 选手（按编号排序）
+    const [contestantRows] = await pool.query(
+      'SELECT id, number, name, group_name FROM contestants WHERE competition_id = ? ORDER BY number, id',
+      [competitionId]
+    );
+    const contestants = contestantRows as any[];
+
+    // 评委
+    const [judgeRows] = await pool.query(
+      'SELECT id, name FROM judges WHERE competition_id = ? ORDER BY name',
+      [competitionId]
+    );
+    const judges = judgeRows as any[];
+
+    if (exportType === 'judge_detail') {
+      // ===== 评分表：每个评委一个 sheet，每行一个选手，列=所有子维度+总分 =====
+      const [detailRows] = await pool.query(
+        'SELECT sd.subdimension_id, sd.score, s.judge_id, s.contestant_id FROM score_details sd JOIN scores s ON sd.score_id = s.id WHERE s.competition_id = ?',
+        [competitionId]
+      );
+      // scoreMap: contestant_id -> judge_id -> subdimension_id -> score
+      const scoreMap: Record<number, Record<number, Record<number, number>>> = {};
+      for (const r of detailRows as any[]) {
+        if (!scoreMap[r.contestant_id]) scoreMap[r.contestant_id] = {};
+        if (!scoreMap[r.contestant_id][r.judge_id]) scoreMap[r.contestant_id][r.judge_id] = {};
+        scoreMap[r.contestant_id][r.judge_id][r.subdimension_id] = Number(r.score);
+      }
+
+      const wb = XLSX.utils.book_new();
+      for (const judge of judges) {
+        const sheetData: any[][] = [];
+        // 标题行
+        sheetData.push([`${competition.name} - ${judge.name} 评分表`]);
+        sheetData.push([]);
+        // 表头行1: 维度名（合并单元格标记）
+        const header1: any[] = ['序号', '作品'];
+        for (const dim of dimensions) {
+          header1.push(dim.name);
+          for (let i = 1; i < dim.subs.length; i++) header1.push('');
+        }
+        header1.push('总分');
+        sheetData.push(header1);
+        // 表头行2: 子维度名
+        const header2: any[] = ['', ''];
+        for (const dim of dimensions) {
+          for (const sub of dim.subs) header2.push(`${sub.name}(${sub.max_score})`);
+        }
+        header2.push('');
+        sheetData.push(header2);
+
+        for (const c of contestants) {
+          const row: any[] = [c.number || '', c.name];
+          let total = 0;
+          for (const dim of dimensions) {
+            for (const sub of dim.subs) {
+              const s = scoreMap[c.id]?.[judge.id]?.[sub.id] ?? '';
+              row.push(s);
+              total += Number(s) || 0;
+            }
+          }
+          row.push(total || '');
+          sheetData.push(row);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+        // 合并维度表头
+        const merges: XLSX.Range[] = [];
+        let col = 2; // 0=序号, 1=作品
+        for (const dim of dimensions) {
+          if (dim.subs.length > 1) {
+            merges.push({ s: { r: 2, c: col }, e: { r: 2, c: col + dim.subs.length - 1 } });
+          }
+          col += dim.subs.length;
+        }
+        ws['!merges'] = merges;
+        const sheetName = judge.name.length > 28 ? judge.name.slice(0, 28) : judge.name;
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      }
+
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.set({
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename=${encodeURIComponent(competition.name)}_评分表.xlsx`,
+      });
+      res.send(Buffer.from(buf));
+    } else {
+      // ===== 统分表：选手×评委矩阵 + 平均分 + 排名 =====
+      const [scoreRows] = await pool.query(
+        'SELECT contestant_id, judge_id, total_score FROM scores WHERE competition_id = ?',
+        [competitionId]
+      );
+      // totalMap: contestant_id -> judge_id -> total_score
+      const totalMap: Record<number, Record<number, number>> = {};
+      for (const r of scoreRows as any[]) {
+        if (!totalMap[r.contestant_id]) totalMap[r.contestant_id] = {};
+        totalMap[r.contestant_id][r.judge_id] = Number(r.total_score);
+      }
+
+      // 计算结果（排名/平均分）
+      const [resultRows] = await pool.query(
+        'SELECT contestant_id, avg_scores, rank FROM competition_results WHERE competition_id = ?',
+        [competitionId]
+      );
+      const resultMap = new Map<number, { rank: number; avg_scores: Record<string, number> }>();
+      for (const r of resultRows as any[]) {
+        resultMap.set(r.contestant_id, {
+          rank: r.rank,
+          avg_scores: typeof r.avg_scores === 'string' ? JSON.parse(r.avg_scores) : (r.avg_scores || {}),
+        });
+      }
+
+      // 计算平均分和排名（如果结果表为空，实时计算）
+      const ranked: { contestant: any; avg: number; rank: number; judgeScores: Record<number, number> }[] = [];
+      for (const c of contestants) {
+        const judgeScores = totalMap[c.id] || {};
+        const scores = Object.values(judgeScores).filter(s => s > 0);
+        const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+        const rank = resultMap.get(c.id)?.rank ?? 0;
+        ranked.push({ contestant: c, avg, rank, judgeScores });
+      }
+      // 按排名排序（排名相同按平均分降序）
+      ranked.sort((a, b) => {
+        if (a.rank && b.rank) return a.rank - b.rank;
+        if (a.rank) return -1;
+        if (b.rank) return 1;
+        return b.avg - a.avg;
+      });
+
+      const sheetData: any[][] = [];
+      sheetData.push([`${competition.name} 统分表`]);
+      sheetData.push([]);
+      const header: any[] = ['序号', '作品'];
+      for (const j of judges) header.push(j.name);
+      header.push('平均分');
+      header.push('排名');
+      sheetData.push(header);
+
+      for (let i = 0; i < ranked.length; i++) {
+        const { contestant, avg, rank, judgeScores } = ranked[i];
+        const row: any[] = [contestant.number || '', contestant.name];
+        for (const j of judges) row.push(judgeScores[j.id] ?? '');
+        row.push(avg > 0 ? Number(avg.toFixed(2)) : '');
+        row.push(rank || (i + 1));
+        sheetData.push(row);
+      }
+
+      const ws = XLSX.utils.aoa_to_sheet(sheetData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '统分表');
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.set({
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename=${encodeURIComponent(competition.name)}_统分表.xlsx`,
+      });
+      res.send(Buffer.from(buf));
+    }
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
