@@ -1025,10 +1025,10 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
               whileTap={{ scale: 0.98 }}
               onClick={async () => {
                 try {
-                  const blob = await resultApi.exportResultsDirect(competitionId, 'summary');
+                  const { blob, filename } = await resultApi.exportResultsDirect(competitionId, 'summary');
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a'); a.href = url;
-                  a.download = `${competition?.name || '比赛'}_统分表.xlsx`;
+                  a.download = filename;
                   a.click(); URL.revokeObjectURL(url);
                 } catch (e: unknown) {
                   setMessageDialog({ open: true, type: 'error', title: '导出失败', message: (e as Error).message || '请检查网络和服务器' });
@@ -1044,10 +1044,10 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
               whileTap={{ scale: 0.98 }}
               onClick={async () => {
                 try {
-                  const blob = await resultApi.exportResultsDirect(competitionId, 'judge_detail');
+                  const { blob, filename } = await resultApi.exportResultsDirect(competitionId, 'judge_detail');
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a'); a.href = url;
-                  a.download = `${competition?.name || '比赛'}_评分表.xlsx`;
+                  a.download = filename;
                   a.click(); URL.revokeObjectURL(url);
                 } catch (e: unknown) {
                   setMessageDialog({ open: true, type: 'error', title: '导出失败', message: (e as Error).message || '请检查网络和服务器' });

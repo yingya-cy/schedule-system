@@ -259,7 +259,10 @@ export const resultApi = {
         const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
         throw new Error(err.error || `HTTP ${r.status}`);
       }
-      return r.blob();
+      const disposition = r.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename\*=(?:UTF-8''|")?([^";]+)/);
+      const filename = match ? decodeURIComponent(match[1]) : `export_${type}.xlsx`;
+      return { blob: await r.blob(), filename };
     });
   },
 };
