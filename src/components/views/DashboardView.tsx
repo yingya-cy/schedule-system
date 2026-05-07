@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { RefreshCw, Calendar, Users, Clock, BookOpen, FolderOpen, Layers } from 'lucide-react';
+import { RefreshCw, Calendar, Users, Clock, BookOpen, FolderOpen, Layers, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FreeTimeResult, TIME_SLOTS, WEEKDAYS } from '@/types';
 import { api } from '@/services/api';
@@ -136,6 +136,27 @@ export default function DashboardView() {
             className="p-2.5 bg-surface-container-low border border-surface-container-high rounded-xl hover:bg-surface-container transition-all"
           >
             <RefreshCw className={cn(loading && "animate-spin")} size={18} />
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                const token = localStorage.getItem('auth_token');
+                const res = await fetch('/api/export/reverse-schedule', {
+                  method: 'POST',
+                  headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
+                });
+                if (!res.ok) throw new Error('导出失败');
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url;
+                a.download = 'reverse-schedule.xlsx'; a.click();
+                URL.revokeObjectURL(url);
+              } catch { /* ignore */ }
+            }}
+            className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors flex items-center gap-1.5"
+          >
+            <Download size={14} />
+            导出反课表
           </button>
         </div>
       </section>
