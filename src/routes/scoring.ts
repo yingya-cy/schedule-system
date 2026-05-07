@@ -1015,6 +1015,8 @@ router.get('/competitions/:id/export', async (req, res) => {
     const wb = new ExcelJS.Workbook();
 
     if (exportType === 'judge_detail') {
+      const targetJudgeId = Number(req.query.judge_id) || 0;
+
       const [detailRows] = await pool.query(
         'SELECT sd.subdimension_id, sd.score, s.judge_id, s.contestant_id FROM score_details sd JOIN scores s ON sd.score_id = s.id WHERE s.competition_id = ?',
         [competitionId]
@@ -1026,7 +1028,12 @@ router.get('/competitions/:id/export', async (req, res) => {
         scoreMap[r.contestant_id][r.judge_id][r.subdimension_id] = Number(r.score);
       }
 
-      for (const judge of judges) {
+      const targetJudges = targetJudgeId
+        ? judges.filter(j => j.id === targetJudgeId)
+        : judges;
+      if (targetJudges.length === 0) { res.status(404).json({ success: false, error: '评委不存在' }); return; }
+
+      for (const judge of targetJudges) {
         const sheetName = judge.name.length > 28 ? judge.name.slice(0, 28) : judge.name;
         const ws = wb.addWorksheet(sheetName);
         const totalCols = 2 + dimensions.reduce((s, d) => s + d.subs.length, 0) + 1; // 序号+作品 + subdims + 总分

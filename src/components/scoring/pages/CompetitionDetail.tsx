@@ -63,6 +63,7 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
   // Excel Import/Export
   const [showImportModal, setShowImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showJudgePicker, setShowJudgePicker] = useState(false);
 
   useEffect(() => {
     loadCompetition();
@@ -1039,25 +1040,44 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
               <Download size={14} />
               导出统分表
             </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={async () => {
-                try {
-                  const { blob, filename } = await resultApi.exportResultsDirect(competitionId, 'judge_detail');
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a'); a.href = url;
-                  a.download = filename;
-                  a.click(); URL.revokeObjectURL(url);
-                } catch (e: unknown) {
-                  setMessageDialog({ open: true, type: 'error', title: '导出失败', message: (e as Error).message || '请检查网络和服务器' });
-                }
-              }}
-              className="px-3 py-2 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors flex items-center gap-1.5 touch-target focus-ring"
-            >
-              <Download size={14} />
-              导出评分表
-            </motion.button>
+            <div className="relative">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowJudgePicker(!showJudgePicker)}
+                className="px-3 py-2 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors flex items-center gap-1.5 touch-target focus-ring"
+              >
+                <Download size={14} />
+                导出评分表
+              </motion.button>
+              {showJudgePicker && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowJudgePicker(false)} />
+                  <div className="absolute right-0 top-full mt-1 bg-surface rounded-xl border border-surface-container-high shadow-lg z-50 py-1 min-w-[140px]">
+                  {judges.map(j => (
+                    <button
+                      key={j.id}
+                      onClick={async () => {
+                        setShowJudgePicker(false);
+                        try {
+                          const { blob, filename } = await resultApi.exportResultsDirect(competitionId, 'judge_detail', j.id);
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a'); a.href = url;
+                          a.download = filename;
+                          a.click(); URL.revokeObjectURL(url);
+                        } catch (e: unknown) {
+                          setMessageDialog({ open: true, type: 'error', title: '导出失败', message: (e as Error).message || '请检查网络和服务器' });
+                        }
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-on-surface hover:bg-surface-container-low transition-colors"
+                    >
+                      {j.name}
+                    </button>
+                  ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           {!resultsLoaded && results.length === 0 ? (
             <div className="py-16 text-center">

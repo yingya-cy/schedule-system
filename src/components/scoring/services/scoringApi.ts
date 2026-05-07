@@ -248,11 +248,12 @@ export const resultApi = {
     request<Competition[]>(
       '/history'
     ),
-  exportResultsDirect: (competitionId: number, type: "judge_detail" | "summary" = "summary") => {
+  exportResultsDirect: (competitionId: number, type: "judge_detail" | "summary" = "summary", judgeId?: number) => {
     const token = localStorage.getItem("auth_token");
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    return fetch(`/api/scoring/competitions/${competitionId}/export?type=${type}`, {
+    const jid = judgeId ? `&judge_id=${judgeId}` : '';
+    return fetch(`/api/scoring/competitions/${competitionId}/export?type=${type}${jid}`, {
       headers,
     }).then(async r => {
       if (!r.ok) {
