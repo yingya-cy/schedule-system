@@ -23,6 +23,7 @@ interface ScheduleEditorProps {
   onCoursesChange: (courses: EditableCourse[]) => void;
   onSave?: () => void;
   onCancel?: () => void;
+  readOnly?: boolean;
   isSaving?: boolean;
 }
 
@@ -31,7 +32,8 @@ export default function ScheduleEditor({
   onCoursesChange,
   onSave,
   onCancel,
-  isSaving = false
+  isSaving = false,
+  readOnly,
 }: ScheduleEditorProps) {
   const [currentWeek, setCurrentWeek] = useState(1);
   const [actualCurrentWeek, setActualCurrentWeek] = useState<number | null>(null);
@@ -183,6 +185,7 @@ export default function ScheduleEditor({
               <List size={16} />
               {showSidebar ? '隐藏列表' : '课程列表'}
             </button>
+            {!readOnly && (
             <button
               onClick={() => setShowAddModal(true)}
               className="px-4 py-2 bg-primary text-on-primary text-sm font-semibold rounded-lg hover:scale-[0.98] transition-all flex items-center gap-2 touch-target"
@@ -190,6 +193,7 @@ export default function ScheduleEditor({
               <Plus size={16} />
               添加课程
             </button>
+            )}
             {onCancel && (
               <button
                 onClick={onCancel}
@@ -198,7 +202,7 @@ export default function ScheduleEditor({
                 取消
               </button>
             )}
-            {onSave && (
+            {onSave && !readOnly && (
               <button
                 onClick={onSave}
                 disabled={isSaving}

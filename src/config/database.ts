@@ -157,6 +157,10 @@ export async function initializeDatabase() {
       await checkAndAddColumn('file_path', 'VARCHAR(500)');
       await checkAndAddColumn('file_size', 'BIGINT DEFAULT 0');
       await checkAndAddColumn('file_hash', 'VARCHAR(64)');
+      await checkAndAddColumn('created_by', 'VARCHAR(100)');
+      await checkAndAddColumn('email_verify_token', 'VARCHAR(64)');
+      await checkAndAddColumn('email_verify_token_expires', 'TIMESTAMP NULL DEFAULT NULL');
+      await checkAndAddColumn('email_verified_at', 'TIMESTAMP NULL DEFAULT NULL');
 
     } catch (alterError) {
       console.log('ℹ️  Column check/add note:', alterError.message);

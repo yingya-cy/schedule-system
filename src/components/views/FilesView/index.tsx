@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { EditableCourse, ScheduleData, Department } from '@/types';
 import { api } from '@/services/api';
 import ManualScheduleEntry from '@/components/ManualScheduleEntry';
+import { useAuthStore } from '@/stores/authStore';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import MessageDialog from '@/components/MessageDialog';
 import { useAppStore } from '@/stores/appStore';
@@ -31,6 +32,8 @@ export default function FilesView() {
   const [isSaving, setIsSaving] = useState(false);
   const [currentEditIndex, setCurrentEditIndex] = useState<number | null>(null);
   const [currentScheduleId, setCurrentScheduleId] = useState<number | null>(null);
+  const [readOnly, setReadOnly] = useState(false);
+  const user = useAuthStore((s) => s.user);
   const [editName, setEditName] = useState('');
   const [editDepartment, setEditDepartment] = useState('');
 
@@ -51,6 +54,11 @@ export default function FilesView() {
 
   // Handlers
   const handleViewSchedule = async (schedule: ScheduleData) => {
+    if (user) {
+      const isPrivileged = user.role === 'admin' || user.department === '秘书部' || user.department === '主任团';
+      const isCreator = (schedule as any).created_by === user.username;
+      setReadOnly(!isPrivileged && !isCreator);
+    }
     try {
       const fullSchedule = await api.getSchedule(schedule.id);
 
@@ -129,19 +137,39 @@ export default function FilesView() {
 
     setIsSaving(true);
     try {
-      // Delete existing schedules for this person/department
-      const existingSchedules = await api.getSchedules({
-        name: editName.trim(),
-        department: editDepartment
-      });
-
-      for (const schedule of existingSchedules) {
-        await api.deleteSchedule(schedule.id);
-      }
-
       const currentResult = currentEditIndex !== null ? batchResults[currentEditIndex] : null;
 
-      const schedule = await api.createSchedule({
+      let scheduleId = currentScheduleId;
+      if (currentScheduleId) {
+        await api.updateSchedule(currentScheduleId, {
+          name: editName.trim(),
+          department: editDepartment,
+        });
+        for (const course of editableCourses) {
+          if (course.id && !course.id.startsWith('new-')) {
+            await api.updateCourse(parseInt(course.id), {
+              course_name: course.course_name,
+              weekday: course.weekday,
+              sections: course.sections,
+              weeks: course.weeks,
+              teacher: course.teacher,
+              location: course.location,
+              remark: course.remark,
+            });
+          } else {
+            await api.createCourse(currentScheduleId, {
+              course_name: course.course_name,
+              weekday: course.weekday,
+              sections: course.sections,
+              weeks: course.weeks,
+              teacher: course.teacher,
+              location: course.location,
+              remark: course.remark,
+            });
+          }
+        }
+      } else {
+        const schedule = await api.createSchedule({
         name: editName.trim(),
         department: editDepartment,
         filename: currentResult?.filename,
@@ -157,11 +185,13 @@ export default function FilesView() {
           remark: c.remark || undefined
         }))
       });
+      scheduleId = schedule.id;
+      }
 
       if (currentEditIndex !== null) {
         setBatchResults(prev => prev.map((r, i) =>
           i === currentEditIndex
-            ? { ...r, saved: true, name: editName.trim(), department: editDepartment, courses: editableCourses, schedule_id: schedule.id }
+            ? { ...r, saved: true, name: editName.trim(), department: editDepartment, courses: editableCourses, schedule_id: scheduleId }
             : r
         ));
       }
@@ -334,6 +364,7 @@ export default function FilesView() {
             batchResults={batchResults}
             currentScheduleId={currentScheduleId}
             isSaving={isSaving}
+            readOnly={readOnly}
             onEditNameChange={setEditName}
             onEditDepartmentChange={setEditDepartment}
             onCoursesChange={setEditableCourses}

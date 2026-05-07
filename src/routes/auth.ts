@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import pool from '../config/database.ts';
 import { authenticate, requireRole, AuthUser, JWT_SECRET } from '../middleware/auth.ts';
+import { sendVerificationEmail } from '../services/emailService.ts';
 
 const router = Router();
 
@@ -24,8 +26,8 @@ router.post('/login', async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      'SELECT id, username, name, email, role, department, avatar_url, password_hash, is_active FROM users WHERE username = ?',
-      [username]
+      'SELECT id, username, name, email, email_verify_token, email_verified_at, role, department, avatar_url, password_hash, is_active FROM users WHERE (username = ? OR email = ?)',
+      [username, username]
     );
     const users = rows as any[];
 
@@ -40,16 +42,20 @@ router.post('/login', async (req, res) => {
       return;
     }
 
+    if (user.email && !user.email_verified_at) {
+      res.status(403).json({ success: false, error: '请先验证邮箱后再登录', needVerify: true, email: user.email });
+      return;
+    }
+
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
       res.status(401).json({ success: false, error: '用户名或密码错误' });
       return;
     }
 
-    // 更新最后登录时间
     await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
 
-    const tokenPayload: AuthUser = { userId: user.id, username: user.username, role: user.role };
+    const tokenPayload: AuthUser = { userId: user.id, username: user.username, role: user.role, department: user.department };
     const token = generateToken(tokenPayload);
 
     res.json({
@@ -69,6 +75,127 @@ router.post('/login', async (req, res) => {
         },
       },
     });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/auth/register
+router.post('/register', async (req, res) => {
+  try {
+    const { username, email, password, name } = req.body;
+    if (!username || !email || !password || !name) {
+      res.status(400).json({ success: false, error: '用户名、邮箱、密码和姓名为必填项' });
+      return;
+    }
+    if (password.length < 6) {
+      res.status(400).json({ success: false, error: '密码长度至少6位' });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ success: false, error: '邮箱格式不正确' });
+      return;
+    }
+
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await pool.query(
+      'INSERT INTO users (username, name, email, password_hash, role, is_active, email_verify_token, email_verify_token_expires) VALUES (?, ?, ?, ?, ?, 1, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))',
+      [username, name, email, passwordHash, 'student', verifyToken]
+    );
+
+    // Send verification email (non-blocking)
+    sendVerificationEmail(email, name, verifyToken).catch((e) =>
+      console.error('Failed to send verification email:', e.message)
+    );
+
+    res.json({ success: true, data: { message: '注册成功，请查收验证邮件' } });
+  } catch (error: any) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      res.status(400).json({ success: false, error: '用户名或邮箱已被注册' });
+      return;
+    }
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/auth/verify-email?token=xxx
+router.get('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token || typeof token !== 'string') {
+      res.status(400).json({ success: false, error: '缺少验证令牌' });
+      return;
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id, email_verify_token_expires FROM users WHERE email_verify_token = ? AND email_verified_at IS NULL',
+      [token]
+    );
+    if ((rows as any[]).length === 0) {
+      const [verified] = await pool.query(
+        'SELECT id FROM users WHERE email_verify_token = ? AND email_verified_at IS NOT NULL',
+        [token]
+      );
+      if ((verified as any[]).length > 0) {
+        res.json({ success: true, data: { message: '邮箱已验证，请登录', alreadyVerified: true } });
+        return;
+      }
+      res.status(400).json({ success: false, error: '验证链接无效或已过期' });
+      return;
+    }
+
+    const user = (rows as any[])[0];
+    if (user.email_verify_token_expires && new Date(user.email_verify_token_expires) < new Date()) {
+      res.status(400).json({ success: false, error: '验证链接已过期，请重新发送验证邮件' });
+      return;
+    }
+
+    await pool.query(
+      'UPDATE users SET email_verified_at = NOW() WHERE id = ?',
+      [(rows as any[])[0].id]
+    );
+
+    res.json({ success: true, data: { message: '邮箱验证成功，请登录' } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/auth/verify-email/resend
+router.post('/verify-email/resend', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ success: false, error: '请输入邮箱' });
+      return;
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id, username, name, email_verified_at FROM users WHERE email = ?',
+      [email]
+    );
+    const users = rows as any[];
+    if (users.length === 0) {
+      res.status(400).json({ success: false, error: '该邮箱未注册' });
+      return;
+    }
+
+    const user = users[0];
+    if (user.email_verified_at) {
+      res.json({ success: true, data: { message: '邮箱已验证，请直接登录' } });
+      return;
+    }
+
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    await pool.query('UPDATE users SET email_verify_token = ?, email_verify_token_expires = DATE_ADD(NOW(), INTERVAL 24 HOUR) WHERE id = ?', [verifyToken, user.id]);
+
+    sendVerificationEmail(email, user.name || user.username, verifyToken).catch((e) =>
+      console.error('Failed to resend verification email:', e.message)
+    );
+
+    res.json({ success: true, data: { message: '验证邮件已重新发送' } });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -165,7 +292,6 @@ router.get('/users', authenticate, requireRole('admin'), async (req, res) => {
 
     const [rows] = await pool.query(sql, params);
 
-    // 总数
     let countSql = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
     const countParams: any[] = [];
     if (search) {
@@ -202,8 +328,9 @@ router.post('/users', authenticate, requireRole('admin'), async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    // Admin-created users are auto-verified (no email verification needed)
     const [result] = await pool.query(
-      'INSERT INTO users (username, name, email, role, department, password_hash) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO users (username, name, email, role, department, password_hash, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
       [username, name, email || null, role, department || null, passwordHash]
     );
     res.json({ success: true, data: { id: (result as any).insertId } });

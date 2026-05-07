@@ -1,118 +1,109 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## 开发命令
 
 ```bash
-npm run dev      # 同时启动 Express (3001) 和 Flask (5002)
-npm run dev:server  # 只启动 Express 后端 (3001)
-npm run dev:flask   # 只启动 Flask AI 服务 (5002)
-npm run build    # Vite 生产构建 (输出到 dist/)
-npm run preview  # 预览生产构建
-npm run lint     # TypeScript 类型检查 (tsc --noEmit)
-npm run clean    # 删除 dist/
-npm run cleanup-files  # 运行文件清理脚本
+npm run dev           # Express (3001) + Flask (5002)
+npm run dev:server    # 仅 Express
+npm run dev:flask     # 仅 Flask
+npm run build         # Vite 生产构建 → dist/
+npm run lint          # tsc --noEmit
+npm test              # vitest 单元+集成
+npx playwright test   # E2E (需先启动 dev server)
 ```
 
-## 架构概览
-
-### 服务架构
+## 架构
 
 ```
-浏览器 → Express (port 3001) → Flask AI OCR (port 5002)
+浏览器 → Express :3001 → Flask AI OCR :5002
                  ↓
-              MySQL (port 3306)
+              MySQL :3306
 ```
 
-- **Express 后端** (`server.ts`): REST API 入口，端口 3001。代理 OCR 请求到 AI 服务，提供课表 CRUD、空闲时间查询、反课表导出 API
-- **Flask AI 服务** (`service.py`): OCR 解析服务，端口 5002。使用 PyMuPDF + Doubao AI API 识别课表
-- **React 前端** (`src/App.tsx`): Vite 开发服务器，懒加载各页面视图
+- **Express** (`server.ts`): REST API，路由模块在 `src/routes/`（auth, scoring, file-center），课表/查询/导出在 server.ts 内联
+- **Flask** (`service.py`): PyMuPDF + Doubao AI OCR
+- **前端**: React SPA (`src/App.tsx`), Zustand 状态管理, Vite 构建
 
-### 前端状态管理
+### 认证
 
-使用 Zustand (`src/stores/appStore.ts`)，通过 `useInitializeStore()` 在应用初始化时自动加载部门和课表数据
+- JWT Bearer token，payload: `{ userId, username, role, department }`
+- `authenticate` 中间件校验登录，`requireRole(...roles)` 限制角色（admin/teacher/student）
+- 文件中心/课表中心/仪表盘全部需登录；评分系统评委接口公开，管理接口需 admin
+- 权限模式：admin 或创建者可编辑删除；课表中心额外允许秘书部/主任团
 
-### API 路由
+### API 路由组
 
-```
-POST /api/ocr/image      图片 OCR (代理到 AI 服务)
-POST /api/ocr/pdf        PDF OCR (代理到 AI 服务)
-POST /api/ocr/batch      批量 OCR
-GET  /api/departments    部门列表
-GET  /api/schedules      课表列表 (支持 department/name 过滤)
-GET  /api/schedules/:id  获取单个课表详情
-GET  /api/schedules/:id/file        查看源文件 (inline)
-GET  /api/schedules/:id/file?download=true  下载源文件
-POST /api/schedules      创建课表
-DELETE /api/schedules/:id 删除课表
-GET  /api/query/free-time  空闲时间查询
-POST /api/export/reverse-schedule 反课表 Excel 导出
-```
+| 前缀 | 认证 | 说明 |
+|------|------|------|
+| `/api/auth` | 部分 | 登录公开，/users 需 admin |
+| `/api/schedules` `/api/query` `/api/export` `/api/dashboard` | 全部 | 课表/查询/导出/仪表盘 |
+| `/api/scoring` | 部分 | 评委登录/提交公开；管理需 admin |
+| `/api/file-center` | 全部 | 文件/活动/文件夹/推文 CRUD + OSS 上传 |
+| `/api/departments` | 无 | 部门列表（上传表单需要） |
 
 ### 数据库
 
-MySQL 8.0，连接池 20 连接，队列限制 50。核心表：`departments`、`schedules`、`courses`（sections 和 weeks 字段存 JSON）
+MySQL 8.0，连接池 20。核心表：
+- 课表: `departments`, `schedules`, `courses`（sections/weeks 存 JSON）
+- 认证: `users`（bcrypt 密码哈希）
+- 评分: `scoring_templates` → `dimensions` → `subdimensions`; `competitions`, `contestants`, `judges`, `scores` + `score_details`, `competition_results`
+- 文件中心: `file_activities`, `file_folders`（parent_id 树）, `file_items`, `file_tweets`, `file_permissions`
 
-**注意**：schedules 表的 `file_data` LONGBLOB 字段存储的是 **base64 编码字符串**，读取时需要解码
-
-### 并发配置
-
-- Express/PM2: 2 集群实例，1.5GB 内存限制
-- Flask/Gunicorn: 3 sync workers，5 分钟超时
-- Docker: 每个容器最大 1.5G 内存
-
-## 目录结构
-
-```
-src/
-├── App.tsx                    # React 入口，路由配置
-├── components/
-│   ├── views/                 # 页面视图
-│   │   ├── FilesView/         # 课表中心页面
-│   │   │   ├── index.tsx     # 主容器，视图切换
-│   │   │   ├── ScheduleListView.tsx  # 课表列表（网格卡片布局）
-│   │   │   ├── ScheduleItem.tsx       # 课表卡片组件
-│   │   │   ├── ScheduleUploadView.tsx # 上传视图
-│   │   │   ├── BatchResultView.tsx    # 批量结果视图
-│   │   │   ├── constants.ts   # 常量定义
-│   │   │   └── utils.ts       # 工具函数
-│   │   └── Dashboard/         # 空闲统计页面
-│   ├── Layout.tsx             # 应用壳和导航
-│   ├── ConfirmDialog.tsx      # 自定义确认弹窗
-│   ├── MessageDialog.tsx      # 自定义消息弹窗（success/error/info）
-│   ├── ManualScheduleEntry.tsx # 手动录入课表弹窗
-│   └── ScheduleEditor.tsx     # 课表编辑组件
-├── services/                  # 业务逻辑
-│   ├── api.ts                 # 前端 API 调用
-│   ├── scheduleService.ts     # 课表服务（Node端）
-│   ├── fileStorageService.ts  # 文件存储服务
-│   └── fileStorageService.ts  # 文件存储服务
-├── repositories/              # 数据访问层
-├── stores/appStore.ts         # Zustand 状态管理
-├── config/database.ts         # MySQL 连接池配置
-├── types.ts                   # TypeScript 接口定义
-└── utils/                     # 工具函数
-
-prompts/                       # AI OCR 提示词模板 (Python)
-service.py                     # Flask AI OCR 服务
-```
-
-## 关键实现细节
+## 关键细节
 
 ### 文件存储
 
-- 文件以 base64 字符串存储在 MySQL LONGBLOB
-- 读取流程：`Buffer.toString('utf8')` → `Buffer.from(base64String, 'base64')` → 原始二进制
-- 相关代码：`src/services/fileStorageService.ts` 的 `getFile()` 方法
+- OSS 模式：阿里云 OSS 预签名 URL 直传（V4 签名）
+- OSS key 格式：`file-center/{活动名}/{文件夹路径}/{fileId}_{原始文件名}`
+- 上传流程：先建 DB 记录拿 ID → 拼 OSS key → 生成预签名 URL → 前端直传
+- 下载/预览走服务端代理 `GET /oss/download|preview?key=`（解决 Content-Disposition 和跨域）
+- `schedules.file_data` LONGBLOB 存 **base64 字符串**，读取: `Buffer.from(base64String, 'base64')`
 
-### 状态管理
+### 权限判定
 
-- 使用 Zustand 管理全局状态
-- `appStore.ts` 包含 departments、schedules 状态和 CRUD 操作
-- `useInitializeStore()` hook 在应用初始化时自动加载数据
+```typescript
+// 文件中心：admin 或创建者
+function canModify(user, createdBy) { return user.role === 'admin' || user.username === createdBy; }
+// 课表中心额外允许特权部门
+const isPrivileged = role === 'admin' || department === '秘书部' || department === '主任团';
+```
 
-### 组件通信模式
+### 评分计算
 
-- 子组件通过 props 回调父组件（如 `onSave`, `onError`, `onSuccess`）
-- 使用 `MessageDialog` 组件替代浏览器原生 `alert`/`confirm`
+去掉一个最高分和一个最低分（≥3 个评分才生效），结果存 `competition_results`（rank, final_score, avg_scores JSON）
+
+### 测试
+
+- Vitest: `tests/unit/` + `tests/integration/`，覆盖率目标 `src/services/` `src/routes/` `src/stores/` `src/middleware/` `src/utils/`
+- Playwright: `tests/*.spec.ts`，baseURL `http://localhost:3001`
+
+### 部署
+
+- Express/PM2: 2 实例，1.5GB 限制
+- Flask/Gunicorn: 3 sync workers，5 分钟超时
+- Docker: 每容器 1.5GB
+
+## 代码质量强制规则
+
+**每次 Write/Edit 之后：**
+- Hook 自动 `tsc --noEmit`（已配置），无需手动调用
+
+**写完一个完整功能/模块后：**
+1. `code-reviewer` 或 `typescript-reviewer` — TS 代码审查
+2. 涉及 auth、用户输入、数据库、文件系统时加 `security-reviewer`
+
+**提交前：**
+- `simplify` — 全面审查复用、质量、效率（一次 ~30K token，不要每次编辑都跑）
+
+**Hook 已配置：** 每次 Write/Edit `.ts/.tsx` 后自动 `tsc --noEmit`，失败会在 UI 显示警告。
+**布局检查：** `npx playwright test tests/layout-health.spec.ts` — 16 个检测用例（溢出、重叠、遮盖、截断 × 4 分辨率）
+
+**测试要求：**
+- 功能前先写测试（TDD），验证 80%+ 覆盖率
+- 前端改动后跑布局健康检查
+- E2E: `npx playwright test` (需 dev server 已启动)
+
+**常用 skill（本项目相关）：**
+- `tdd-workflow` / `e2e-testing` / `frontend-design` / `frontend-patterns` / `backend-patterns`
+- `api-design` / `database-migrations` / `docker-patterns` / `deployment-patterns`
+- `security-review` / `search-first` / `coding-standards`

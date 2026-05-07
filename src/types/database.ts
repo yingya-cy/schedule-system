@@ -13,6 +13,7 @@ export interface Schedule {
   filename: string | null;
   file_data?: Buffer | null;
   file_type?: string | null;
+  created_by?: string | null;
   created_at: Date;
   updated_at: Date;
   courses?: Course[];
@@ -42,6 +43,7 @@ export interface CreateScheduleDto {
   file_path?: string | null;
   file_size?: number;
   file_hash?: string | null;
+  created_by?: string | null;
   courses: CreateCourseDto[];
 }
 

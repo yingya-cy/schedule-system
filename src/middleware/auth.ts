@@ -7,6 +7,7 @@ export interface AuthUser {
   userId: number;
   username: string;
   role: 'admin' | 'teacher' | 'student';
+  department?: string;
 }
 
 declare global {
@@ -17,14 +18,24 @@ declare global {
   }
 }
 
-export function authenticate(req: Request, res: Response, next: NextFunction): void {
+function getToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  const q = req.query.token;
+  if (typeof q === 'string' && q.length > 0) {
+    return q;
+  }
+  return null;
+}
+
+export function authenticate(req: Request, res: Response, next: NextFunction): void {
+  const token = getToken(req);
+  if (!token) {
     res.status(401).json({ success: false, error: '未登录，请先登录' });
     return;
   }
-
-  const token = authHeader.substring(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
     req.user = decoded;

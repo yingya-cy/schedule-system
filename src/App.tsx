@@ -6,6 +6,7 @@ import { useAppStore } from './stores/appStore';
 import { useAuthStore } from './stores/authStore';
 
 const LoginView = lazy(() => import('./components/views/LoginView'));
+const RegisterView = lazy(() => import('./components/views/RegisterView'));
 const DashboardView = lazy(() => import('./components/views/DashboardView'));
 const CoursesView = lazy(() => import('./components/views/CoursesView'));
 const FilesView = lazy(() => import('./components/views/FilesView'));
@@ -40,6 +41,7 @@ function AppContent() {
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen">加载中...</div>}>
         <Routes>
           <Route path="/login" element={<LoginView />} />
+          <Route path="/register" element={<RegisterView />} />
           <Route element={<AuthGuard />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardView />} />

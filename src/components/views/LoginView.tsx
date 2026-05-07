@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { LayoutDashboard, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
@@ -9,15 +9,41 @@ export default function LoginView() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Handle email verification from URL
+  useEffect(() => {
+    const verifyToken = searchParams.get('verify');
+    if (verifyToken) {
+      (async () => {
+        try {
+          const res = await fetch(`/api/auth/verify-email?token=${encodeURIComponent(verifyToken)}`);
+          const json = await res.json();
+          if (json.success) {
+            setSuccessMsg(json.data.message || '邮箱验证成功，请登录');
+          } else {
+            setError(json.error || '验证链接无效');
+          }
+        } catch {
+          setError('验证失败，请稍后重试');
+        }
+        // Clean URL
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('verify');
+        setSearchParams(newParams, { replace: true });
+      })();
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
     if (!username.trim() || !password) {
       setError('请输入用户名和密码');
       return;
@@ -28,7 +54,9 @@ export default function LoginView() {
       const returnUrl = searchParams.get('returnUrl') || '/dashboard';
       navigate(returnUrl, { replace: true });
     } catch (err: any) {
-      setError(err.message || '登录失败');
+      const msg = err.message || '登录失败';
+      // Handle need-verify case with resend link
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -68,7 +96,7 @@ export default function LoginView() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl bg-surface-container-lowest border border-surface-container-high text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none font-medium"
-                placeholder="请输入用户名"
+                placeholder="用户名或邮箱"
                 autoFocus
               />
             </div>
@@ -95,6 +123,16 @@ export default function LoginView() {
               </div>
             </div>
 
+            {successMsg && (
+              <motion.p
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-sm text-green-600 bg-green-50 rounded-lg px-3 py-2"
+              >
+                {successMsg}
+              </motion.p>
+            )}
+
             {error && (
               <motion.p
                 initial={{ opacity: 0, y: -4 }}
@@ -116,6 +154,13 @@ export default function LoginView() {
             </motion.button>
           </form>
         </div>
+
+        <p className="text-center text-sm text-on-surface-variant mt-6">
+          还没有账号？{' '}
+          <Link to="/register" className="text-primary font-medium hover:underline">
+            立即注册
+          </Link>
+        </p>
       </motion.div>
     </div>
   );

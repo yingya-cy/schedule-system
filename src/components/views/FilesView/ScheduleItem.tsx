@@ -9,9 +9,10 @@ interface ScheduleItemProps {
   schedule: ScheduleData;
   onView: (schedule: ScheduleData) => void;
   onDelete: (id: number) => void;
+  canDelete?: boolean;
 }
 
-export default function ScheduleItem({ schedule, onView, onDelete }: ScheduleItemProps) {
+export default function ScheduleItem({ schedule, onView, onDelete, canDelete }: ScheduleItemProps) {
   const [showFileMenu, setShowFileMenu] = useState(false);
 
   return (
@@ -19,12 +20,12 @@ export default function ScheduleItem({ schedule, onView, onDelete }: ScheduleIte
       whileHover={{ y: -4, scale: 1.01 }}
       whileTap={{ scale: 0.99 }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      className="bg-surface-container-lowest rounded-2xl border border-surface-container-high/80 shadow-sm p-5 hover:shadow-lg hover:border-primary/20 transition-all duration-200 group flex flex-col min-w-0"
+      className="bg-surface-container-lowest rounded-2xl border border-surface-container-high/80 shadow-sm p-5 group flex flex-col min-w-0"
     >
       <div className="flex-1 space-y-4">
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center group-hover:from-primary/25 group-hover:to-primary/10 transition-all">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center group-hover:from-primary/25 group-hover:to-primary/10 transition-[background] duration-200">
             <FileSpreadsheet className="text-primary" size={22} />
           </div>
           {schedule.filename && (
@@ -55,7 +56,7 @@ export default function ScheduleItem({ schedule, onView, onDelete }: ScheduleIte
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => onView(schedule)}
-          className="focus-ring min-w-0 flex-1 py-2 px-3 bg-primary text-on-primary text-sm font-semibold rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap"
+          className="focus-ring min-w-0 flex-1 py-2 px-3 bg-primary text-on-primary text-sm font-semibold rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap"
         >
           <Eye size={14} />
           <span>查看课表</span>
@@ -67,7 +68,7 @@ export default function ScheduleItem({ schedule, onView, onDelete }: ScheduleIte
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowFileMenu(!showFileMenu)}
-              className="focus-ring p-2 bg-surface-container-low text-on-surface-variant rounded-lg hover:bg-surface-container transition-all"
+              className="focus-ring p-2 bg-surface-container-low text-on-surface-variant rounded-lg hover:bg-surface-container transition-colors"
               title="更多操作"
             >
               <MoreHorizontal size={14} />
@@ -97,15 +98,17 @@ export default function ScheduleItem({ schedule, onView, onDelete }: ScheduleIte
           </div>
         )}
 
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => onDelete(schedule.id)}
-          className="focus-ring p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all flex-shrink-0"
-          title="删除"
-        >
-          <Trash2 size={14} />
-        </motion.button>
+        {canDelete !== false && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onDelete(schedule.id)}
+            className="focus-ring p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-colors flex-shrink-0"
+            title="删除"
+          >
+            <Trash2 size={14} />
+          </motion.button>
+        )}
       </div>
     </motion.div>
   );

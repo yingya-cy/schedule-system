@@ -18,6 +18,7 @@ export interface NavItem {
   id: string;
   label: string;
   icon: string;
+  adminOnly?: boolean;
 }
 
 export interface Member {

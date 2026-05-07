@@ -10,9 +10,15 @@ import type {
 
 const BASE_URL = '/api/scoring';
 
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('auth_token');
+  if (!token) return { 'Content-Type': 'application/json' };
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${url}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     ...options,
   });
   // Handle non-2xx responses that may carry success:false in body
@@ -253,8 +259,12 @@ export const importExportApi = {
   parseTemplate: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     return fetch('/api/scoring/parse-template', {
       method: 'POST',
+      headers,
       body: formData,
     }).then(r => r.json());
   },
@@ -263,8 +273,12 @@ export const importExportApi = {
   parseContestants: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     return fetch('/api/scoring/parse-contestants', {
       method: 'POST',
+      headers,
       body: formData,
     }).then(r => r.json());
   },
@@ -286,8 +300,12 @@ export const importExportApi = {
     const formData = new FormData();
     formData.append('template_file', templateFile);
     formData.append('result_data', JSON.stringify(resultData));
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     return fetch('/api/scoring/export-results', {
       method: 'POST',
+      headers,
       body: formData,
     }).then(r => r.blob());
   },

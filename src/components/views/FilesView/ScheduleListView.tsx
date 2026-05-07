@@ -6,6 +6,7 @@ import { ScheduleData, Department } from '@/types';
 import { filterSchedules } from './utils';
 import ScheduleItem from './ScheduleItem';
 import { SkeletonList } from '@/components/Skeleton';
+import { useAuthStore } from '@/stores/authStore';
 
 interface ScheduleListViewProps {
   schedules: ScheduleData[];
@@ -70,6 +71,15 @@ function ScheduleGrid({
   onViewSchedule: (schedule: ScheduleData) => void;
   onDeleteSchedule: (id: number) => void;
 }) {
+  const user = useAuthStore((s) => s.user);
+
+  function canModify(schedule: ScheduleData): boolean {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    if (user.department === '秘书部' || user.department === '主任团') return true;
+    return (schedule as any).created_by === user.username;
+  }
+
   return (
     <motion.div
       initial="hidden"
@@ -96,6 +106,7 @@ function ScheduleGrid({
               schedule={schedule}
               onView={onViewSchedule}
               onDelete={onDeleteSchedule}
+              canDelete={canModify(schedule)}
             />
           </motion.div>
         ))}
@@ -186,7 +197,7 @@ export default function ScheduleListView({
           <div className="p-3 sm:p-4 border-b border-surface-container-high">
             <div className="flex items-center justify-between gap-3">
               {/* Department filter pills */}
-              <div className="flex items-center gap-2 overflow-x-auto flex-1 pb-1">
+              <div className="flex items-center gap-2 overflow-x-auto flex-1 min-w-0 pb-1">
                 <button
                   onClick={() => setFilterDepartment('')}
                   className={cn(

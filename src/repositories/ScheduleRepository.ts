@@ -67,7 +67,8 @@ export class ScheduleRepository {
         storage_type: dto.storage_type || 'database',
         file_path: dto.file_path || null,
         file_size: dto.file_size || 0,
-        file_hash: dto.file_hash || null
+        file_hash: dto.file_hash || null,
+        created_by: dto.created_by || null,
       };
 
       const { query, params } = buildInsertQuery('schedules', scheduleInsert);

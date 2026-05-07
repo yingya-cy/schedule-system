@@ -11,6 +11,7 @@ import { testConnection, initializeDatabase } from "./src/config/database.ts";
 import scheduleService from "./src/services/scheduleService.ts";
 import queryService from "./src/services/queryService.ts";
 import excelExportService from "./src/services/excelExportService.ts";
+import { authenticate } from "./src/middleware/auth.ts";
 import scoringRouter from "./src/routes/scoring.ts";
 import authRouter from "./src/routes/auth.ts";
 import fileCenterRouter from "./src/routes/file-center.ts";
@@ -166,7 +167,11 @@ app.get("/api/reset-departments", async (req, res) => {
     }
   });
 
-
+  // Auth required for all schedule/query/export/dashboard endpoints
+  app.use('/api/schedules', authenticate);
+  app.use('/api/query', authenticate);
+  app.use('/api/export', authenticate);
+  app.use('/api/dashboard', authenticate);
 
   app.get("/api/schedules", async (req, res) => {
     try {
@@ -230,7 +235,10 @@ app.get("/api/schedules/:id/file", async (req, res) => {
 
   app.post("/api/schedules", async (req, res) => {
     try {
-      const schedule = await scheduleService.createSchedule(req.body);
+      const schedule = await scheduleService.createSchedule({
+        ...req.body,
+        created_by: req.user!.username,
+      });
       res.json({ success: true, data: schedule });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -240,10 +248,18 @@ app.get("/api/schedules/:id/file", async (req, res) => {
   app.put("/api/schedules/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const schedule = await scheduleService.updateSchedule(id, req.body);
-      if (!schedule) {
+      const existing = await scheduleService.getScheduleById(id);
+      if (!existing) {
         return res.status(404).json({ success: false, error: "Schedule not found" });
       }
+      // Permission: admin, 秘书部/主任团, or teacher who created it. Students cannot edit.
+      const { role, username, department } = req.user!;
+      const isPrivileged = role === 'admin' || department === '秘书部' || department === '主任团';
+      const isCreator = (existing as any).created_by === username;
+      if (!isPrivileged && !isCreator) {
+        return res.status(403).json({ success: false, error: '无权编辑此课表' });
+      }
+      const schedule = await scheduleService.updateSchedule(id, req.body);
       res.json({ success: true, data: schedule });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
@@ -253,6 +269,16 @@ app.get("/api/schedules/:id/file", async (req, res) => {
   app.delete("/api/schedules/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const existing = await scheduleService.getScheduleById(id);
+      if (!existing) {
+        return res.status(404).json({ success: false, error: "Schedule not found" });
+      }
+      const { role, username, department } = req.user!;
+      const isPrivileged = role === 'admin' || department === '秘书部' || department === '主任团';
+      const isCreator = (existing as any).created_by === username;
+      if (!isPrivileged && !isCreator) {
+        return res.status(403).json({ success: false, error: '无权删除此课表' });
+      }
       const deleted = await scheduleService.deleteSchedule(id);
       res.json({ success: true, deleted });
     } catch (error: any) {

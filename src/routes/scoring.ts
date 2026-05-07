@@ -1,11 +1,189 @@
 import { Router, Request } from 'express';
 import pool from '../config/database.ts';
+import { authenticate, requireRole } from '../middleware/auth.ts';
 import multer from 'multer';
 import axios from 'axios';
 import FormData from 'form-data';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
+
+// =============================================
+// 公开接口（评委登录 + 评分提交，无需系统账号）
+// =============================================
+
+// 评委登录（用名字 + 比赛ID）
+router.post('/judge/login', async (req, res) => {
+  try {
+    const { name, competition_id } = req.body;
+    const [rows] = await pool.query(
+      `SELECT j.*, c.name as competition_name, c.status as competition_status
+       FROM judges j
+       LEFT JOIN competitions c ON j.competition_id = c.id
+       WHERE j.name = ? AND j.competition_id = ?`,
+      [name, competition_id]
+    );
+    if ((rows as any[]).length === 0) {
+      return res.status(404).json({ success: false, error: '评委姓名不存在' });
+    }
+    res.json({ success: true, data: (rows as any[])[0] });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取评委可评分的选手列表
+router.get('/judge/:judgeId/contestants', async (req, res) => {
+  try {
+    const [judgeRows] = await pool.query(
+      'SELECT * FROM judges WHERE id = ?',
+      [req.params.judgeId]
+    );
+    if ((judgeRows as any[]).length === 0) {
+      return res.status(404).json({ success: false, error: '评委不存在' });
+    }
+    const judge = (judgeRows as any[])[0];
+
+    const [contestants] = await pool.query(
+      'SELECT * FROM contestants WHERE competition_id = ? ORDER BY number',
+      [judge.competition_id]
+    );
+
+    const contestantsWithScore = await Promise.all(
+      (contestants as any[]).map(async (c: any) => {
+        const [scores] = await pool.query(
+          'SELECT * FROM scores WHERE contestant_id = ? AND judge_id = ?',
+          [c.id, judge.id]
+        );
+        return {
+          ...c,
+          scored: (scores as any[]).length > 0,
+          score: (scores as any[]).length > 0 ? (scores as any[])[0] : null
+        };
+      })
+    );
+
+    res.json({ success: true, data: contestantsWithScore });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 获取指定选手的评分记录
+router.get('/judge/scores/:contestantId/:judgeId', async (req, res) => {
+  try {
+    const { contestantId, judgeId } = req.params;
+    const [scoreRows] = await pool.query(
+      `SELECT sd.subdimension_id, sd.dimension_id, sd.score
+       FROM scores s
+       LEFT JOIN score_details sd ON sd.score_id = s.id
+       WHERE s.contestant_id = ? AND s.judge_id = ?`,
+      [contestantId, judgeId]
+    );
+    res.json({ success: true, data: scoreRows });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 提交评分
+router.post('/judge/scores', async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.query('SET NAMES utf8mb4');
+    await connection.beginTransaction();
+
+    const { judge_id, contestant_id, scores } = req.body;
+
+    const [judgeRows] = await connection.query(
+      'SELECT * FROM judges WHERE id = ?',
+      [judge_id]
+    );
+    if ((judgeRows as any[]).length === 0) {
+      throw new Error('评委不存在');
+    }
+    const judge = (judgeRows as any[])[0];
+
+    const [contestantRows] = await connection.query(
+      'SELECT * FROM contestants WHERE id = ?',
+      [contestant_id]
+    );
+    if ((contestantRows as any[]).length === 0) {
+      throw new Error('选手不存在');
+    }
+    const contestant = (contestantRows as any[])[0];
+
+    const [compRows] = await connection.query(
+      'SELECT status FROM competitions WHERE id = ?',
+      [contestant.competition_id]
+    );
+    if ((compRows as any[]).length > 0 && (compRows as any[])[0].status === 'completed') {
+      throw new Error('比赛已结束，无法提交评分');
+    }
+
+    let totalScore = 0;
+    const scoreDetails: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
+
+    if (scores && Array.isArray(scores)) {
+      for (const s of scores) {
+        totalScore += parseFloat(s.score || 0);
+        scoreDetails.push({
+          subdimension_id: s.subdimension_id || undefined,
+          dimension_id: s.dimension_id || undefined,
+          score: parseFloat(s.score || 0)
+        });
+      }
+    }
+
+    const [existingScores] = await connection.query(
+      'SELECT * FROM scores WHERE contestant_id = ? AND judge_id = ?',
+      [contestant_id, judge.id]
+    );
+
+    let scoreId: number;
+    if ((existingScores as any[]).length > 0) {
+      scoreId = (existingScores as any[])[0].id;
+      await connection.query(
+        'UPDATE scores SET total_score = ?, ip_address = ? WHERE id = ?',
+        [totalScore, req.ip, scoreId]
+      );
+      await connection.query('DELETE FROM score_details WHERE score_id = ?', [scoreId]);
+    } else {
+      const [insertResult] = await connection.query(
+        'INSERT INTO scores (competition_id, contestant_id, judge_id, total_score, ip_address) VALUES (?, ?, ?, ?, ?)',
+        [contestant.competition_id, contestant_id, judge.id, totalScore, req.ip]
+      );
+      scoreId = (insertResult as any).insertId;
+    }
+
+    for (const s of scoreDetails) {
+      if (s.subdimension_id) {
+        await connection.query(
+          'INSERT INTO score_details (score_id, subdimension_id, score) VALUES (?, ?, ?)',
+          [scoreId, s.subdimension_id, s.score]
+        );
+      } else if (s.dimension_id) {
+        await connection.query(
+          'INSERT INTO score_details (score_id, dimension_id, score) VALUES (?, ?, ?)',
+          [scoreId, s.dimension_id, s.score]
+        );
+      }
+    }
+
+    await connection.commit();
+    res.json({ success: true, data: { total_score: totalScore } });
+  } catch (error: any) {
+    await connection.rollback();
+    res.status(500).json({ success: false, error: error.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// =============================================
+// 需登录接口（管理操作）
+// =============================================
+router.use(authenticate);
 
 // Multer adds file property to request
 interface MulterRequest extends Request {
@@ -81,8 +259,8 @@ router.get('/templates/:id', async (req, res) => {
   }
 });
 
-// 创建模板
-router.post('/templates', async (req, res) => {
+// 创建模板（仅管理员）
+router.post('/templates', requireRole('admin'), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.query('SET NAMES utf8mb4');
@@ -127,8 +305,8 @@ router.post('/templates', async (req, res) => {
   }
 });
 
-// 更新模板
-router.put('/templates/:id', async (req, res) => {
+// 更新模板（仅管理员）
+router.put('/templates/:id', requireRole('admin'), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.query('SET NAMES utf8mb4');
@@ -179,8 +357,8 @@ router.put('/templates/:id', async (req, res) => {
   }
 });
 
-// 删除模板
-router.delete('/templates/:id', async (req, res) => {
+// 删除模板（仅管理员）
+router.delete('/templates/:id', requireRole('admin'), async (req, res) => {
   try {
     await pool.query('UPDATE scoring_templates SET is_active = 0 WHERE id = ?', [
       req.params.id
@@ -273,8 +451,8 @@ router.get('/competitions/:id', async (req, res) => {
   }
 });
 
-// 创建比赛
-router.post('/competitions', async (req, res) => {
+// 创建比赛（仅管理员）
+router.post('/competitions', requireRole('admin'), async (req, res) => {
   try {
     await pool.query('SET NAMES utf8mb4');
     const { name, description, template_id, judging_mode } = req.body;
@@ -288,8 +466,8 @@ router.post('/competitions', async (req, res) => {
   }
 });
 
-// 更新比赛
-router.put('/competitions/:id', async (req, res) => {
+// 更新比赛（仅管理员）
+router.put('/competitions/:id', requireRole('admin'), async (req, res) => {
   try {
     await pool.query('SET NAMES utf8mb4');
     const { name, description, status, judging_mode, result_published, start_time, end_time } = req.body;
@@ -303,8 +481,8 @@ router.put('/competitions/:id', async (req, res) => {
   }
 });
 
-// 删除比赛
-router.delete('/competitions/:id', async (req, res) => {
+// 删除比赛（仅管理员）
+router.delete('/competitions/:id', requireRole('admin'), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -343,8 +521,8 @@ router.get('/competitions/:id/contestants', async (req, res) => {
   }
 });
 
-// 添加选手
-router.post('/competitions/:id/contestants', async (req, res) => {
+// 添加选手（仅管理员）
+router.post('/competitions/:id/contestants', requireRole('admin'), async (req, res) => {
   try {
     await pool.query('SET NAMES utf8mb4');
     const { number, name, group_name, description, extra_data } = req.body;
@@ -358,8 +536,8 @@ router.post('/competitions/:id/contestants', async (req, res) => {
   }
 });
 
-// 批量导入选手（Excel格式：number, name, work_name, group_name, description）
-router.post('/competitions/:id/contestants/import', async (req, res) => {
+// 批量导入选手（仅管理员）
+router.post('/competitions/:id/contestants/import', requireRole('admin'), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.query('SET NAMES utf8mb4');
@@ -392,8 +570,8 @@ router.post('/competitions/:id/contestants/import', async (req, res) => {
   }
 });
 
-// 删除选手
-router.delete('/competitions/:id/contestants/:contestantId', async (req, res) => {
+// 删除选手（仅管理员）
+router.delete('/competitions/:id/contestants/:contestantId', requireRole('admin'), async (req, res) => {
   try {
     await pool.query(
       'DELETE FROM contestants WHERE id = ? AND competition_id = ?',
@@ -413,7 +591,7 @@ router.delete('/competitions/:id/contestants/:contestantId', async (req, res) =>
 router.get('/competitions/:id/judges', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, name, code, is_active, created_at FROM judges WHERE competition_id = ?',
+      'SELECT j.id, j.name, j.code, j.user_id, j.is_active, j.created_at, u.department FROM judges j LEFT JOIN users u ON j.user_id = u.id WHERE j.competition_id = ?',
       [req.params.id]
     );
     res.json({ success: true, data: rows });
@@ -422,15 +600,36 @@ router.get('/competitions/:id/judges', async (req, res) => {
   }
 });
 
-// 添加评委
-router.post('/competitions/:id/judges', async (req, res) => {
+// 获取当前登录用户的评分任务（评委视角）
+router.get('/my-tasks', async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const [rows] = await pool.query(
+      `SELECT c.id, c.name, c.description, c.status, c.judging_mode, c.start_time, c.end_time,
+        j.id as judge_id,
+        (SELECT COUNT(*) FROM contestants WHERE competition_id = c.id) as contestant_count,
+        (SELECT COUNT(DISTINCT s.contestant_id) FROM scores s WHERE s.judge_id = j.id AND s.competition_id = c.id) as scored_count
+       FROM judges j
+       JOIN competitions c ON j.competition_id = c.id
+       WHERE j.user_id = ? AND j.is_active = 1 AND c.status IN ('scoring', 'completed')
+       ORDER BY c.created_at DESC`,
+      [userId]
+    );
+    res.json({ success: true, data: rows });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 添加评委（仅管理员，可选关联系统用户）
+router.post('/competitions/:id/judges', requireRole('admin'), async (req, res) => {
   try {
     await pool.query('SET NAMES utf8mb4');
-    const { name } = req.body;
+    const { name, user_id } = req.body;
     const code = Math.random().toString(36).slice(2, 8).toUpperCase();
     const [result] = await pool.query(
-      'INSERT INTO judges (name, code, competition_id) VALUES (?, ?, ?)',
-      [name, code, req.params.id]
+      'INSERT INTO judges (name, code, competition_id, user_id) VALUES (?, ?, ?, ?)',
+      [name, code, req.params.id, user_id || null]
     );
     res.json({ success: true, data: { id: (result as any).insertId } });
   } catch (error: any) {
@@ -438,8 +637,8 @@ router.post('/competitions/:id/judges', async (req, res) => {
   }
 });
 
-// 批量导入评委
-router.post('/competitions/:id/judges/import', async (req, res) => {
+// 批量导入评委（仅管理员）
+router.post('/competitions/:id/judges/import', requireRole('admin'), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.query('SET NAMES utf8mb4');
@@ -468,8 +667,8 @@ router.post('/competitions/:id/judges/import', async (req, res) => {
   }
 });
 
-// 删除评委
-router.delete('/competitions/:id/judges/:judgeId', async (req, res) => {
+// 删除评委（仅管理员）
+router.delete('/competitions/:id/judges/:judgeId', requireRole('admin'), async (req, res) => {
   try {
     const { judgeId, id } = req.params;
     // 先删除评委的评分记录(score_details会级联删除)
@@ -489,191 +688,11 @@ router.delete('/competitions/:id/judges/:judgeId', async (req, res) => {
 });
 
 // =============================================
-// 评委评分 API
-// =============================================
-
-// 评委登录（用名字 + 比赛ID）
-router.post('/judge/login', async (req, res) => {
-  try {
-    const { name, competition_id } = req.body;
-    const [rows] = await pool.query(
-      `SELECT j.*, c.name as competition_name, c.status as competition_status
-       FROM judges j
-       LEFT JOIN competitions c ON j.competition_id = c.id
-       WHERE j.name = ? AND j.competition_id = ?`,
-      [name, competition_id]
-    );
-    if ((rows as any[]).length === 0) {
-      return res.status(404).json({ success: false, error: '评委姓名不存在' });
-    }
-    res.json({ success: true, data: (rows as any[])[0] });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// 获取评委可评分的选手列表
-router.get('/judge/:judgeId/contestants', async (req, res) => {
-  try {
-    const [judgeRows] = await pool.query(
-      'SELECT * FROM judges WHERE id = ?',
-      [req.params.judgeId]
-    );
-    if ((judgeRows as any[]).length === 0) {
-      return res.status(404).json({ success: false, error: '评委不存在' });
-    }
-    const judge = (judgeRows as any[])[0];
-
-    const [contestants] = await pool.query(
-      'SELECT * FROM contestants WHERE competition_id = ? ORDER BY number',
-      [judge.competition_id]
-    );
-
-    // 获取该评委对每个选手的评分状态
-    const contestantsWithScore = await Promise.all(
-      (contestants as any[]).map(async (c: any) => {
-        const [scores] = await pool.query(
-          'SELECT * FROM scores WHERE contestant_id = ? AND judge_id = ?',
-          [c.id, judge.id]
-        );
-        return {
-          ...c,
-          scored: (scores as any[]).length > 0,
-          score: (scores as any[]).length > 0 ? (scores as any[])[0] : null
-        };
-      })
-    );
-
-    res.json({ success: true, data: contestantsWithScore });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// 获取指定选手的评分记录
-router.get('/judge/scores/:contestantId/:judgeId', async (req, res) => {
-  try {
-    const { contestantId, judgeId } = req.params;
-    const [scoreRows] = await pool.query(
-      `SELECT sd.subdimension_id, sd.dimension_id, sd.score
-       FROM scores s
-       LEFT JOIN score_details sd ON sd.score_id = s.id
-       WHERE s.contestant_id = ? AND s.judge_id = ?`,
-      [contestantId, judgeId]
-    );
-    res.json({ success: true, data: scoreRows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// 提交评分
-router.post('/judge/scores', async (req, res) => {
-  const connection = await pool.getConnection();
-  try {
-    await connection.query('SET NAMES utf8mb4');
-    await connection.beginTransaction();
-
-    const { judge_id, contestant_id, scores } = req.body;
-
-    // 获取评委信息
-    const [judgeRows] = await connection.query(
-      'SELECT * FROM judges WHERE id = ?',
-      [judge_id]
-    );
-    if ((judgeRows as any[]).length === 0) {
-      throw new Error('评委不存在');
-    }
-    const judge = (judgeRows as any[])[0];
-
-    // 获取选手信息
-    const [contestantRows] = await connection.query(
-      'SELECT * FROM contestants WHERE id = ?',
-      [contestant_id]
-    );
-    if ((contestantRows as any[]).length === 0) {
-      throw new Error('选手不存在');
-    }
-    const contestant = (contestantRows as any[])[0];
-
-    // 检查比赛状态，已完成的比赛不允许提交评分
-    const [compRows] = await connection.query(
-      'SELECT status FROM competitions WHERE id = ?',
-      [contestant.competition_id]
-    );
-    if ((compRows as any[]).length > 0 && (compRows as any[])[0].status === 'completed') {
-      throw new Error('比赛已结束，无法提交评分');
-    }
-
-    // 计算总分
-    let totalScore = 0;
-    const scoreDetails: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
-
-    if (scores && Array.isArray(scores)) {
-      for (const s of scores) {
-        totalScore += parseFloat(s.score || 0);
-        scoreDetails.push({
-          subdimension_id: s.subdimension_id || undefined,
-          dimension_id: s.dimension_id || undefined,
-          score: parseFloat(s.score || 0)
-        });
-      }
-    }
-
-    // 检查是否已有评分，有则更新，无则插入
-    const [existingScores] = await connection.query(
-      'SELECT * FROM scores WHERE contestant_id = ? AND judge_id = ?',
-      [contestant_id, judge.id]
-    );
-
-    let scoreId: number;
-    if ((existingScores as any[]).length > 0) {
-      scoreId = (existingScores as any[])[0].id;
-      await connection.query(
-        'UPDATE scores SET total_score = ?, ip_address = ? WHERE id = ?',
-        [totalScore, req.ip, scoreId]
-      );
-      // 删除旧的评分详情
-      await connection.query('DELETE FROM score_details WHERE score_id = ?', [scoreId]);
-    } else {
-      const [insertResult] = await connection.query(
-        'INSERT INTO scores (competition_id, contestant_id, judge_id, total_score, ip_address) VALUES (?, ?, ?, ?, ?)',
-        [contestant.competition_id, contestant_id, judge.id, totalScore, req.ip]
-      );
-      scoreId = (insertResult as any).insertId;
-    }
-
-    // 插入评分详情
-    for (const s of scoreDetails) {
-      if (s.subdimension_id) {
-        await connection.query(
-          'INSERT INTO score_details (score_id, subdimension_id, score) VALUES (?, ?, ?)',
-          [scoreId, s.subdimension_id, s.score]
-        );
-      } else if (s.dimension_id) {
-        await connection.query(
-          'INSERT INTO score_details (score_id, dimension_id, score) VALUES (?, ?, ?)',
-          [scoreId, s.dimension_id, s.score]
-        );
-      }
-    }
-
-    await connection.commit();
-    res.json({ success: true, data: { total_score: totalScore } });
-  } catch (error: any) {
-    await connection.rollback();
-    res.status(500).json({ success: false, error: error.message });
-  } finally {
-    connection.release();
-  }
-});
-
-// =============================================
 // 结果计算与展示 API
 // =============================================
 
-// 计算最终结果
-router.post('/competitions/:id/calculate', async (req, res) => {
+// 计算最终结果（仅管理员）
+router.post('/competitions/:id/calculate', requireRole('admin'), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -789,8 +808,8 @@ router.post('/competitions/:id/calculate', async (req, res) => {
   }
 });
 
-// 清除所有评分记录和计算结果
-router.delete('/competitions/:id/clear-all', async (req, res) => {
+// 清除所有评分记录和计算结果（仅管理员）
+router.delete('/competitions/:id/clear-all', requireRole('admin'), async (req, res) => {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -910,8 +929,8 @@ router.get('/competitions/:id/score-details', async (req, res) => {
   }
 });
 
-// 发布结果
-router.post('/competitions/:id/publish', async (req, res) => {
+// 发布结果（仅管理员）
+router.post('/competitions/:id/publish', requireRole('admin'), async (req, res) => {
   try {
     await pool.query(
       'UPDATE competitions SET result_published = 1 WHERE id = ?',

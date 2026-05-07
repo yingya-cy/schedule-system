@@ -14,6 +14,7 @@ interface ScheduleEditFormProps {
   batchResults: { filename?: string; file_data?: string; file_type?: string }[];
   currentScheduleId: number | null;
   isSaving: boolean;
+  readOnly?: boolean;
   onEditNameChange: (name: string) => void;
   onEditDepartmentChange: (dept: string) => void;
   onCoursesChange: (courses: EditableCourse[]) => void;
@@ -30,6 +31,7 @@ export default function ScheduleEditForm({
   batchResults,
   currentScheduleId,
   isSaving,
+  readOnly,
   onEditNameChange,
   onEditDepartmentChange,
   onCoursesChange,
@@ -65,7 +67,12 @@ export default function ScheduleEditForm({
     >
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-on-surface tracking-tight">课表编辑</h1>
+          <h1 className="text-2xl font-bold text-on-surface tracking-tight">
+            课表{readOnly ? '查看' : '编辑'}
+          </h1>
+          {readOnly && (
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-2 py-0.5 inline-block mt-1">只读 — 你无权编辑此课表</p>
+          )}
           <p className="text-sm text-on-surface-variant mt-1">
             {currentEditIndex !== null && batchResults[currentEditIndex]?.filename}
             {currentEditIndex === null && editName && ` · ${editName}`}
@@ -95,7 +102,8 @@ export default function ScheduleEditForm({
               value={editName}
               onChange={(e) => onEditNameChange(e.target.value)}
               placeholder="请输入姓名"
-              className="focus-ring w-full px-4 py-3 border border-surface-container-high rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all bg-surface-container-lowest"
+              disabled={readOnly}
+              className="focus-ring w-full px-4 py-3 border border-surface-container-high rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all bg-surface-container-lowest disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
           <div>
@@ -108,7 +116,8 @@ export default function ScheduleEditForm({
             <select
               value={editDepartment}
               onChange={(e) => onEditDepartmentChange(e.target.value)}
-              className="focus-ring w-full px-4 py-3 border border-surface-container-high rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all appearance-none bg-surface-container-lowest"
+              disabled={readOnly}
+              className="focus-ring w-full px-4 py-3 border border-surface-container-high rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all appearance-none bg-surface-container-lowest disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="">请选择部门</option>
               {departments.map(dept => (
@@ -137,6 +146,7 @@ export default function ScheduleEditForm({
         onSave={onSave}
         onCancel={onCancel}
         isSaving={isSaving}
+        readOnly={readOnly}
       />
     </motion.div>
   );

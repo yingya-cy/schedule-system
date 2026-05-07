@@ -56,7 +56,7 @@ export class ScheduleService {
       storage_type: fileMetadata?.storageType || 'database',
       file_path: fileMetadata?.filePath || null,
       file_size: fileMetadata?.fileSize || 0,
-      file_hash: fileMetadata?.fileHash || null
+      file_hash: fileMetadata?.fileHash || null,
     };
 
     return scheduleRepository.create(scheduleDto);

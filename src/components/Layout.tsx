@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
   { id: 'files', label: '课表中心', icon: 'calendar' },
   { id: 'file-center', label: '文件中心', icon: 'folder' },
   { id: 'scoring', label: '比赛评分', icon: 'trophy' },
+  { id: 'users', label: '用户管理', icon: 'users', adminOnly: true },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -58,6 +59,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     setMobileMenuOpen(false);
   };
 
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.adminOnly && user?.role !== 'admin') return false;
+    return true;
+  });
+
   const getIcon = (iconName: string) => {
     switch (iconName) {
       case 'dashboard': return <LayoutDashboard size={20} />;
@@ -72,7 +78,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background overflow-x-hidden">
       {/* Mobile Overlay */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -114,7 +120,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 space-y-1">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <button
               key={item.id}
               onClick={() => handleNavClick(item.id)}
@@ -159,19 +165,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 lg:ml-64 flex flex-col w-full pb-20 lg:pb-0">
         {/* Top Bar */}
         <header className="sticky top-0 z-40 h-16 bg-white/80 backdrop-blur-xl flex justify-between items-center px-4 lg:px-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 min-w-0 flex-1">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="focus-ring lg:hidden p-2 hover:bg-surface-container-low rounded-lg transition-colors"
             >
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
-            <h2 className="text-base sm:text-lg lg:text-xl font-bold tracking-tighter text-primary font-headline">
+            <h2 className="text-base sm:text-lg lg:text-xl font-bold tracking-tighter text-primary font-headline truncate">
               {ROUTE_LABELS[currentPath] || ROUTE_LABELS['/dashboard']}
             </h2>
           </div>
 
-          <div className="flex items-center gap-2 lg:gap-4">
+          <div className="flex items-center gap-2 lg:gap-4 shrink-0">
             <div className="relative group hidden sm:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-outline size-4" />
               <input
@@ -251,7 +257,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Tab Bar */}
       {isMobile && (
         <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface border-t border-surface-container-high safe-area-inset flex lg:hidden">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <button
               key={item.id}
               onClick={() => handleNavClick(item.id)}

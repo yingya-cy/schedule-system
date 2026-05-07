@@ -47,6 +47,11 @@ export default function UserManagementView() {
       if (json.success) {
         setUsers(json.data);
         setTotal(json.meta?.total || 0);
+        setError('');
+      } else {
+        setError(json.error || '加载失败');
+        setUsers([]);
+        setTotal(0);
       }
     } catch (e: any) {
       setError(e.message);

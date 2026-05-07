@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import pool from '../config/database.ts';
-import { authenticate } from '../middleware/auth.ts';
+import { authenticate, AuthUser } from '../middleware/auth.ts';
 import {
   generatePresignedUploadUrl,
   generatePresignedDownloadUrl,
   getObjectUrl,
+  getObjectContent,
   buildObjectKey,
 } from '../services/ossService.ts';
 
@@ -12,6 +13,10 @@ const router = Router();
 
 // All file center routes require authentication
 router.use(authenticate);
+
+function canModify(user: AuthUser, createdBy: string): boolean {
+  return user.role === 'admin' || user.username === createdBy;
+}
 
 // =============================================
 // Activities CRUD
@@ -65,6 +70,16 @@ router.post('/activities', async (req, res) => {
 // PUT /api/file-center/activities/:id
 router.put('/activities/:id', async (req, res) => {
   try {
+    const [act] = await pool.query('SELECT created_by FROM file_activities WHERE id = ?', [req.params.id]);
+    const activities = act as any[];
+    if (activities.length === 0) {
+      res.status(404).json({ success: false, error: '活动不存在' });
+      return;
+    }
+    if (!canModify(req.user!, activities[0].created_by)) {
+      res.status(403).json({ success: false, error: '无权编辑此活动' });
+      return;
+    }
     const { name, description, department, cover_url, status } = req.body;
     const [result] = await pool.query(
       'UPDATE file_activities SET name = COALESCE(?, name), description = COALESCE(?, description), department = COALESCE(?, department), cover_url = COALESCE(?, cover_url), status = COALESCE(?, status) WHERE id = ?',
@@ -83,7 +98,25 @@ router.put('/activities/:id', async (req, res) => {
 // DELETE /api/file-center/activities/:id
 router.delete('/activities/:id', async (req, res) => {
   try {
-    const [result] = await pool.query('DELETE FROM file_activities WHERE id = ?', [req.params.id]);
+    const activityId = req.params.id;
+    const [act] = await pool.query('SELECT created_by FROM file_activities WHERE id = ?', [activityId]);
+    const activities = act as any[];
+    if (activities.length === 0) {
+      res.status(404).json({ success: false, error: '活动不存在' });
+      return;
+    }
+    if (!canModify(req.user!, activities[0].created_by)) {
+      res.status(403).json({ success: false, error: '无权删除此活动' });
+      return;
+    }
+    // Manually delete child records first to avoid FK cascade issues
+    await pool.query('DELETE FROM file_permissions WHERE activity_id = ?', [activityId]);
+    await pool.query('DELETE FROM file_tweets WHERE activity_id = ?', [activityId]);
+    await pool.query('UPDATE file_items SET folder_id = NULL WHERE activity_id = ?', [activityId]);
+    await pool.query('DELETE FROM file_items WHERE activity_id = ?', [activityId]);
+    await pool.query('UPDATE file_folders SET parent_id = NULL WHERE activity_id = ?', [activityId]);
+    await pool.query('DELETE FROM file_folders WHERE activity_id = ?', [activityId]);
+    const [result] = await pool.query('DELETE FROM file_activities WHERE id = ?', [activityId]);
     if ((result as any).affectedRows === 0) {
       res.status(404).json({ success: false, error: '活动不存在' });
       return;
@@ -132,6 +165,16 @@ router.post('/activities/:id/folders', async (req, res) => {
 // PUT /api/file-center/folders/:id
 router.put('/folders/:id', async (req, res) => {
   try {
+    const [f] = await pool.query('SELECT created_by FROM file_folders WHERE id = ?', [req.params.id]);
+    const folders = f as any[];
+    if (folders.length === 0) {
+      res.status(404).json({ success: false, error: '文件夹不存在' });
+      return;
+    }
+    if (!canModify(req.user!, folders[0].created_by)) {
+      res.status(403).json({ success: false, error: '无权编辑此文件夹' });
+      return;
+    }
     const { name, sort_order, parent_id } = req.body;
     const [result] = await pool.query(
       'UPDATE file_folders SET name = COALESCE(?, name), sort_order = COALESCE(?, sort_order), parent_id = COALESCE(?, parent_id) WHERE id = ?',
@@ -150,6 +193,16 @@ router.put('/folders/:id', async (req, res) => {
 // DELETE /api/file-center/folders/:id
 router.delete('/folders/:id', async (req, res) => {
   try {
+    const [f] = await pool.query('SELECT created_by FROM file_folders WHERE id = ?', [req.params.id]);
+    const folders = f as any[];
+    if (folders.length === 0) {
+      res.status(404).json({ success: false, error: '文件夹不存在' });
+      return;
+    }
+    if (!canModify(req.user!, folders[0].created_by)) {
+      res.status(403).json({ success: false, error: '无权删除此文件夹' });
+      return;
+    }
     // Move child items to parent folder or set folder_id to null
     await pool.query('UPDATE file_items SET folder_id = NULL WHERE folder_id = ?', [req.params.id]);
     await pool.query('UPDATE file_tweets SET folder_id = NULL WHERE folder_id = ?', [req.params.id]);
@@ -177,7 +230,7 @@ router.delete('/folders/:id', async (req, res) => {
 router.get('/folders/:id/items', async (req, res) => {
   try {
     const [files] = await pool.query(
-      "SELECT id, original_filename, stored_filename, file_size, mime_type, file_category, oss_url, thumbnail_url, description, created_by, created_at, 'file' as item_type FROM file_items WHERE folder_id = ? ORDER BY created_at DESC",
+      "SELECT id, original_filename, stored_filename, file_size, mime_type, file_category, oss_object_key, oss_url, thumbnail_url, description, created_by, created_at, 'file' as item_type FROM file_items WHERE folder_id = ? ORDER BY created_at DESC",
       [req.params.id]
     );
     const [tweets] = await pool.query(
@@ -211,6 +264,16 @@ router.post('/folders/:id/items', async (req, res) => {
 // PUT /api/file-center/items/:id
 router.put('/items/:id', async (req, res) => {
   try {
+    const [it] = await pool.query('SELECT created_by FROM file_items WHERE id = ?', [req.params.id]);
+    const items = it as any[];
+    if (items.length === 0) {
+      res.status(404).json({ success: false, error: '文件不存在' });
+      return;
+    }
+    if (!canModify(req.user!, items[0].created_by)) {
+      res.status(403).json({ success: false, error: '无权编辑此文件' });
+      return;
+    }
     const { original_filename, description, folder_id } = req.body;
     const [result] = await pool.query(
       'UPDATE file_items SET original_filename = COALESCE(?, original_filename), description = COALESCE(?, description), folder_id = COALESCE(?, folder_id) WHERE id = ?',
@@ -247,6 +310,16 @@ router.put('/items/:id/schedule', async (req, res) => {
 // DELETE /api/file-center/items/:id
 router.delete('/items/:id', async (req, res) => {
   try {
+    const [it] = await pool.query('SELECT created_by FROM file_items WHERE id = ?', [req.params.id]);
+    const items = it as any[];
+    if (items.length === 0) {
+      res.status(404).json({ success: false, error: '文件不存在' });
+      return;
+    }
+    if (!canModify(req.user!, items[0].created_by)) {
+      res.status(403).json({ success: false, error: '无权删除此文件' });
+      return;
+    }
     const [result] = await pool.query('DELETE FROM file_items WHERE id = ?', [req.params.id]);
     if ((result as any).affectedRows === 0) {
       res.status(404).json({ success: false, error: '文件不存在' });
@@ -283,6 +356,16 @@ router.post('/folders/:id/tweets', async (req, res) => {
 // PUT /api/file-center/tweets/:id
 router.put('/tweets/:id', async (req, res) => {
   try {
+    const [tw] = await pool.query('SELECT created_by FROM file_tweets WHERE id = ?', [req.params.id]);
+    const tweets = tw as any[];
+    if (tweets.length === 0) {
+      res.status(404).json({ success: false, error: '推文不存在' });
+      return;
+    }
+    if (!canModify(req.user!, tweets[0].created_by)) {
+      res.status(403).json({ success: false, error: '无权编辑此推文' });
+      return;
+    }
     const { title, content, summary, cover_image, link_url, author, folder_id } = req.body;
     const [result] = await pool.query(
       'UPDATE file_tweets SET title = COALESCE(?, title), content = COALESCE(?, content), summary = COALESCE(?, summary), cover_image = COALESCE(?, cover_image), link_url = COALESCE(?, link_url), author = COALESCE(?, author), folder_id = COALESCE(?, folder_id) WHERE id = ?',
@@ -301,6 +384,16 @@ router.put('/tweets/:id', async (req, res) => {
 // DELETE /api/file-center/tweets/:id
 router.delete('/tweets/:id', async (req, res) => {
   try {
+    const [tw] = await pool.query('SELECT created_by FROM file_tweets WHERE id = ?', [req.params.id]);
+    const tweets = tw as any[];
+    if (tweets.length === 0) {
+      res.status(404).json({ success: false, error: '推文不存在' });
+      return;
+    }
+    if (!canModify(req.user!, tweets[0].created_by)) {
+      res.status(403).json({ success: false, error: '无权删除此推文' });
+      return;
+    }
     const [result] = await pool.query('DELETE FROM file_tweets WHERE id = ?', [req.params.id]);
     if ((result as any).affectedRows === 0) {
       res.status(404).json({ success: false, error: '推文不存在' });
@@ -389,6 +482,57 @@ router.get('/my-activities', async (req, res) => {
 // OSS Presigned URL Endpoints
 // =============================================
 
+// POST /api/file-center/oss/init - create DB record first, then generate presigned URL
+// Returns: { id, uploadUrl, objectKey } — frontend uploads to OSS, no confirm needed
+router.post('/oss/init', async (req, res) => {
+  try {
+    const { activity_id, folder_id, original_filename, file_size, mime_type, file_category, description } = req.body;
+    if (!activity_id || !folder_id || !original_filename) {
+      res.status(400).json({ success: false, error: 'activity_id, folder_id, original_filename 为必填项' });
+      return;
+    }
+
+    // 1. Create DB record first to get the auto-increment ID
+    const [insertResult] = await pool.query(
+      'INSERT INTO file_items (activity_id, folder_id, original_filename, stored_filename, file_size, mime_type, file_category, description, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [activity_id, folder_id, original_filename, original_filename, file_size || 0, mime_type || null, file_category || 'document', description || null, req.user!.username]
+    );
+    const fileId = (insertResult as any).insertId;
+
+    // 2. Get activity name
+    const [activityRows] = await pool.query('SELECT name FROM file_activities WHERE id = ?', [activity_id]);
+    const activityName = (activityRows as any[])[0]?.name || `activity_${activity_id}`;
+
+    // 3. Build folder path by traversing parent chain
+    const folderParts: string[] = [];
+    let currentId: number | null = folder_id;
+    while (currentId) {
+      const [folderRows] = await pool.query('SELECT id, parent_id, name FROM file_folders WHERE id = ?', [currentId]);
+      if ((folderRows as any[]).length === 0) break;
+      folderParts.unshift((folderRows as any[])[0].name);
+      currentId = (folderRows as any[])[0].parent_id;
+    }
+    const folderPath = folderParts.join('/');
+
+    // 4. Build OSS key with readable names + fileId
+    const objectKey = buildObjectKey(activityName, folderPath, fileId, original_filename);
+    const ossUrl = getObjectUrl(objectKey);
+
+    // 5. Update DB record with OSS key
+    await pool.query(
+      'UPDATE file_items SET oss_object_key = ?, oss_url = ? WHERE id = ?',
+      [objectKey, ossUrl, fileId]
+    );
+
+    // 6. Generate presigned upload URL
+    const { uploadUrl } = await generatePresignedUploadUrl(objectKey, mime_type || undefined);
+
+    res.json({ success: true, data: { id: fileId, uploadUrl, objectKey } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // POST /api/file-center/oss/presigned-url
 router.post('/oss/presigned-url', async (req, res) => {
   try {
@@ -397,7 +541,7 @@ router.post('/oss/presigned-url', async (req, res) => {
       res.status(400).json({ success: false, error: 'activity_id, folder_id, filename 为必填项' });
       return;
     }
-    const objectKey = buildObjectKey(activity_id, folder_id, filename);
+    const objectKey = buildObjectKey(`activity_${activity_id}`, `folder_${folder_id}`, Date.now(), filename);
     const result = await generatePresignedUploadUrl(objectKey, content_type || undefined);
     res.json({ success: true, data: result });
   } catch (error: any) {
@@ -408,15 +552,15 @@ router.post('/oss/presigned-url', async (req, res) => {
 // POST /api/file-center/oss/confirm
 router.post('/oss/confirm', async (req, res) => {
   try {
-    const { activity_id, folder_id, object_key, original_filename, file_size, mime_type, file_category, schedule_id } = req.body;
+    const { activity_id, folder_id, object_key, original_filename, file_size, mime_type, file_category, description, schedule_id } = req.body;
     if (!activity_id || !folder_id || !object_key || !original_filename) {
       res.status(400).json({ success: false, error: '缺少必要参数' });
       return;
     }
     const ossUrl = getObjectUrl(object_key);
     const [result] = await pool.query(
-      'INSERT INTO file_items (activity_id, folder_id, original_filename, stored_filename, file_size, mime_type, file_category, oss_object_key, oss_url, schedule_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [activity_id, folder_id, original_filename, original_filename, file_size || 0, mime_type || null, file_category || 'document', object_key, ossUrl, schedule_id || null, req.user!.username]
+      'INSERT INTO file_items (activity_id, folder_id, original_filename, stored_filename, file_size, mime_type, file_category, oss_object_key, oss_url, description, schedule_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [activity_id, folder_id, original_filename, original_filename, file_size || 0, mime_type || null, file_category || 'document', object_key, ossUrl, description || null, schedule_id || null, req.user!.username]
     );
     res.json({ success: true, data: { id: (result as any).insertId, oss_url: ossUrl } });
   } catch (error: any) {
@@ -434,6 +578,43 @@ router.post('/oss/download-url', async (req, res) => {
     }
     const url = await generatePresignedDownloadUrl(object_key);
     res.json({ success: true, data: { downloadUrl: url } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/file-center/oss/download - server proxy with original filename
+router.get('/oss/download', async (req, res) => {
+  try {
+    const key = req.query.key as string;
+    const filename = req.query.filename as string;
+    if (!key) {
+      res.status(400).json({ success: false, error: 'key 为必填项' });
+      return;
+    }
+    const { body, contentType } = await getObjectContent(key);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename || key.split('/').pop() || 'download')}"`);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.end(body);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/file-center/oss/preview - proxied with inline Content-Disposition
+router.get('/oss/preview', async (req, res) => {
+  try {
+    const key = req.query.key as string;
+    if (!key) {
+      res.status(400).json({ success: false, error: 'key 为必填项' });
+      return;
+    }
+    const { body, contentType } = await getObjectContent(key);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.end(body);
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
