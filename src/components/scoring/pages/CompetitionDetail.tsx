@@ -1010,6 +1010,7 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
         <div>
           <div className="flex items-center justify-between mb-4">
             <div className="text-sm text-outline">共 {results.length} 条结果</div>
+            <div className="flex gap-2">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -1066,6 +1067,7 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
                   </div>
                 </>
               )}
+            </div>
             </div>
           </div>
           {!resultsLoaded && results.length === 0 ? (
