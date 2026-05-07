@@ -254,8 +254,11 @@ export const resultApi = {
     if (token) headers["Authorization"] = `Bearer ${token}`;
     return fetch(`/api/scoring/competitions/${competitionId}/export?type=${type}`, {
       headers,
-    }).then(r => {
-      if (!r.ok) throw new Error("导出失败");
+    }).then(async r => {
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+        throw new Error(err.error || `HTTP ${r.status}`);
+      }
       return r.blob();
     });
   },
