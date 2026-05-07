@@ -1079,7 +1079,9 @@ router.get('/competitions/:id/export', async (req, res) => {
     } else {
       // ===== 统分表：选手×评委矩阵 + 平均分 + 排名 =====
       const [scoreRows] = await pool.query(
-        'SELECT contestant_id, judge_id, total_score FROM scores WHERE competition_id = ?',
+        `SELECT contestant_id, judge_id, total_score
+         FROM scores
+         WHERE competition_id = ?`,
         [competitionId]
       );
       // totalMap: contestant_id -> judge_id -> total_score
@@ -1091,7 +1093,7 @@ router.get('/competitions/:id/export', async (req, res) => {
 
       // 计算结果（排名/平均分）
       const [resultRows] = await pool.query(
-        'SELECT contestant_id, avg_scores, rank FROM competition_results WHERE competition_id = ?',
+        'SELECT contestant_id, avg_scores, `rank` FROM competition_results WHERE competition_id = ?',
         [competitionId]
       );
       const resultMap = new Map<number, { rank: number; avg_scores: Record<string, number> }>();
