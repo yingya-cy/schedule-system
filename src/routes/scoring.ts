@@ -1004,6 +1004,7 @@ router.get('/competitions/:id/export', async (req, res) => {
     const font11 = { name: '微软雅黑', size: 11 };
     const fontBold11 = { name: '微软雅黑', size: 11, bold: true };
     const fontBold14 = { name: '微软雅黑', size: 14, bold: true };
+    const fontBold16 = { name: '微软雅黑', size: 16, bold: true };
     const fontBold18 = { name: '微软雅黑', size: 18, bold: true };
     const fontBold20 = { name: '微软雅黑', size: 20, bold: true };
     const styleCell = (cell: ExcelJS.Cell, font?: any, align?: any) => {
@@ -1036,106 +1037,100 @@ router.get('/competitions/:id/export', async (req, res) => {
       for (const judge of targetJudges) {
         const sheetName = judge.name.length > 28 ? judge.name.slice(0, 28) : judge.name;
         const ws = wb.addWorksheet(sheetName);
-        const totalCols = 2 + dimensions.reduce((s, d) => s + d.subs.length, 0) + 1; // 序号+作品 + subdims + 总分
+        const firstDimCol = 3; // col A=序号, B=作品, C+=dimensions
+        const totalCols = 2 + dimensions.reduce((s, d) => s + Math.max(d.subs.length, 1), 0) + 1;
+        const headerEndRow = 8; // rows 4-8 are headers, data starts row 9
 
-        // Title row (row 1-3 merged)
+        // Title (rows 1-3 merged)
         ws.mergeCells(1, 1, 3, totalCols);
         const titleCell = ws.getCell('A1');
-        titleCell.value = `${competition.name} - ${judge.name} 评分表`;
+        titleCell.value = `${competition.name} — ${judge.name} 评分表`;
         styleCell(titleCell, fontBold18, center);
-        ws.getRow(1).height = 25;
+        ws.getRow(1).height = 26;
 
-        // Row 4: 序号 (col A) + 作品 (cols B-F merged) + 评分标准 (cols G-W merged)
-        const dataStartRow = 4;
-        ws.mergeCells(dataStartRow, 1, dataStartRow, 1); // 序号
-        const seqCell = ws.getCell(dataStartRow, 1);
-        seqCell.value = '序号';
-        styleCell(seqCell, fontBold14, center);
+        // Row 4: 序号 + 作品 + 评分标准 (vertically merged through header)
+        ws.mergeCells(4, 1, headerEndRow, 1);
+        styleCell(ws.getCell('A4'), fontBold16, center);
+        ws.getCell('A4').value = '序号';
 
-        ws.mergeCells(dataStartRow, 2, dataStartRow, 2 + 3); // 作品 (B-F, assuming 4-5 cols)
-        const workCell = ws.getCell(dataStartRow, 2);
-        workCell.value = '作品';
-        styleCell(workCell, fontBold14, center);
-        // Adjust 作品 merge to fit: use a generous width
-        ws.unMergeCells(dataStartRow, 2, dataStartRow, 2 + 3);
-        const firstDimCol = 3; // Start dimensions at column C (after 序号 + 作品)
-        ws.mergeCells(dataStartRow, 2, dataStartRow, firstDimCol - 1);
-        ws.getCell(dataStartRow, 2).value = '作品';
-        styleCell(ws.getCell(dataStartRow, 2), fontBold14, center);
-        for (let c = 3; c < firstDimCol; c++) {
-          styleCell(ws.getCell(dataStartRow, c), fontBold14, center);
+        ws.mergeCells(4, 2, headerEndRow, 2);
+        styleCell(ws.getCell('B4'), fontBold16, center);
+        ws.getCell('B4').value = '作品';
+
+        ws.mergeCells(4, firstDimCol, 4, totalCols);
+        styleCell(ws.getCell(4, firstDimCol), fontBold14, center);
+        ws.getCell(4, firstDimCol).value = '评分标准';
+
+        // Row 5: rubric text (from template dimension descriptions)
+        const rubricLines: string[] = [];
+        for (const dim of dimensions) {
+          if (dim.description) {
+            rubricLines.push(`${dim.name}（${dim.max_score}分）：${dim.description}`);
+          }
+          for (const sub of dim.subs) {
+            if (sub.description) {
+              rubricLines.push(`  ${sub.name}（${sub.max_score}分）：${sub.description}`);
+            }
+          }
+        }
+        if (rubricLines.length > 0) {
+          ws.mergeCells(5, firstDimCol, 5, totalCols);
+          const rubricCell = ws.getCell(5, firstDimCol);
+          rubricCell.value = `评分细则：\n${rubricLines.join('\n')}`;
+          styleCell(rubricCell, { name: '微软雅黑', size: 10 }, leftAlign);
+          ws.getRow(5).height = Math.max(40, rubricLines.length * 18);
         }
 
-        // Merge 评分标准 across all dimension columns (row 4)
-        if (totalCols > firstDimCol) {
-          ws.mergeCells(dataStartRow, firstDimCol, dataStartRow, totalCols);
-          const rubricCell = ws.getCell(dataStartRow, firstDimCol);
-          rubricCell.value = '评分标准';
-          styleCell(rubricCell, fontBold14, center);
-        }
-
-        // Row 5: rubric description text (merged across all dimension cols)
-        ws.mergeCells(dataStartRow + 1, firstDimCol, dataStartRow + 1, totalCols);
-        const rubricText = dimensions.map(d => `${d.name}(${d.max_score}分): ${d.subs.map(s => `${s.name}(${s.max_score}分)`).join('、')}`).join('；');
-        const rubricDescCell = ws.getCell(dataStartRow + 1, firstDimCol);
-        rubricDescCell.value = `评分标准分为${dimensions.map(d => d.name).join('、')}四个维度。各维度满分值：${dimensions.map(d => `${d.name}${d.max_score}分`).join('，')}。具体评分细则如下：\n${dimensions.map(d => `${d.name}(${d.max_score}分): ${d.subs.map(s => `${s.name}(${s.max_score}分)`).join('、')}`).join('\n')}`;
-        styleCell(rubricDescCell, { name: '微软雅黑', size: 10 }, leftAlign);
-        ws.getRow(dataStartRow + 1).height = Math.max(60, dimensions.length * 30);
-
-        // Row 6: rubrics description text (empty merged for spacing)
-        ws.mergeCells(dataStartRow + 2, firstDimCol, dataStartRow + 2, totalCols);
-
-        // Row 7: dimension names
-        const dimHeaderRow = dataStartRow + 3;
+        // Row 6-7: part of 序号/作品 vertical merge (empty row for spacing)
+        // Row 7: dimension group headers
+        const dimHeaderRow = 7;
         let col = firstDimCol;
         for (const dim of dimensions) {
-          if (dim.subs.length > 1) {
-            ws.mergeCells(dimHeaderRow, col, dimHeaderRow, col + dim.subs.length - 1);
+          const nCols = Math.max(dim.subs.length, 1);
+          if (nCols > 1) {
+            ws.mergeCells(dimHeaderRow, col, dimHeaderRow, col + nCols - 1);
           }
           const dc = ws.getCell(dimHeaderRow, col);
           dc.value = `${dim.name}（${dim.max_score}分）`;
           styleCell(dc, fontBold14, center);
-          for (let i = 0; i < dim.subs.length; i++) {
+          for (let i = 0; i < nCols; i++) {
             styleCell(ws.getCell(dimHeaderRow, col + i), fontBold14, center);
           }
-          col += dim.subs.length;
+          col += nCols;
         }
-        // 总分 header
+        // 总分
         ws.mergeCells(dimHeaderRow, col, dimHeaderRow, col);
-        const totalHdr = ws.getCell(dimHeaderRow, col);
-        totalHdr.value = `总分（${dimensions.reduce((s, d) => s + d.max_score, 0)}分）`;
-        styleCell(totalHdr, fontBold14, center);
+        const totalScore = dimensions.reduce((s, d) => s + d.max_score, 0);
+        const th = ws.getCell(dimHeaderRow, col);
+        th.value = `总分（${totalScore}分）`;
+        styleCell(th, fontBold14, center);
+        ws.getRow(dimHeaderRow).height = 22;
 
-        // Row 8: subdimension names & descriptions
-        const subHeaderRow = dimHeaderRow + 1;
-        for (let c = 1; c < firstDimCol; c++) {
-          styleCell(ws.getCell(subHeaderRow, c), fontBold11, center);
-        }
+        // Row 8: subdimension names
+        const subHeaderRow = 8;
         col = firstDimCol;
         for (const dim of dimensions) {
           for (const sub of dim.subs) {
             const sc = ws.getCell(subHeaderRow, col);
-            sc.value = `${sub.name}\n(${sub.max_score}分)`;
+            sc.value = `${sub.name}\n（${sub.max_score}分）`;
             styleCell(sc, fontBold11, center);
             col++;
           }
         }
         styleCell(ws.getCell(subHeaderRow, col), fontBold11, center);
-        ws.getRow(subHeaderRow).height = 35;
+        ws.getRow(subHeaderRow).height = 32;
 
-        // Data rows
-        const dataFirstRow = subHeaderRow + 1;
+        // Data rows (start at row 9)
+        const dataFirstRow = 9;
         for (let i = 0; i < contestants.length; i++) {
           const c = contestants[i];
           const r = dataFirstRow + i;
-          const seqC = ws.getCell(r, 1);
-          seqC.value = c.number || (i + 1);
-          styleCell(seqC, { name: '微软雅黑', size: 12, bold: true }, center);
 
-          const nameC = ws.getCell(r, 2);
-          nameC.value = c.name;
-          styleCell(nameC, font11, center);
-          for (let cc = 3; cc < firstDimCol; cc++) styleCell(ws.getCell(r, cc), font11, center);
+          styleCell(ws.getCell(r, 1), { name: '微软雅黑', size: 12, bold: true }, center);
+          ws.getCell(r, 1).value = c.number || (i + 1);
+
+          styleCell(ws.getCell(r, 2), font11, center);
+          ws.getCell(r, 2).value = c.name;
 
           col = firstDimCol;
           const scoreCols: string[] = [];
@@ -1143,28 +1138,24 @@ router.get('/competitions/:id/export', async (req, res) => {
             for (const sub of dim.subs) {
               const val = scoreMap[c.id]?.[judge.id]?.[sub.id];
               const sc = ws.getCell(r, col);
-              if (val != null && val > 0) sc.value = val;
+              if (val != null && val > 0) { sc.value = val; sc.numFmt = '0.0'; }
               styleCell(sc, font11, center);
-              if (val != null && val > 0) sc.numFmt = '0.0';
               scoreCols.push(columnLetter(col));
               col++;
             }
           }
-          // Total formula
+          const totalCell = ws.getCell(r, col);
           if (scoreCols.length > 0) {
-            const totalCell = ws.getCell(r, col);
             totalCell.value = { formula: `SUM(${scoreCols[0]}${r}:${scoreCols[scoreCols.length - 1]}${r})` };
-            styleCell(totalCell, fontBold11, center);
-          } else {
-            styleCell(ws.getCell(r, col), fontBold11, center);
           }
+          styleCell(totalCell, fontBold11, center);
         }
 
         // Column widths
-        ws.getColumn(1).width = 8;
-        ws.getColumn(2).width = 40;
+        ws.getColumn(1).width = 7;
+        ws.getColumn(2).width = 42;
         for (let cc = 3; cc <= totalCols; cc++) {
-          ws.getColumn(cc).width = 12;
+          ws.getColumn(cc).width = cc === totalCols ? 14 : 11;
         }
       }
 
