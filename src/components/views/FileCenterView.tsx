@@ -112,7 +112,7 @@ export default function FileCenterView() {
   const [folderForm, setFolderForm] = useState({ name: '', parent_id: '' });
   const [folderError, setFolderError] = useState('');
 
-  const [items, setItems] = useState<{ files: FileItem[]; tweets: TweetItem[] }>({ files: [], tweets: [] });
+  const [items, setItems] = useState<{ files: FileItem[]; tweets: TweetItem[]; subfolders: Folder[] }>({ files: [], tweets: [], subfolders: [] });
   const [showItemModal, setShowItemModal] = useState(false);
   const [showTweetModal, setShowTweetModal] = useState(false);
   const [editingItem, setEditingItem] = useState<FileItem | null>(null);
@@ -469,7 +469,7 @@ export default function FileCenterView() {
         setSelectedActivity(null);
         setSelectedFolderId(null);
         setFolders([]);
-        setItems({ files: [], tweets: [] });
+        setItems({ files: [], tweets: [], subfolders: [] });
         fetchActivities();
       } else if (deleteTarget.type === 'folder') {
         if (selectedActivity) fetchFolders(selectedActivity.id);
@@ -569,7 +569,7 @@ export default function FileCenterView() {
                     onClick={() => {
                       setSelectedActivity(a);
                       setSelectedFolderId(null);
-                      setItems({ files: [], tweets: [] });
+                      setItems({ files: [], tweets: [], subfolders: [] });
                       setExpandedFolders(new Set());
                     }}
                     className="w-full text-left"
@@ -618,7 +618,7 @@ export default function FileCenterView() {
               onClick={() => {
                 setSelectedActivity(null);
                 setSelectedFolderId(null);
-                setItems({ files: [], tweets: [] });
+                setItems({ files: [], tweets: [], subfolders: [] });
                 setExpandedFolders(new Set());
               }}
               className="w-full flex items-center gap-2 px-3 py-2 mb-2 rounded-xl text-sm text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors"
@@ -656,7 +656,7 @@ export default function FileCenterView() {
                     onClick={() => {
                       setSelectedActivity(null);
                       setSelectedFolderId(null);
-                      setItems({ files: [], tweets: [] });
+                      setItems({ files: [], tweets: [], subfolders: [] });
                       setExpandedFolders(new Set());
                     }}
                     className="p-1 hover:bg-surface-container-low rounded-lg text-outline hover:text-primary transition-colors shrink-0"
@@ -781,6 +781,45 @@ export default function FileCenterView() {
                 <p className="text-sm text-on-surface-variant py-8 text-center">加载中...</p>
               ) : (
                 <>
+                  {items.subfolders.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs font-bold text-outline uppercase tracking-wider mb-2">文件夹</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {items.subfolders.map(sf => (
+                          <div key={sf.id} className="group relative bg-surface-container-lowest rounded-xl border border-surface-container-high p-3 hover:border-primary/30 transition-all cursor-pointer"
+                            onClick={() => setSelectedFolderId(sf.id)}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                                <FolderOpen size={16} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-on-surface truncate">{sf.name}</p>
+                                <p className="text-xs text-on-surface-variant mt-0.5">文件夹</p>
+                              </div>
+                            </div>
+                            <div className="absolute bottom-2 right-2 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-surface/80 backdrop-blur rounded-lg p-0.5">
+                              <button
+                                onClick={e => { e.stopPropagation(); setEditingFolder(sf); setFolderForm({ name: sf.name, parent_id: String(sf.parent_id || '') }); setFolderError(''); }}
+                                className="p-1 hover:bg-primary/10 rounded text-primary"
+                                title="编辑"
+                              >
+                                <Edit3 size={12} />
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); setDeleteTarget({ type: 'folder', id: sf.id, name: sf.name }); }}
+                                className="p-1 hover:bg-red-50 rounded text-red-400"
+                                title="删除"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {items.files.length > 0 && (
                     <div className="mb-4">
                       <p className="text-xs font-bold text-outline uppercase tracking-wider mb-2">文件</p>
@@ -882,7 +921,7 @@ export default function FileCenterView() {
                     </div>
                   )}
 
-                  {items.files.length === 0 && items.tweets.length === 0 && (
+                  {items.files.length === 0 && items.tweets.length === 0 && items.subfolders.length === 0 && (
                     <div className="text-center py-12 text-on-surface-variant">
                       <p className="text-sm">此文件夹为空</p>
                       <p className="text-xs mt-1">上传文件或添加推文</p>

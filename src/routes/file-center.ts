@@ -237,7 +237,11 @@ router.get('/folders/:id/items', async (req, res) => {
       "SELECT id, title, content, summary, cover_image, link_url, author, created_by, created_at, 'tweet' as item_type FROM file_tweets WHERE folder_id = ? ORDER BY created_at DESC",
       [req.params.id]
     );
-    res.json({ success: true, data: { files, tweets } });
+    const [subfolders] = await pool.query(
+      "SELECT id, activity_id, parent_id, name, sort_order, created_by FROM file_folders WHERE parent_id = ? ORDER BY sort_order, name",
+      [req.params.id]
+    );
+    res.json({ success: true, data: { files, tweets, subfolders } });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
