@@ -200,12 +200,15 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - **Status:** completed — 215/215 tests
 
 ### Phase 14: 查漏补缺 — 文件中心、评分导出、反课表
-- [x] 文件中心子文件夹显示 — `GET /folders/:id/items` 新增 subfolders 查询，前端文件列表上方渲染子文件夹卡片
-- [x] 评分结果双格式导出 — 评分表(按评委详细维度) + 统分表(汇总排名，不去最高最低)
-- [x] 反课表导出 — 7天工作簿，按部门+人员网格，遵循反课表格式规则
-- [x] 前端防御修复 — items.subfolders/folders 为 undefined 时容错
-- **Status:** completed（待重启 server 验证子文件夹显示）
-- **Status:** in_progress
+- [x] 14.1 文件中心子文件夹显示 + 根目录显示 + 目录树 hover 按钮修复
+- [x] 14.2 评分结果双格式导出 — 统分表(汇总排名+公式) + 评分表(按评委、DB描述、子维度详情)
+- [x] 14.3 评分导出格式升级 — xlsx→exceljs，支持边框/字体/居中/合并/公式
+- [x] 14.4 评分表按评委导出 — judge_id 参数 + 前端评委下拉选择器
+- [x] 14.5 移除上传模板导出按钮 — 已被直接导出替代
+- [x] 14.6 反课表导出 — 按部门+人员×时间段网格，7天工作簿，反课表格式规则
+- [x] 14.7 反课表导出按钮 — 从孤儿 QueryPanel 移至仪表盘 DashboardView
+- [x] 14.8 各种 Bug 修复 — rank 保留字、Content-Disposition 编码、auth header 遗漏、pool.query 兼容
+- **Status:** completed
 
 ## Key Questions
 1. 登录系统是独立用户体系还是对接学校 SSO/LDAP？→ **独立用户体系（用户名+密码+JWT），不开放注册，管理员后台创建**
