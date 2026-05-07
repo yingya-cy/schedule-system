@@ -4,7 +4,6 @@ import type { Competition, Contestant, Judge } from '../types/scoring.ts';
 import MessageDialog from '../../MessageDialog.tsx';
 import ConfirmDialog from '../../ConfirmDialog.tsx';
 import ImportExcelModal from './ImportExcelModal.tsx';
-import ExportExcelModal from './ExportExcelModal.tsx';
 import { motion } from 'motion/react';
 import { ArrowLeft, Plus, Trash2, X as XIcon, Users, UserCheck, BarChart3, Calculator, RotateCcw, Trash, Wand2, Table, FileSpreadsheet, Download } from 'lucide-react';
 
@@ -62,7 +61,6 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
 
   // Excel Import/Export
   const [showImportModal, setShowImportModal] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
   const [showJudgePicker, setShowJudgePicker] = useState(false);
 
   useEffect(() => {
@@ -1015,15 +1013,6 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setShowExportModal(true)}
-              className="px-4 py-2.5 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors flex items-center gap-2 touch-target focus-ring"
-            >
-              <Download size={16} />
-              上传模板导出
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
               onClick={async () => {
                 try {
                   const { blob, filename } = await resultApi.exportResultsDirect(competitionId, 'summary');
@@ -1177,12 +1166,6 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
         competitions={[{ id: competitionId, name: competition?.name || '' }]}
       />
 
-      {/* Excel Export Modal */}
-      <ExportExcelModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        currentCompetition={competition ?? undefined}
-      />
     </div>
   );
 }
