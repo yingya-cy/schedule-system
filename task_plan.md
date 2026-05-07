@@ -4,7 +4,7 @@
 构建完整的学术管理平台，包含课表管理、比赛评分、登录认证、网盘系统、即时通讯等功能模块。
 
 ## Current Phase
-Phase 13: 权限完善 & Bug 修复
+Phase 14: 查漏补缺 — 文件中心、评分导出、反课表
 
 ## Phases
 
@@ -198,6 +198,14 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - [x] 验证 token 加 24h 过期 — `email_verify_token_expires` 列
 - [x] 登录页 placeholder 改为「用户名或邮箱」
 - **Status:** completed — 215/215 tests
+
+### Phase 14: 查漏补缺 — 文件中心、评分导出、反课表
+- [x] 文件中心子文件夹显示 — `GET /folders/:id/items` 新增 subfolders 查询，前端文件列表上方渲染子文件夹卡片
+- [x] 评分结果双格式导出 — 评分表(按评委详细维度) + 统分表(汇总排名，不去最高最低)
+- [x] 反课表导出 — 7天工作簿，按部门+人员网格，遵循反课表格式规则
+- [x] 前端防御修复 — items.subfolders/folders 为 undefined 时容错
+- **Status:** completed（待重启 server 验证子文件夹显示）
+- **Status:** in_progress
 
 ## Key Questions
 1. 登录系统是独立用户体系还是对接学校 SSO/LDAP？→ **独立用户体系（用户名+密码+JWT），不开放注册，管理员后台创建**

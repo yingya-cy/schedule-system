@@ -148,7 +148,7 @@ export default function FileCenterView() {
     try {
       const res = await fetch(`/api/file-center/activities/${activityId}/folders`, { headers });
       const json = await res.json();
-      if (json.success) setFolders(json.data);
+      if (json.success) setFolders(Array.isArray(json.data) ? json.data : []);
     } catch { /* ignore */ }
   }
 
@@ -157,7 +157,7 @@ export default function FileCenterView() {
     try {
       const res = await fetch(`/api/file-center/folders/${folderId}/items`, { headers });
       const json = await res.json();
-      if (json.success) setItems(json.data);
+      if (json.success) setItems({ files: json.data.files || [], tweets: json.data.tweets || [], subfolders: json.data.subfolders || [] });
     } catch { /* ignore */ }
     setLoading(false);
   }
