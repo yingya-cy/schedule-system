@@ -99,7 +99,9 @@ const isPrivileged = role === 'admin' || department === '秘书部' || departmen
 **布局检查：** `npx playwright test tests/layout-health.spec.ts` — 16 个检测用例（溢出、重叠、遮盖、截断 × 4 分辨率）
 
 **测试要求：**
+- **每次代码改动必须同步新增/修改测试** — 新功能加测试、安全修复加权限测试、bug 修复加回归测试
 - 功能前先写测试（TDD），验证 80%+ 覆盖率
+- 不能只跑老测试通过就完事，老测试覆盖不到新改动
 - 前端改动后跑布局健康检查
 - E2E: `npx playwright test` (需 dev server 已启动)
 
