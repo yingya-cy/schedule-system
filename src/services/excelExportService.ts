@@ -20,7 +20,7 @@ const TIME_PERIODS = [
   { label: '9-11节', sections: [9, 10, 11] },
 ];
 
-const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+const dayNames = ['周一', '周二', '周三', '周四', '周五'];
 
 function hasCourse(person: PersonData, day: number, section: number, week: number): boolean {
   return person.courses.some(c =>
@@ -90,24 +90,20 @@ const thinBorder = {
   top: { style: 'thin' as const }, bottom: { style: 'thin' as const },
   left: { style: 'thin' as const }, right: { style: 'thin' as const },
 };
-const centerMiddle: Partial<ExcelJS.Alignment> = { horizontal: 'center', vertical: 'middle', wrapText: true };
+const centerWrap: Partial<ExcelJS.Alignment> = { horizontal: 'center', vertical: 'middle', wrapText: true };
+const fontName = '等线';
+const FONT = { data: { name: fontName, size: 14 }, title: { name: fontName, size: 48, bold: true }, header: { name: fontName, size: 22, bold: true } };
 
 // Rotating department background colors
 const deptColors = ['FFD9E1F4', 'FFC5E0B4', 'FFB4C7E7', 'FFF9CBAA', 'FFE3F2D9', 'FFFFFF99', 'FFF4B4C2', 'FFD0CECE'];
 let deptColorIdx = 0;
-function nextDeptColor(): string {
-  const c = deptColors[deptColorIdx % deptColors.length];
-  deptColorIdx++;
-  return c;
-}
+function nextDeptColor(): string { return deptColors[deptColorIdx++ % deptColors.length]; }
 
-function styleCell(cell: ExcelJS.Cell, font: any, fill?: string) {
+function sc(cell: ExcelJS.Cell, font: any, fill?: string) {
   cell.font = font;
-  cell.alignment = centerMiddle;
+  cell.alignment = centerWrap;
   cell.border = thinBorder;
-  if (fill) {
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
-  }
+  if (fill) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
 }
 
 function colLetter(n: number): string {
@@ -135,121 +131,102 @@ export class ExcelExportService {
     let maxPeople = 0;
     for (const dp of peopleByDept.values()) { if (dp.length > maxPeople) maxPeople = dp.length; }
     const subCols = Math.min(Math.max(maxPeople, 1), 5);
-    // Total columns: A=部门, then for each period: subCols + 1 separator (except last period has no separator)
     const totalCols = 1 + TIME_PERIODS.length * (subCols + 1) - 1;
 
     deptColorIdx = 0;
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'Academic Ether';
+
+    // Build dept groups first to know the last data row for separator merges
+    const deptGroups: { dept: string; people: PersonData[]; color: string }[] = [];
+    for (const dept of deptOrder) {
+      deptGroups.push({ dept, people: peopleByDept.get(dept)!, color: nextDeptColor() });
+    }
+    let totalDataRows = 4;
+    for (const g of deptGroups) totalDataRows += Math.ceil(g.people.length / subCols);
+    const lastDataRow = totalDataRows - 1;
 
     for (let day = 1; day <= 5; day++) {
       const ws = wb.addWorksheet(dayNames[day - 1]);
 
       // === Row 1: Title ===
       ws.mergeCells(1, 1, 1, totalCols);
-      const titleName = termName ? `第${termName}届朋辈反课表` : '朋辈反课表';
       const titleCell = ws.getCell('A1');
-      titleCell.value = titleName;
-      styleCell(titleCell, { name: '微软雅黑', size: 48, bold: true });
-      ws.getRow(1).height = 61.5;
+      titleCell.value = termName ? `第${termName}届朋辈反课表` : '朋辈反课表';
+      sc(titleCell, FONT.title);
+      ws.getRow(1).height = 61.1;
 
       // === Row 2-3: Headers ===
-      // A2:A3 merged = 部门
       ws.mergeCells(2, 1, 3, 1);
-      const deptHdr = ws.getCell('A2');
-      deptHdr.value = '部门';
-      styleCell(deptHdr, { name: '微软雅黑', size: 22, bold: true });
-      ws.getCell('A3').border = thinBorder; // ensure border on merged cell
+      sc(ws.getCell('A2'), FONT.header);
+      ws.getCell('A2').value = '部门';
 
-      // B2 = 时间 (merged across all period columns)
-      const timeHeaderEnd = totalCols;
-      ws.mergeCells(2, 2, 2, timeHeaderEnd);
-      const timeHdr = ws.getCell('B2');
-      timeHdr.value = '时间';
-      styleCell(timeHdr, { name: '微软雅黑', size: 22, bold: true });
+      ws.mergeCells(2, 2, 2, totalCols);
+      sc(ws.getCell('B2'), FONT.header);
+      ws.getCell('B2').value = '时间';
 
-      // Row 3: time period labels (each merged across subCols), with separators between
+      // Row 3: time period labels
       let col = 2;
       for (let tpIdx = 0; tpIdx < TIME_PERIODS.length; tpIdx++) {
         const tp = TIME_PERIODS[tpIdx];
         ws.mergeCells(3, col, 3, col + subCols - 1);
-        const tpCell = ws.getCell(3, col);
-        tpCell.value = tp.label;
-        styleCell(tpCell, { name: '微软雅黑', size: 22, bold: true });
-        for (let i = 0; i < subCols; i++) {
-          styleCell(ws.getCell(3, col + i), { name: '微软雅黑', size: 22, bold: true });
-        }
+        sc(ws.getCell(3, col), FONT.header);
+        ws.getCell(3, col).value = tp.label;
+        for (let i = 0; i < subCols; i++) sc(ws.getCell(3, col + i), FONT.header);
         col += subCols;
-        // Separator column after each period (except last)
         if (tpIdx < TIME_PERIODS.length - 1) {
-          // Merge separator through rows 3-26 (header through data)
-          // We'll just set the separator column headers
-          styleCell(ws.getCell(3, col), { name: '微软雅黑', size: 22, bold: true });
+          ws.mergeCells(3, col, lastDataRow, col); // separator merged through all rows
           col++;
         }
       }
-      ws.getRow(2).height = 27;
-      ws.getRow(3).height = 27;
+      ws.getRow(2).height = 27.8;
+      ws.getRow(3).height = 27.8;
 
-      // === Data rows (starting row 4) ===
+      // === Data rows (grid layout: subCols people per row) ===
       let dataRow = 4;
-      const deptMergeGroups: { startRow: number; people: PersonData[]; dept: string; color: string }[] = [];
-      for (const dept of deptOrder) {
-        const deptPeople = peopleByDept.get(dept)!;
-        deptMergeGroups.push({ startRow: dataRow, people: deptPeople, dept, color: nextDeptColor() });
-        dataRow += deptPeople.length;
-      }
-      dataRow = 4;
-      for (const grp of deptMergeGroups) {
+      for (const grp of deptGroups) {
+        const numRows = Math.ceil(grp.people.length / subCols);
         const deptStart = dataRow;
-        const deptEnd = deptStart + grp.people.length - 1;
+        const deptEnd = deptStart + numRows - 1;
 
-        // Department column (A) — merge once per department
-        if (grp.people.length > 1) {
+        if (numRows > 1) {
           ws.mergeCells(deptStart, 1, deptEnd, 1);
         }
-        const dc = ws.getCell(deptStart, 1);
-        dc.value = grp.dept;
-        styleCell(dc, { name: '微软雅黑', size: 14, bold: false }, grp.color);
-        // Style remaining merged cells
-        for (let mr = deptStart + 1; mr <= deptEnd; mr++) {
-          styleCell(ws.getCell(mr, 1), { name: '微软雅黑', size: 14, bold: false }, grp.color);
-        }
+        sc(ws.getCell(deptStart, 1), FONT.data, grp.color);
+        ws.getCell(deptStart, 1).value = grp.dept;
 
-        for (let pi = 0; pi < grp.people.length; pi++) {
-          const rowNum = dataRow;
-          const person = grp.people[pi];
+        for (let r = 0; r < numRows; r++) {
+          const rowNum = deptStart + r;
 
-          // Time period data
+          // Apply bg color to ALL cells in this row
+          for (let c = 1; c <= totalCols; c++) {
+            sc(ws.getCell(rowNum, c), FONT.data, grp.color);
+          }
+
           col = 2;
           for (let tpIdx = 0; tpIdx < TIME_PERIODS.length; tpIdx++) {
             const tp = TIME_PERIODS[tpIdx];
-            // Each person occupies sub-column position pi within this period
-            for (let sc = 0; sc < subCols; sc++) {
-              const cell = ws.getCell(rowNum, col);
-              if (sc === pi) {
+            for (let sc2 = 0; sc2 < subCols; sc2++) {
+              const pi = r * subCols + sc2;
+              if (pi < grp.people.length) {
+                const person = grp.people[pi];
                 const freeNotation = formatFreeTimeForPeriod(person, day, tp.sections);
-                cell.value = person.name + freeNotation;
+                ws.getCell(rowNum, col).value = person.name + freeNotation;
               }
-              styleCell(cell, { name: '微软雅黑', size: 10 });
               col++;
             }
-            // Separator column
-            if (tpIdx < TIME_PERIODS.length - 1) {
-              styleCell(ws.getCell(rowNum, col), { name: '微软雅黑', size: 10 });
-              col++;
-            }
+            if (tpIdx < TIME_PERIODS.length - 1) col++;
           }
+
           ws.getRow(rowNum).height = 56.2;
-          dataRow++;
         }
+        dataRow = deptEnd + 1;
       }
 
       // Column widths
       ws.getColumn(1).width = 10.6;
       col = 2;
       for (let tpIdx = 0; tpIdx < TIME_PERIODS.length; tpIdx++) {
-        for (let sc = 0; sc < subCols; sc++) {
+        for (let sc2 = 0; sc2 < subCols; sc2++) {
           ws.getColumn(col).width = 23.5;
           col++;
         }
