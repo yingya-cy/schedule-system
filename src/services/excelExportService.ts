@@ -20,7 +20,7 @@ const TIME_PERIODS = [
   { label: '9-11节', sections: [9, 10, 11] },
 ];
 
-const dayNames = ['周一', '周二', '周三', '周四', '周五'];
+const dayNames = ['星期一', '星期二', '星期三', '星期四', '星期五'];
 
 function hasCourse(person: PersonData, day: number, section: number, week: number): boolean {
   return person.courses.some(c =>
@@ -178,8 +178,8 @@ export class ExcelExportService {
           col++;
         }
       }
-      ws.getRow(2).height = 27.8;
-      ws.getRow(3).height = 27.8;
+      ws.getRow(2).height = 27.75;
+      ws.getRow(3).height = 27.75;
 
       // === Data rows (grid layout: subCols people per row) ===
       let dataRow = 4;
@@ -217,7 +217,7 @@ export class ExcelExportService {
             if (tpIdx < TIME_PERIODS.length - 1) col++;
           }
 
-          ws.getRow(rowNum).height = 56.2;
+          ws.getRow(rowNum).height = 56.25;
         }
         dataRow = deptEnd + 1;
       }
@@ -227,7 +227,7 @@ export class ExcelExportService {
       col = 2;
       for (let tpIdx = 0; tpIdx < TIME_PERIODS.length; tpIdx++) {
         for (let sc2 = 0; sc2 < subCols; sc2++) {
-          ws.getColumn(col).width = 23.5;
+          ws.getColumn(col).width = sc2 === 0 ? 23.5 : 13.0;
           col++;
         }
         if (tpIdx < TIME_PERIODS.length - 1) {
