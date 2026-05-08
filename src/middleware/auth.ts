@@ -14,7 +14,7 @@ if (JWT_SECRET === DEFAULT_SECRET) {
 export interface AuthUser {
   userId: number;
   username: string;
-  role: 'admin' | 'teacher' | 'student';
+  role: 'admin' | 'teacher' | 'student' | 'department_head';
   department?: string;
 }
 

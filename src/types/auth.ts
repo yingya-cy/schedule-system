@@ -3,7 +3,7 @@ export interface UserInfo {
   username: string;
   name: string;
   email: string | null;
-  role: 'admin' | 'teacher' | 'student';
+  role: 'admin' | 'teacher' | 'student' | 'department_head';
   department: string | null;
   avatar_url: string | null;
   is_active?: boolean;

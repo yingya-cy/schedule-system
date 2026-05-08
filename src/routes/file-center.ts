@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../config/database.ts';
-import { authenticate, AuthUser } from '../middleware/auth.ts';
+import { authenticate } from '../middleware/auth.ts';
+import { canModifyResource } from '../middleware/permissions.ts';
 import {
   generatePresignedUploadUrl,
   generatePresignedDownloadUrl,
@@ -14,10 +15,6 @@ const router = Router();
 // All file center routes require authentication
 router.use(authenticate);
 
-function canModify(user: AuthUser, createdBy: string): boolean {
-  return user.role === 'admin' || user.username === createdBy;
-}
-
 // =============================================
 // Activities CRUD
 // =============================================
@@ -29,8 +26,8 @@ router.get('/activities', async (req, res) => {
       'SELECT * FROM file_activities ORDER BY created_at DESC'
     );
     res.json({ success: true, data: rows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -44,8 +41,8 @@ router.get('/activities/:id', async (req, res) => {
       return;
     }
     res.json({ success: true, data: activities[0] });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -62,8 +59,8 @@ router.post('/activities', async (req, res) => {
       [name, description || null, department, cover_url || null, req.user!.username]
     );
     res.json({ success: true, data: { id: (result as any).insertId } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -76,7 +73,7 @@ router.put('/activities/:id', async (req, res) => {
       res.status(404).json({ success: false, error: '活动不存在' });
       return;
     }
-    if (!canModify(req.user!, activities[0].created_by)) {
+    if (!canModifyResource(req.user!, activities[0].created_by)) {
       res.status(403).json({ success: false, error: '无权编辑此活动' });
       return;
     }
@@ -90,8 +87,8 @@ router.put('/activities/:id', async (req, res) => {
       return;
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -105,12 +102,11 @@ router.delete('/activities/:id', async (req, res) => {
       res.status(404).json({ success: false, error: '活动不存在' });
       return;
     }
-    if (!canModify(req.user!, activities[0].created_by)) {
+    if (!canModifyResource(req.user!, activities[0].created_by)) {
       res.status(403).json({ success: false, error: '无权删除此活动' });
       return;
     }
     // Manually delete child records first to avoid FK cascade issues
-    await pool.query('DELETE FROM file_permissions WHERE activity_id = ?', [activityId]);
     await pool.query('DELETE FROM file_tweets WHERE activity_id = ?', [activityId]);
     await pool.query('UPDATE file_items SET folder_id = NULL WHERE activity_id = ?', [activityId]);
     await pool.query('DELETE FROM file_items WHERE activity_id = ?', [activityId]);
@@ -122,8 +118,8 @@ router.delete('/activities/:id', async (req, res) => {
       return;
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -139,8 +135,8 @@ router.get('/activities/:id/folders', async (req, res) => {
       [req.params.id]
     );
     res.json({ success: true, data: rows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -157,8 +153,8 @@ router.post('/activities/:id/folders', async (req, res) => {
       [req.params.id, parent_id || null, name, req.user!.username]
     );
     res.json({ success: true, data: { id: (result as any).insertId } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -171,7 +167,7 @@ router.put('/folders/:id', async (req, res) => {
       res.status(404).json({ success: false, error: '文件夹不存在' });
       return;
     }
-    if (!canModify(req.user!, folders[0].created_by)) {
+    if (!canModifyResource(req.user!, folders[0].created_by)) {
       res.status(403).json({ success: false, error: '无权编辑此文件夹' });
       return;
     }
@@ -185,8 +181,8 @@ router.put('/folders/:id', async (req, res) => {
       return;
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -199,7 +195,7 @@ router.delete('/folders/:id', async (req, res) => {
       res.status(404).json({ success: false, error: '文件夹不存在' });
       return;
     }
-    if (!canModify(req.user!, folders[0].created_by)) {
+    if (!canModifyResource(req.user!, folders[0].created_by)) {
       res.status(403).json({ success: false, error: '无权删除此文件夹' });
       return;
     }
@@ -217,8 +213,8 @@ router.delete('/folders/:id', async (req, res) => {
       return;
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -242,8 +238,8 @@ router.get('/folders/:id/items', async (req, res) => {
       [req.params.id]
     );
     res.json({ success: true, data: { files, tweets, subfolders } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -260,8 +256,8 @@ router.post('/folders/:id/items', async (req, res) => {
       [activity_id, req.params.id, original_filename, stored_filename || original_filename, file_size || 0, mime_type || null, file_category || 'document', oss_url || null, description || null, schedule_id || null, req.user!.username]
     );
     res.json({ success: true, data: { id: (result as any).insertId } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -274,7 +270,7 @@ router.put('/items/:id', async (req, res) => {
       res.status(404).json({ success: false, error: '文件不存在' });
       return;
     }
-    if (!canModify(req.user!, items[0].created_by)) {
+    if (!canModifyResource(req.user!, items[0].created_by)) {
       res.status(403).json({ success: false, error: '无权编辑此文件' });
       return;
     }
@@ -288,8 +284,8 @@ router.put('/items/:id', async (req, res) => {
       return;
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -306,8 +302,8 @@ router.put('/items/:id/schedule', async (req, res) => {
       return;
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -320,7 +316,7 @@ router.delete('/items/:id', async (req, res) => {
       res.status(404).json({ success: false, error: '文件不存在' });
       return;
     }
-    if (!canModify(req.user!, items[0].created_by)) {
+    if (!canModifyResource(req.user!, items[0].created_by)) {
       res.status(403).json({ success: false, error: '无权删除此文件' });
       return;
     }
@@ -330,8 +326,8 @@ router.delete('/items/:id', async (req, res) => {
       return;
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -352,8 +348,8 @@ router.post('/folders/:id/tweets', async (req, res) => {
       [activity_id, req.params.id, title, content || null, summary || null, cover_image || null, link_url || null, author || null, req.user!.username]
     );
     res.json({ success: true, data: { id: (result as any).insertId } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -366,7 +362,7 @@ router.put('/tweets/:id', async (req, res) => {
       res.status(404).json({ success: false, error: '推文不存在' });
       return;
     }
-    if (!canModify(req.user!, tweets[0].created_by)) {
+    if (!canModifyResource(req.user!, tweets[0].created_by)) {
       res.status(403).json({ success: false, error: '无权编辑此推文' });
       return;
     }
@@ -380,8 +376,8 @@ router.put('/tweets/:id', async (req, res) => {
       return;
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -394,7 +390,7 @@ router.delete('/tweets/:id', async (req, res) => {
       res.status(404).json({ success: false, error: '推文不存在' });
       return;
     }
-    if (!canModify(req.user!, tweets[0].created_by)) {
+    if (!canModifyResource(req.user!, tweets[0].created_by)) {
       res.status(403).json({ success: false, error: '无权删除此推文' });
       return;
     }
@@ -404,84 +400,13 @@ router.delete('/tweets/:id', async (req, res) => {
       return;
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
 // =============================================
 // Permissions CRUD
-// =============================================
-
-// GET /api/file-center/permissions/:activityId
-router.get('/permissions/:activityId', async (req, res) => {
-  try {
-    const [rows] = await pool.query(
-      'SELECT * FROM file_permissions WHERE activity_id = ? ORDER BY created_at DESC',
-      [req.params.activityId]
-    );
-    res.json({ success: true, data: rows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// POST /api/file-center/permissions
-router.post('/permissions', async (req, res) => {
-  try {
-    const { activity_id, file_id, folder_id, permission_type, grantee_type, grantee_name } = req.body;
-    if (!activity_id || !permission_type || !grantee_name) {
-      res.status(400).json({ success: false, error: 'activity_id, permission_type, grantee_name 为必填项' });
-      return;
-    }
-    const [result] = await pool.query(
-      'INSERT INTO file_permissions (activity_id, file_id, folder_id, permission_type, grantee_type, grantee_name) VALUES (?, ?, ?, ?, ?, ?)',
-      [activity_id, file_id || null, folder_id || null, permission_type, grantee_type || 'department', grantee_name]
-    );
-    res.json({ success: true, data: { id: (result as any).insertId } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// DELETE /api/file-center/permissions/:id
-router.delete('/permissions/:id', async (req, res) => {
-  try {
-    const [result] = await pool.query('DELETE FROM file_permissions WHERE id = ?', [req.params.id]);
-    if ((result as any).affectedRows === 0) {
-      res.status(404).json({ success: false, error: '权限记录不存在' });
-      return;
-    }
-    res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// GET /api/file-center/my-activities - activities the current user has access to
-router.get('/my-activities', async (req, res) => {
-  try {
-    const { role, username } = req.user!;
-    // Admins see all activities
-    if (role === 'admin') {
-      const [rows] = await pool.query('SELECT * FROM file_activities ORDER BY created_at DESC');
-      res.json({ success: true, data: rows });
-      return;
-    }
-    // Others see activities where they have permissions or created them
-    const [rows] = await pool.query(
-      `SELECT DISTINCT a.* FROM file_activities a
-       LEFT JOIN file_permissions p ON a.id = p.activity_id
-       WHERE a.created_by = ? OR (p.grantee_type = 'user' AND p.grantee_name = ?)
-       ORDER BY a.created_at DESC`,
-      [username, username]
-    );
-    res.json({ success: true, data: rows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 // =============================================
 // OSS Presigned URL Endpoints
 // =============================================
@@ -532,8 +457,8 @@ router.post('/oss/init', async (req, res) => {
     const { uploadUrl } = await generatePresignedUploadUrl(objectKey, mime_type || undefined);
 
     res.json({ success: true, data: { id: fileId, uploadUrl, objectKey } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -548,8 +473,8 @@ router.post('/oss/presigned-url', async (req, res) => {
     const objectKey = buildObjectKey(`activity_${activity_id}`, `folder_${folder_id}`, Date.now(), filename);
     const result = await generatePresignedUploadUrl(objectKey, content_type || undefined);
     res.json({ success: true, data: result });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -567,8 +492,8 @@ router.post('/oss/confirm', async (req, res) => {
       [activity_id, folder_id, original_filename, original_filename, file_size || 0, mime_type || null, file_category || 'document', object_key, ossUrl, description || null, schedule_id || null, req.user!.username]
     );
     res.json({ success: true, data: { id: (result as any).insertId, oss_url: ossUrl } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -582,8 +507,8 @@ router.post('/oss/download-url', async (req, res) => {
     }
     const url = await generatePresignedDownloadUrl(object_key);
     res.json({ success: true, data: { downloadUrl: url } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -601,8 +526,8 @@ router.get('/oss/download', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename || key.split('/').pop() || 'download')}"`);
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.end(body);
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -619,8 +544,8 @@ router.get('/oss/preview', async (req, res) => {
     res.setHeader('Content-Disposition', 'inline');
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.end(body);
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 

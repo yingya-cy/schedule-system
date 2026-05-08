@@ -55,8 +55,8 @@ export const processImageFile = async (file: File, signal?: AbortSignal): Promis
     } else {
       throw new Error(result.error || '图片识别未提取到课程数据');
     }
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
+  } catch (error: unknown) {
+    if ((error as any).name === 'AbortError') {
       return {
         filename: file.name,
         success: false,
@@ -67,7 +67,7 @@ export const processImageFile = async (file: File, signal?: AbortSignal): Promis
     return {
       filename: file.name,
       success: false,
-      error: error.message || '未知错误'
+      error: (error as Error).message || '未知错误'
     };
   }
 };
@@ -99,8 +99,8 @@ export const processVerticalPdf = async (file: File, signal?: AbortSignal): Prom
     } else {
       throw new Error(result.error || '竖型PDF解析未提取到课程数据');
     }
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
+  } catch (error: unknown) {
+    if ((error as any).name === 'AbortError') {
       return {
         filename: file.name,
         success: false,
@@ -111,7 +111,7 @@ export const processVerticalPdf = async (file: File, signal?: AbortSignal): Prom
     return {
       filename: file.name,
       success: false,
-      error: error.message || '未知错误'
+      error: (error as Error).message || '未知错误'
     };
   }
 };
@@ -163,8 +163,8 @@ export const processHorizontalPdf = async (file: File, signal?: AbortSignal): Pr
     } else {
       throw new Error(aiResult.error || '横型PDFAI处理未提取到课程数据');
     }
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
+  } catch (error: unknown) {
+    if ((error as any).name === 'AbortError') {
       return {
         filename: file.name,
         success: false,
@@ -175,7 +175,7 @@ export const processHorizontalPdf = async (file: File, signal?: AbortSignal): Pr
     return {
       filename: file.name,
       success: false,
-      error: error.message || '未知错误'
+      error: (error as Error).message || '未知错误'
     };
   }
 };

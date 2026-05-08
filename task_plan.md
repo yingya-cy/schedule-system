@@ -4,7 +4,7 @@
 构建完整的学术管理平台，包含课表管理、比赛评分、登录认证、网盘系统、即时通讯等功能模块。
 
 ## Current Phase
-Phase 14: 查漏补缺 — 文件中心、评分导出、反课表
+Phase 15: 权限重构 + 换届系统 + 部长角色 — 实施中
 
 ## Phases
 
@@ -211,6 +211,23 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - [x] 14.9 反课表完美复刻 — 等线→宋体、48pt/22pt/14pt、行高61.1/27.75/56.25、列宽23.5/13.0/1.6、分隔列、整行底色(除分隔列)、网格布局(一行三人)
 - [x] 14.10 反课表格式规则修正 — `1(6)(12)/(1-5)(7-11)(13-18)`，同组周段直接拼接，`/` 仅隔开节次特定与全空闲
 - **Status:** completed
+
+### Phase 15: 权限重构 + 换届系统 + 部长角色
+- [x] 15.1 删 `file_permissions` 表 — 死代码，权限表从未真正生效
+- [x] 15.2 统一权限中间件 `canModifyResource` — admin/teacher/创建者/department_head
+- [x] 15.3 文件中心权限简化 — 所有人可查看/上传，admin/teacher/创建者/部长可改删
+- [x] 15.4 前端清理 — 删权限管理面板、删 QueryPanel 死代码
+- [x] 15.5 届系统 `terms` 表 — id/name/academic_year/semester/sequence_number/status
+- [x] 15.6 `schedules`/`file_activities`/`competitions` 加 `term_id` 列
+- [x] 15.7 `GET /api/terms/current` + 导出自动取届名做标题
+- [x] 15.8 `POST /api/terms/transition` — 归档旧届、创建新届、离任者 is_active=0
+- [x] 15.9 `users.role` 加 `department_head` — 部长角色
+- [x] 15.10 部长权限 — 看本部门成员、编辑本部门 name/email/dept、不能改角色/密码
+- [x] 15.11 `getAllFreeTimeData` 按活跃届过滤 — JOIN terms WHERE status='active'
+- [x] 15.12 `useUnknownInCatchVariables: true` + 105 处 `catch (error: any)` → `unknown`
+- [x] 15.13 死代码清理 — QueryPanel.tsx、errors.ts、useInitializeStore、api.getAllFreeTimeData
+- [x] 15.14 测试 — 权限矩阵(7) + 届 API(4) + 部长权限(3) = 14 新测试，总计 235
+- **Status:** in progress（前端届选择器、换届 UI 待实现）
 
 ## Key Questions
 1. 登录系统是独立用户体系还是对接学校 SSO/LDAP？→ **独立用户体系（用户名+密码+JWT），不开放注册，管理员后台创建**

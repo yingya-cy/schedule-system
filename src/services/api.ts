@@ -150,12 +150,4 @@ export const api = {
     throw new Error(result.error);
   },
 
-  async getAllFreeTimeData(): Promise<{
-    total_schedules: number;
-  }> {
-    const response = await fetch('/api/query/all-free-time', { headers: authHeaders() });
-    const result = await response.json();
-    if (result.success) return result.data;
-    throw new Error(result.error);
-  },
 };

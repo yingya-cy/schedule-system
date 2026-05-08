@@ -29,8 +29,8 @@ router.post('/judge/login', async (req, res) => {
       return res.status(404).json({ success: false, error: '评委姓名不存在' });
     }
     res.json({ success: true, data: (rows as any[])[0] });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -66,8 +66,8 @@ router.get('/judge/:judgeId/contestants', async (req, res) => {
     );
 
     res.json({ success: true, data: contestantsWithScore });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -83,8 +83,8 @@ router.get('/judge/scores/:contestantId/:judgeId', async (req, res) => {
       [contestantId, judgeId]
     );
     res.json({ success: true, data: scoreRows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -174,9 +174,9 @@ router.post('/judge/scores', async (req, res) => {
 
     await connection.commit();
     res.json({ success: true, data: { total_score: totalScore } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     await connection.rollback();
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: (error as Error).message });
   } finally {
     connection.release();
   }
@@ -221,8 +221,8 @@ router.get('/templates', async (req, res) => {
       ORDER BY t.created_at DESC
     `);
     res.json({ success: true, data: rows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -256,8 +256,8 @@ router.get('/templates/:id', async (req, res) => {
       success: true,
       data: { ...(templates as any[])[0], dimensions: dimensionsWithSubs }
     });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -299,9 +299,9 @@ router.post('/templates', requireRole('admin'), async (req, res) => {
 
     await connection.commit();
     res.json({ success: true, data: { id: templateId } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     await connection.rollback();
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: (error as Error).message });
   } finally {
     connection.release();
   }
@@ -351,9 +351,9 @@ router.put('/templates/:id', requireRole('admin'), async (req, res) => {
 
     await connection.commit();
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     await connection.rollback();
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: (error as Error).message });
   } finally {
     connection.release();
   }
@@ -366,8 +366,8 @@ router.delete('/templates/:id', requireRole('admin'), async (req, res) => {
       req.params.id
     ]);
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -387,8 +387,8 @@ router.get('/competitions', async (req, res) => {
       ORDER BY c.created_at DESC
     `);
     res.json({ success: true, data: rows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -448,8 +448,8 @@ router.get('/competitions/:id', async (req, res) => {
       success: true,
       data: { ...competition, contestants, judges, template }
     });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -463,8 +463,8 @@ router.post('/competitions', requireRole('admin'), async (req, res) => {
       [name, description || '', template_id, judging_mode || 'offline']
     );
     res.json({ success: true, data: { id: (result as any).insertId } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -478,8 +478,8 @@ router.put('/competitions/:id', requireRole('admin'), async (req, res) => {
       [name, description || '', status, judging_mode, result_published, start_time, end_time, req.params.id]
     );
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -498,9 +498,9 @@ router.delete('/competitions/:id', requireRole('admin'), async (req, res) => {
     await connection.query('DELETE FROM competitions WHERE id = ?', [competitionId]);
     await connection.commit();
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     await connection.rollback();
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: (error as Error).message });
   } finally {
     connection.release();
   }
@@ -518,8 +518,8 @@ router.get('/competitions/:id/contestants', async (req, res) => {
       [req.params.id]
     );
     res.json({ success: true, data: rows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -533,8 +533,8 @@ router.post('/competitions/:id/contestants', requireRole('admin'), async (req, r
       [req.params.id, number || '', name, group_name || '', description || '', extra_data || null]
     );
     res.json({ success: true, data: { id: (result as any).insertId } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -564,9 +564,9 @@ router.post('/competitions/:id/contestants/import', requireRole('admin'), async 
 
     await connection.commit();
     res.json({ success: true, data: { inserted: insertedIds.length, ids: insertedIds } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     await connection.rollback();
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: (error as Error).message });
   } finally {
     connection.release();
   }
@@ -580,8 +580,8 @@ router.delete('/competitions/:id/contestants/:contestantId', requireRole('admin'
       [req.params.contestantId, req.params.id]
     );
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -597,8 +597,8 @@ router.get('/competitions/:id/judges', async (req, res) => {
       [req.params.id]
     );
     res.json({ success: true, data: rows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -618,8 +618,8 @@ router.get('/my-tasks', async (req, res) => {
       [userId]
     );
     res.json({ success: true, data: rows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -634,8 +634,8 @@ router.post('/competitions/:id/judges', requireRole('admin'), async (req, res) =
       [name, code, req.params.id, user_id || null]
     );
     res.json({ success: true, data: { id: (result as any).insertId } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -661,9 +661,9 @@ router.post('/competitions/:id/judges/import', requireRole('admin'), async (req,
     }
     await connection.commit();
     res.json({ success: true, data: { inserted: insertedIds.length, ids: insertedIds } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     await connection.rollback();
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: (error as Error).message });
   } finally {
     connection.release();
   }
@@ -684,8 +684,8 @@ router.delete('/competitions/:id/judges/:judgeId', requireRole('admin'), async (
       [judgeId, id]
     );
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -802,9 +802,9 @@ router.post('/competitions/:id/calculate', requireRole('admin'), async (req, res
         }))
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     await connection.rollback();
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: (error as Error).message });
   } finally {
     connection.release();
   }
@@ -827,9 +827,9 @@ router.delete('/competitions/:id/clear-all', requireRole('admin'), async (req, r
     );
     await connection.commit();
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     await connection.rollback();
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: (error as Error).message });
   } finally {
     connection.release();
   }
@@ -924,8 +924,8 @@ router.get('/competitions/:id/score-details', async (req, res) => {
         totalScoreMap,
       }
     });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   } finally {
     connection.release();
   }
@@ -939,8 +939,8 @@ router.post('/competitions/:id/publish', requireRole('admin'), async (req, res) 
       [req.params.id]
     );
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -956,8 +956,8 @@ router.get('/competitions/:id/results', async (req, res) => {
       [req.params.id]
     );
     res.json({ success: true, data: results });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -1309,8 +1309,8 @@ router.get('/competitions/:id/export', async (req, res) => {
       });
       res.send(Buffer.from(buf));
     }
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -1349,8 +1349,8 @@ router.get('/competitions/:id/live-results', async (req, res) => {
         results
       }
     });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -1372,8 +1372,8 @@ router.post('/parse-template', upload.single('file'), async (req: MulterRequest,
       headers: formData.getHeaders(),
     });
     res.json(response.data);
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -1389,8 +1389,8 @@ router.post('/parse-contestants', upload.single('file'), async (req: MulterReque
       headers: formData.getHeaders(),
     });
     res.json(response.data);
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -1425,8 +1425,8 @@ router.post('/export-results', upload.fields([{ name: 'template_file' }, { name:
       'Content-Disposition': 'attachment; filename=scoring_results.xlsx',
     });
     res.send(Buffer.from(buffer));
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -1447,8 +1447,8 @@ router.get('/history', async (req, res) => {
       ORDER BY c.updated_at DESC
     `);
     res.json({ success: true, data: rows });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 

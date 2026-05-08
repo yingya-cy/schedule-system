@@ -6,7 +6,7 @@ describe('File Center Permissions', () => {
   let app: ReturnType<typeof createAppWithAuth>;
   let adminToken: string;
   let teacherWebToken: string;
-  let teacherSecToken: string;
+  let studentToken: string;
 
   let activityId: number;
   let folderId: number;
@@ -18,10 +18,10 @@ describe('File Center Permissions', () => {
     adminToken = (await loginAs(app, 'admin', 'admin123')).token;
 
     await createTestUser(app, adminToken, { username: 'fc_tw', name: '网编教师', password: 'test123', role: 'teacher', department: '网编部' });
-    await createTestUser(app, adminToken, { username: 'fc_ts', name: '秘书教师', password: 'test123', role: 'teacher', department: '秘书部' });
+    await createTestUser(app, adminToken, { username: 'fc_stu', name: '学生', password: 'test123', role: 'student', department: '网编部' });
 
     teacherWebToken = (await loginAs(app, 'fc_tw', 'test123')).token;
-    teacherSecToken = (await loginAs(app, 'fc_ts', 'test123')).token;
+    studentToken = (await loginAs(app, 'fc_stu', 'test123')).token;
 
     const authWeb = (req: supertest.Test) => req.set('Authorization', `Bearer ${teacherWebToken}`);
 
@@ -61,7 +61,7 @@ describe('File Center Permissions', () => {
     it('should return 403 when non-creator non-admin tries to PUT activity', async () => {
       await supertest(app)
         .put(`/api/file-center/activities/${activityId}`)
-        .set('Authorization', `Bearer ${teacherSecToken}`)
+        .set('Authorization', `Bearer ${studentToken}`)
         .send({ name: 'hacked' })
         .expect(403);
     });
@@ -69,7 +69,7 @@ describe('File Center Permissions', () => {
     it('should return 403 when non-creator non-admin tries to DELETE activity', async () => {
       await supertest(app)
         .delete(`/api/file-center/activities/${activityId}`)
-        .set('Authorization', `Bearer ${teacherSecToken}`)
+        .set('Authorization', `Bearer ${studentToken}`)
         .expect(403);
     });
 
@@ -88,6 +88,16 @@ describe('File Center Permissions', () => {
         .send({ name: 'admin updated' })
         .expect(200);
     });
+
+    it('should allow non-creator teacher to PUT activity', async () => {
+      await createTestUser(app, adminToken, { username: 'fc_t2', name: '其他教师', password: 'test123', role: 'teacher', department: '网编部' });
+      const { token } = await loginAs(app, 'fc_t2', 'test123');
+      await supertest(app)
+        .put(`/api/file-center/activities/${activityId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'teacher updated' })
+        .expect(200);
+    });
   });
 
   // ---- canModify: Folders ----
@@ -95,7 +105,7 @@ describe('File Center Permissions', () => {
     it('should return 403 when non-creator non-admin tries to PUT folder', async () => {
       await supertest(app)
         .put(`/api/file-center/folders/${folderId}`)
-        .set('Authorization', `Bearer ${teacherSecToken}`)
+        .set('Authorization', `Bearer ${studentToken}`)
         .send({ name: 'hacked' })
         .expect(403);
     });
@@ -103,7 +113,7 @@ describe('File Center Permissions', () => {
     it('should return 403 when non-creator non-admin tries to DELETE folder', async () => {
       await supertest(app)
         .delete(`/api/file-center/folders/${folderId}`)
-        .set('Authorization', `Bearer ${teacherSecToken}`)
+        .set('Authorization', `Bearer ${studentToken}`)
         .expect(403);
     });
 
@@ -129,7 +139,7 @@ describe('File Center Permissions', () => {
     it('should return 403 when non-creator non-admin tries to PUT item', async () => {
       await supertest(app)
         .put(`/api/file-center/items/${itemId}`)
-        .set('Authorization', `Bearer ${teacherSecToken}`)
+        .set('Authorization', `Bearer ${studentToken}`)
         .send({ original_filename: 'hacked.pdf' })
         .expect(403);
     });
@@ -137,7 +147,7 @@ describe('File Center Permissions', () => {
     it('should return 403 when non-creator non-admin tries to DELETE item', async () => {
       await supertest(app)
         .delete(`/api/file-center/items/${itemId}`)
-        .set('Authorization', `Bearer ${teacherSecToken}`)
+        .set('Authorization', `Bearer ${studentToken}`)
         .expect(403);
     });
 
@@ -167,7 +177,7 @@ describe('File Center Permissions', () => {
     it('should return 403 when non-creator non-admin tries to PUT tweet', async () => {
       await supertest(app)
         .put(`/api/file-center/tweets/${tweetId}`)
-        .set('Authorization', `Bearer ${teacherSecToken}`)
+        .set('Authorization', `Bearer ${studentToken}`)
         .send({ title: 'hacked' })
         .expect(403);
     });
@@ -175,7 +185,7 @@ describe('File Center Permissions', () => {
     it('should return 403 when non-creator non-admin tries to DELETE tweet', async () => {
       await supertest(app)
         .delete(`/api/file-center/tweets/${tweetId}`)
-        .set('Authorization', `Bearer ${teacherSecToken}`)
+        .set('Authorization', `Bearer ${studentToken}`)
         .expect(403);
     });
 

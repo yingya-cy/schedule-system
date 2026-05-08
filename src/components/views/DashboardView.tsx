@@ -32,6 +32,7 @@ export default function DashboardView() {
   const [freeTimeData, setFreeTimeData] = useState<FreeTimeResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [currentTerm, setCurrentTerm] = useState<string>('');
 
   const [useCustomRange, setUseCustomRange] = useState(false);
   const [customStartSection, setCustomStartSection] = useState(1);
@@ -41,6 +42,10 @@ export default function DashboardView() {
     fetch('/api/dashboard/stats', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(json => { if (json.success) setStats(json.data); })
+      .catch(() => {});
+    fetch('/api/terms/current')
+      .then(r => r.json())
+      .then(json => { if (json.success && json.data) setCurrentTerm(json.data.name); })
       .catch(() => {});
   }, [token]);
 
@@ -118,6 +123,7 @@ export default function DashboardView() {
         <div className="space-y-1">
           <h1 className="text-4xl font-extrabold text-on-surface font-headline tracking-tight">空闲统计</h1>
           <p className="text-on-surface-variant font-medium">查看各部门成员的空闲时间分布</p>
+          {currentTerm && <span className="inline-block mt-1 text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">{currentTerm}</span>}
         </div>
         <div className="flex items-center gap-3">
           <select

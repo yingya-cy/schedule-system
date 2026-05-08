@@ -87,7 +87,7 @@ export async function initializeDatabase() {
       `);
       console.log('✅ Database created or already exists');
     } catch (error) {
-      console.log('ℹ️  Database creation note:', error.message);
+      console.log('ℹ️  Database creation note:', (error as Error).message);
     }
 
     adminConnection.release();
@@ -163,7 +163,7 @@ export async function initializeDatabase() {
       await checkAndAddColumn('email_verified_at', 'TIMESTAMP NULL DEFAULT NULL');
 
     } catch (alterError) {
-      console.log('ℹ️  Column check/add note:', alterError.message);
+      console.log('ℹ️  Column check/add note:', (alterError as Error).message);
     }
 
     // 创建课程表
@@ -249,7 +249,7 @@ export async function initializeDatabase() {
         console.log('✅ Added description column to scoring_dimensions table');
       }
     } catch (alterError) {
-      console.log('ℹ️  Column check/add note:', alterError.message);
+      console.log('ℹ️  Column check/add note:', (alterError as Error).message);
     }
 
     // 评分子维度表（二级指标）
@@ -313,7 +313,7 @@ export async function initializeDatabase() {
         console.log('✅ Added work_name column to contestants table');
       }
     } catch (alterError) {
-      console.log('ℹ️  Column check/add note:', alterError.message);
+      console.log('ℹ️  Column check/add note:', (alterError as Error).message);
     }
 
     // 评委表
@@ -392,7 +392,7 @@ export async function initializeDatabase() {
         console.log('✅ Modified subdimension_id to allow NULL');
       }
     } catch (alterError) {
-      console.log('ℹ️  Column check/add note:', alterError.message);
+      console.log('ℹ️  Column check/add note:', (alterError as Error).message);
     }
 
     // 计算结果表（最终排名）
@@ -434,7 +434,7 @@ export async function initializeDatabase() {
         name VARCHAR(100) NOT NULL COMMENT '显示名称',
         email VARCHAR(200) UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
-        role ENUM('admin', 'teacher', 'student') DEFAULT 'teacher',
+        role ENUM('admin', 'teacher', 'student', 'department_head') DEFAULT 'teacher',
         department VARCHAR(100),
         avatar_url VARCHAR(500),
         is_active TINYINT(1) DEFAULT 1,
@@ -557,16 +557,17 @@ export async function initializeDatabase() {
     `);
 
     await connection.query(`
-      CREATE TABLE IF NOT EXISTS file_permissions (
+      CREATE TABLE IF NOT EXISTS terms (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        activity_id INT NOT NULL,
-        file_id INT DEFAULT NULL,
-        folder_id INT DEFAULT NULL,
-        permission_type ENUM('view', 'upload', 'edit', 'admin') NOT NULL,
-        grantee_type ENUM('department', 'user') DEFAULT 'department',
-        grantee_name VARCHAR(100) NOT NULL,
+        name VARCHAR(100) NOT NULL COMMENT '如 2025秋·第1届',
+        academic_year VARCHAR(20) NOT NULL,
+        semester ENUM('春','秋') NOT NULL,
+        sequence_number INT NOT NULL,
+        status ENUM('active','archived') DEFAULT 'active',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (activity_id) REFERENCES file_activities(id) ON DELETE CASCADE
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_sequence (sequence_number),
+        INDEX idx_status (status)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
 
@@ -584,6 +585,50 @@ export async function initializeDatabase() {
         INDEX idx_created_at (created_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci
     `);
+
+    // =============================================
+    // 迁移：清理 file_permissions 表
+    // =============================================
+    try { await connection.query('DROP TABLE IF EXISTS file_permissions'); } catch (e: any) {}
+
+    // =============================================
+    // 迁移：添加 term_id 到已有表
+    // =============================================
+    const tablesForTermId = ['schedules', 'file_activities', 'competitions'];
+    for (const table of tablesForTermId) {
+      try {
+        const [cols] = await connection.query(`SHOW COLUMNS FROM ${table} LIKE 'term_id'`);
+        if ((cols as any[]).length === 0) {
+          await connection.query(`ALTER TABLE ${table} ADD COLUMN term_id INT, ADD INDEX idx_term_id (term_id)`);
+          console.log(`✅ Added term_id to ${table}`);
+        }
+      } catch (e: any) { console.log(`ℹ️  term_id on ${table}:`, e.message); }
+    }
+
+    // =============================================
+    // 迁移：users.role 加 department_head
+    // =============================================
+    try {
+      await connection.query("ALTER TABLE users MODIFY COLUMN role ENUM('admin','teacher','student','department_head') DEFAULT 'teacher'");
+    } catch (e: any) { /* already includes department_head */ }
+
+    // =============================================
+    // 迁移：创建默认届（若无）
+    // =============================================
+    try {
+      const [termRows] = await connection.query('SELECT COUNT(*) as cnt FROM terms');
+      if ((termRows as any[])[0].cnt === 0) {
+        await connection.query(
+          "INSERT INTO terms (name, academic_year, semester, sequence_number, status) VALUES ('2024秋·第1届', '2024-2025', '秋', 1, 'active')"
+        );
+        const [t] = await connection.query('SELECT id FROM terms WHERE sequence_number = 1');
+        const termId = (t as any[])[0].id;
+        for (const table of ['schedules', 'file_activities', 'competitions']) {
+          try { await connection.query(`UPDATE ${table} SET term_id = ? WHERE term_id IS NULL`, [termId]); } catch (e: any) {}
+        }
+        console.log('✅ Default term created (2024秋·第1届)');
+      }
+    } catch (e: any) { console.log('ℹ️  Default term:', e.message); }
 
     connection.release();
     console.log('✅ Database initialized successfully');

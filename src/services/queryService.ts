@@ -174,7 +174,9 @@ export class QueryService {
     const [rows] = await pool.execute(`
       SELECT s.id as schedule_id, s.name, s.department, c.weekday, c.sections, c.weeks
       FROM schedules s
+      JOIN terms t ON s.term_id = t.id
       LEFT JOIN courses c ON s.id = c.schedule_id
+      WHERE t.status = 'active'
     `);
 
     const personMap = new Map<string, { name: string; department: string; courses: { weekday: number; sections: number[]; weeks: number[] }[] }>();

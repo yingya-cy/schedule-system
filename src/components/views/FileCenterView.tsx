@@ -125,11 +125,6 @@ export default function FileCenterView() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Permissions
-  const [permissions, setPermissions] = useState<any[]>([]);
-  const [showPermPanel, setShowPermPanel] = useState(false);
-  const [permForm, setPermForm] = useState({ permission_type: 'view', grantee_type: 'department', grantee_name: '' });
-
   const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: number; name: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -162,38 +157,11 @@ export default function FileCenterView() {
     setLoading(false);
   }
 
-  async function fetchPermissions(activityId: number) {
-    try {
-      const res = await fetch(`/api/file-center/permissions/${activityId}`, { headers });
-      const json = await res.json();
-      if (json.success) setPermissions(json.data);
-    } catch { /* ignore */ }
-  }
-
-  async function handleAddPermission() {
-    if (!selectedActivity || !permForm.grantee_name) return;
-    try {
-      await fetch('/api/file-center/permissions', {
-        method: 'POST', headers,
-        body: JSON.stringify({ ...permForm, activity_id: selectedActivity.id }),
-      });
-      setPermForm({ permission_type: 'view', grantee_type: 'department', grantee_name: '' });
-      fetchPermissions(selectedActivity.id);
-    } catch { /* ignore */ }
-  }
-
-  async function handleRemovePermission(id: number) {
-    try {
-      await fetch(`/api/file-center/permissions/${id}`, { method: 'DELETE', headers });
-      if (selectedActivity) fetchPermissions(selectedActivity.id);
-    } catch { /* ignore */ }
-  }
-
   useEffect(() => { fetchActivities(); }, []);
 
   useEffect(() => {
     if (selectedActivity) {
-      Promise.all([fetchFolders(selectedActivity.id), fetchPermissions(selectedActivity.id)]);
+      fetchFolders(selectedActivity.id);
     }
   }, [selectedActivity]);
 
@@ -709,73 +677,6 @@ export default function FileCenterView() {
                 </div>
               </div>
 
-              <div className="mb-4 border-t border-surface-container-high pt-3">
-                <button
-                  onClick={() => setShowPermPanel(!showPermPanel)}
-                  className="flex items-center gap-1.5 text-xs font-medium text-outline hover:text-on-surface transition-colors"
-                >
-                  {showPermPanel ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                  权限管理 ({permissions.length})
-                </button>
-                {showPermPanel && (
-                  <div className="mt-2 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={permForm.permission_type}
-                        onChange={e => setPermForm({ ...permForm, permission_type: e.target.value })}
-                        className="px-2 py-1 rounded-lg bg-surface-container-lowest border border-surface-container-high text-xs"
-                      >
-                        <option value="view">查看</option>
-                        <option value="upload">上传</option>
-                        <option value="edit">编辑</option>
-                        <option value="admin">管理</option>
-                      </select>
-                      <select
-                        value={permForm.grantee_type}
-                        onChange={e => setPermForm({ ...permForm, grantee_type: e.target.value })}
-                        className="px-2 py-1 rounded-lg bg-surface-container-lowest border border-surface-container-high text-xs"
-                      >
-                        <option value="department">部门</option>
-                        <option value="user">用户</option>
-                      </select>
-                      <input
-                        type="text"
-                        value={permForm.grantee_name}
-                        onChange={e => setPermForm({ ...permForm, grantee_name: e.target.value })}
-                        placeholder={permForm.grantee_type === 'department' ? '部门名称' : '用户名'}
-                        className="flex-1 px-2 py-1 rounded-lg bg-surface-container-lowest border border-surface-container-high text-xs"
-                      />
-                      <button
-                        onClick={handleAddPermission}
-                        className="px-2 py-1 text-xs font-medium rounded-lg bg-primary text-on-primary hover:bg-primary/90 shrink-0"
-                      >
-                        添加
-                      </button>
-                    </div>
-                    {permissions.length > 0 ? (
-                      <div className="space-y-1 max-h-32 overflow-y-auto">
-                        {permissions.map((p: any) => (
-                          <div key={p.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-surface-container-lowest">
-                            <span>
-                              <span className={`font-medium ${p.permission_type === 'admin' ? 'text-primary' : 'text-on-surface'}`}>
-                                {p.permission_type === 'admin' ? '管理' : p.permission_type === 'edit' ? '编辑' : p.permission_type === 'upload' ? '上传' : '查看'}
-                              </span>
-                              <span className="text-outline mx-1">·</span>
-                              <span className="text-outline">{p.grantee_type === 'department' ? '部门' : '用户'}:</span>
-                              <span className="text-on-surface-variant ml-0.5">{p.grantee_name}</span>
-                            </span>
-                            <button onClick={() => handleRemovePermission(p.id)} className="text-red-400 hover:text-red-500">
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-on-surface-variant">暂无权限设置（管理员可查看全部）</p>
-                    )}
-                  </div>
-                )}
-              </div>
 
               {loading ? (
                 <p className="text-sm text-on-surface-variant py-8 text-center">加载中...</p>

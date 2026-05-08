@@ -18,7 +18,7 @@ const emptyForm: UserFormData = {
   username: '', name: '', password: '', role: 'teacher', department: '', email: '',
 };
 
-const roleLabels: Record<string, string> = { admin: '管理员', teacher: '教师', student: '学生' };
+const roleLabels: Record<string, string> = { admin: '管理员', teacher: '教师', student: '学生', department_head: '部长' };
 
 export default function UserManagementView() {
   const [users, setUsers] = useState<UserInfo[]>([]);
@@ -314,6 +314,7 @@ export default function UserManagementView() {
                         <option value="teacher">教师</option>
                         <option value="admin">管理员</option>
                         <option value="student">学生</option>
+                        <option value="department_head">部长</option>
                       </select>
                     </div>
                     <div>

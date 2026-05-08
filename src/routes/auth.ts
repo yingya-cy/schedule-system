@@ -75,8 +75,8 @@ router.post('/login', async (req, res) => {
         },
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -111,12 +111,12 @@ router.post('/register', async (req, res) => {
     );
 
     res.json({ success: true, data: { message: '注册成功，请查收验证邮件' } });
-  } catch (error: any) {
-    if (error.code === 'ER_DUP_ENTRY') {
+  } catch (error: unknown) {
+    if ((error as any).code === 'ER_DUP_ENTRY') {
       res.status(400).json({ success: false, error: '用户名或邮箱已被注册' });
       return;
     }
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -158,8 +158,8 @@ router.get('/verify-email', async (req, res) => {
     );
 
     res.json({ success: true, data: { message: '邮箱验证成功，请登录' } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -196,8 +196,8 @@ router.post('/verify-email/resend', async (req, res) => {
     );
 
     res.json({ success: true, data: { message: '验证邮件已重新发送' } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -218,8 +218,8 @@ router.get('/me', authenticate, async (req, res) => {
       return;
     }
     res.json({ success: true, data: users[0] });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -232,8 +232,8 @@ router.put('/me', authenticate, async (req, res) => {
       [name, email, department, req.user!.userId]
     );
     res.json({ success: true, data: { updated: (result as any).affectedRows > 0 } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -261,8 +261,8 @@ router.put('/password', authenticate, async (req, res) => {
     const newHash = await bcrypt.hash(newPassword, 10);
     await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, req.user!.userId]);
     res.json({ success: true, data: { message: '密码修改成功' } });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -271,11 +271,24 @@ router.put('/password', authenticate, async (req, res) => {
 // =============================================
 
 // GET /api/auth/users
-router.get('/users', authenticate, requireRole('admin'), async (req, res) => {
+router.get('/users', authenticate, async (req, res) => {
   try {
+    const user = req.user!;
+    // Only admin and department_head can list users
+    if (user.role !== 'admin' && user.role !== 'department_head') {
+      res.status(403).json({ success: false, error: '权限不足' });
+      return;
+    }
+
     const { search, role, page = '1', limit = '20' } = req.query;
     let sql = 'SELECT id, username, name, email, role, department, is_active, last_login, created_at FROM users WHERE 1=1';
     const params: any[] = [];
+
+    // Department head can only see their department
+    if (user.role === 'department_head') {
+      sql += ' AND department = ?';
+      params.push(user.department);
+    }
 
     if (search) {
       sql += ' AND (username LIKE ? OR name LIKE ? OR department LIKE ?)';
@@ -294,6 +307,10 @@ router.get('/users', authenticate, requireRole('admin'), async (req, res) => {
 
     let countSql = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
     const countParams: any[] = [];
+    if (user.role === 'department_head') {
+      countSql += ' AND department = ?';
+      countParams.push(user.department);
+    }
     if (search) {
       countSql += ' AND (username LIKE ? OR name LIKE ? OR department LIKE ?)';
       countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
@@ -309,8 +326,8 @@ router.get('/users', authenticate, requireRole('admin'), async (req, res) => {
       data: rows,
       meta: { total: (countRows as any[])[0].total, page: parseInt(page as string), limit: parseInt(limit as string) },
     });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -334,30 +351,55 @@ router.post('/users', authenticate, requireRole('admin'), async (req, res) => {
       [username, name, email || null, role, department || null, passwordHash]
     );
     res.json({ success: true, data: { id: (result as any).insertId } });
-  } catch (error: any) {
-    if (error.code === 'ER_DUP_ENTRY') {
+  } catch (error: unknown) {
+    if ((error as any).code === 'ER_DUP_ENTRY') {
       res.status(400).json({ success: false, error: '用户名或邮箱已存在' });
       return;
     }
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
 // PUT /api/auth/users/:id
-router.put('/users/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.put('/users/:id', authenticate, async (req, res) => {
   try {
-    const { name, role, department, email, is_active } = req.body;
-    const [result] = await pool.query(
-      'UPDATE users SET name = COALESCE(?, name), role = COALESCE(?, role), department = COALESCE(?, department), email = COALESCE(?, email), is_active = COALESCE(?, is_active) WHERE id = ?',
-      [name, role, department, email, is_active, req.params.id]
-    );
-    if ((result as any).affectedRows === 0) {
+    const editor = req.user!;
+
+    // Admin can edit everything; department_head can edit same-dept members
+    if (editor.role !== 'admin' && editor.role !== 'department_head') {
+      res.status(403).json({ success: false, error: '权限不足' });
+      return;
+    }
+
+    // Check target user
+    const [targetRows] = await pool.query('SELECT id, department FROM users WHERE id = ?', [req.params.id]);
+    const target = (targetRows as any[])[0];
+    if (!target) {
       res.status(404).json({ success: false, error: '用户不存在' });
       return;
     }
+
+    if (editor.role === 'department_head') {
+      if (target.department !== editor.department) {
+        res.status(403).json({ success: false, error: '只能编辑本部门成员' });
+        return;
+      }
+      // Department head can only edit name, email, department
+      const { name, email, department } = req.body;
+      await pool.query(
+        'UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), department = COALESCE(?, department) WHERE id = ?',
+        [name, email, department, req.params.id]
+      );
+    } else {
+      const { name, role, department, email, is_active } = req.body;
+      await pool.query(
+        'UPDATE users SET name = COALESCE(?, name), role = COALESCE(?, role), department = COALESCE(?, department), email = COALESCE(?, email), is_active = COALESCE(?, is_active) WHERE id = ?',
+        [name, role, department, email, is_active, req.params.id]
+      );
+    }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -370,8 +412,8 @@ router.delete('/users/:id', authenticate, requireRole('admin'), async (req, res)
       return;
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 
@@ -390,8 +432,8 @@ router.put('/users/:id/reset-password', authenticate, requireRole('admin'), asyn
       return;
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
 

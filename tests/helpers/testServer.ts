@@ -5,6 +5,7 @@ import { authenticate, requireRole } from '../../src/middleware/auth.ts';
 import authRouter from '../../src/routes/auth.ts';
 import scoringRouter from '../../src/routes/scoring.ts';
 import fileCenterRouter from '../../src/routes/file-center.ts';
+import termsRouter from '../../src/routes/terms.ts';
 import scheduleService from '../../src/services/scheduleService.ts';
 import queryService from '../../src/services/queryService.ts';
 import excelExportService from '../../src/services/excelExportService.ts';
@@ -26,6 +27,7 @@ function registerRoutes(app: express.Express) {
   app.use('/api/auth', authRouter);
   app.use('/api/scoring', scoringRouter);
   app.use('/api/file-center', fileCenterRouter);
+  app.use('/api/terms', termsRouter);
 
   app.get('/api/departments', async (req, res) => {
     try {
@@ -210,9 +212,11 @@ function registerRoutes(app: express.Express) {
 
   app.post('/api/export/reverse-schedule', async (req, res) => {
     try {
-      const { term } = req.body as { term?: string };
+      const pool = (await import('../../src/config/database.ts')).default;
       const data = await queryService.getAllFreeTimeData();
-      const wb = await excelExportService.generateReverseScheduleWorkbook(data, term || '');
+      const [terms] = await pool.query("SELECT name FROM terms WHERE status = 'active' LIMIT 1");
+      const termName = (terms as any[])[0]?.name || '';
+      const wb = await excelExportService.generateReverseScheduleWorkbook(data, termName);
       const buf = await wb.xlsx.writeBuffer();
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=reverse-schedule.xlsx');
@@ -252,6 +256,7 @@ export function createAppWithAuth(): express.Express {
   app.use('/api/auth', authRouter);
   app.use('/api/scoring', scoringRouter);
   app.use('/api/file-center', fileCenterRouter);
+  app.use('/api/terms', termsRouter);
 
   app.get('/api/departments', async (req, res) => {
     try {
@@ -477,9 +482,11 @@ export function createAppWithAuth(): express.Express {
 
   app.post('/api/export/reverse-schedule', async (req, res) => {
     try {
-      const { term } = req.body as { term?: string };
+      const pool = (await import('../../src/config/database.ts')).default;
       const data = await queryService.getAllFreeTimeData();
-      const wb = await excelExportService.generateReverseScheduleWorkbook(data, term || '');
+      const [terms] = await pool.query("SELECT name FROM terms WHERE status = 'active' LIMIT 1");
+      const termName = (terms as any[])[0]?.name || '';
+      const wb = await excelExportService.generateReverseScheduleWorkbook(data, termName);
       const buf = await wb.xlsx.writeBuffer();
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=reverse-schedule.xlsx');

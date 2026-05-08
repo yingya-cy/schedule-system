@@ -67,18 +67,3 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 }));
 
-// Initialize data on first use
-let initialized = false;
-
-export function useInitializeStore() {
-  if (!initialized) {
-    initialized = true;
-    const store = useAppStore.getState();
-    if (!store.departmentsLoaded) {
-      store.refreshDepartments();
-    }
-    if (!store.schedulesLoaded) {
-      store.refreshSchedules();
-    }
-  }
-}

@@ -6,10 +6,22 @@ export interface Department {
   updated_at: Date;
 }
 
+export interface Term {
+  id: number;
+  name: string;
+  academic_year: string;
+  semester: '春' | '秋';
+  sequence_number: number;
+  status: 'active' | 'archived';
+  created_at: Date;
+  updated_at: Date;
+}
+
 export interface Schedule {
   id: number;
   name: string;
   department: string;
+  term_id?: number | null;
   filename: string | null;
   file_data?: Buffer | null;
   file_type?: string | null;

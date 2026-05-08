@@ -15,6 +15,7 @@ import { authenticate, requireRole } from "./src/middleware/auth.ts";
 import scoringRouter from "./src/routes/scoring.ts";
 import authRouter from "./src/routes/auth.ts";
 import fileCenterRouter from "./src/routes/file-center.ts";
+import termsRouter from "./src/routes/terms.ts";
 import pool from './src/config/database.ts';
 
 dotenv.config();
@@ -92,9 +93,9 @@ async function startServer() {
       const result = response.data;
       console.log(`🚀 Proxied: [Python -> Node -> Frontend] SUCCESS: ${result.success}, ITEMS: ${result.schedule_data?.length}`);
       res.json(result);
-    } catch (error: any) {
-      console.error(`❌ Proxy Error (${endpoint}):`, error.message);
-      res.status(500).json({ error: error.message || "OCR service connection failed" });
+    } catch (error: unknown) {
+      console.error(`❌ Proxy Error (${endpoint}):`, (error as Error).message);
+      res.status(500).json({ error: (error as Error).message || "OCR service connection failed" });
     }
   };
 
@@ -107,9 +108,9 @@ async function startServer() {
       console.log(`📡 Proxying: [Node -> Python] /api/ocr/horizontal_rules`);
       const response = await axios.post(`${AI_SERVICE_URL}/api/ocr/horizontal_rules`, req.body);
       res.json(response.data);
-    } catch (error: any) {
-      console.error(`❌ Proxy Error (/api/ocr/horizontal_rules):`, error.message);
-      res.status(500).json({ error: error.message || "OCR service connection failed" });
+    } catch (error: unknown) {
+      console.error(`❌ Proxy Error (/api/ocr/horizontal_rules):`, (error as Error).message);
+      res.status(500).json({ error: (error as Error).message || "OCR service connection failed" });
     }
   });
 
@@ -145,11 +146,11 @@ app.get("/api/reset-departments", authenticate, requireRole('admin'), async (req
       success: true, 
       message: "✅ 部门数据已成功重置为正确中文" 
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ 重置部门数据失败:", error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: (error as Error).message 
     });
   } finally {
     // ✅ 必须释放连接，避免连接池泄漏
@@ -162,8 +163,8 @@ app.get("/api/reset-departments", authenticate, requireRole('admin'), async (req
     try {
       const departments = await scheduleService.getAllDepartments();
       res.json({ success: true, data: departments });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -181,8 +182,8 @@ app.get("/api/reset-departments", authenticate, requireRole('admin'), async (req
         name: name as string
       });
       res.json({ success: true, data: schedules });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -194,8 +195,8 @@ app.get("/api/reset-departments", authenticate, requireRole('admin'), async (req
         return res.status(404).json({ success: false, error: "Schedule not found" });
       }
       res.json({ success: true, data: schedule });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -207,8 +208,8 @@ app.get("/api/reset-departments", authenticate, requireRole('admin'), async (req
         [id]
       );
       res.json({ success: true, data: rows });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -228,8 +229,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
         res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileData.filename)}"`);
       }
       res.send(fileData.file_data);
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -240,8 +241,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
         created_by: req.user!.username,
       });
       res.json({ success: true, data: schedule });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -261,8 +262,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
       }
       const schedule = await scheduleService.updateSchedule(id, req.body);
       res.json({ success: true, data: schedule });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -281,8 +282,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
       }
       const deleted = await scheduleService.deleteSchedule(id);
       res.json({ success: true, deleted });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -291,8 +292,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
       const scheduleId = parseInt(req.params.scheduleId);
       const course = await scheduleService.createCourse(scheduleId, req.body);
       res.json({ success: true, data: course });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -304,8 +305,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
         return res.status(404).json({ success: false, error: "Course not found" });
       }
       res.json({ success: true, data: course });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -314,8 +315,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
       const id = parseInt(req.params.id);
       const deleted = await scheduleService.deleteCourse(id);
       res.json({ success: true, deleted });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -330,8 +331,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
         name: name as string
       });
       res.json({ success: true, data: results });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -346,8 +347,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
         return res.status(404).json({ success: false, error: "Person not found" });
       }
       res.json({ success: true, data: result });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -359,8 +360,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
       }
       const result = await queryService.getDepartmentStats(department as string);
       res.json({ success: true, data: result });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -368,22 +369,23 @@ app.get("/api/schedules/:id/file", async (req, res) => {
     try {
       const result = await queryService.getAllFreeTimeData();
       res.json({ success: true, data: result });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
   app.post("/api/export/reverse-schedule", async (req, res) => {
     try {
-      const { term } = req.body as { term?: string };
       const data = await queryService.getAllFreeTimeData();
-      const wb = await excelExportService.generateReverseScheduleWorkbook(data, term || '');
+      const [terms] = await pool.query("SELECT name FROM terms WHERE status = 'active' LIMIT 1");
+      const termName = (terms as any[])[0]?.name || '';
+      const wb = await excelExportService.generateReverseScheduleWorkbook(data, termName);
       const buf = await wb.xlsx.writeBuffer();
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=reverse-schedule.xlsx');
       res.send(Buffer.from(buf));
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -404,8 +406,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename=${name}-schedule.xlsx`);
       res.send(excelBuffer);
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -422,8 +424,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename=${department}-stats.xlsx`);
       res.send(excelBuffer);
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -447,8 +449,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
           files: (fileCount as any[])[0].total,
         },
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -466,8 +468,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
       sql += ' ORDER BY c.weekday ASC, c.id DESC LIMIT 200';
       const [rows] = await pool.query(sql, params);
       res.json({ success: true, data: rows });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -484,8 +486,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
       sql += ' ORDER BY role, name LIMIT 200';
       const [rows] = await pool.query(sql, params);
       res.json({ success: true, data: rows });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   });
 
@@ -495,6 +497,7 @@ app.get("/api/schedules/:id/file", async (req, res) => {
   app.use('/api/scoring', scoringRouter);
   // 文件中心 API
   app.use('/api/file-center', fileCenterRouter);
+  app.use('/api/terms', termsRouter);
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
