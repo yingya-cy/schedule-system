@@ -45,7 +45,7 @@ function formatWeekGroups(weeks: number[]): string {
     }
   }
   parts.push(start === prev ? `(${start})` : `(${start}-${prev})`);
-  return parts.join('/');
+  return parts.join(''); // concatenate, no separator
 }
 
 function detectParity(weeks: number[]): '' | '单' | '双' {
