@@ -1,7 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'academic-ether-default-secret-change-me';
+const DEFAULT_SECRET = 'academic-ether-default-secret-change-me';
+const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_SECRET;
+
+if (JWT_SECRET === DEFAULT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET 环境变量未设置，生产环境拒绝启动');
+  }
+  console.warn('⚠ JWT_SECRET 使用默认值，请在生产环境设置环境变量');
+}
 
 export interface AuthUser {
   userId: number;

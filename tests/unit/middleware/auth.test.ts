@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 
@@ -158,5 +158,24 @@ describe('JWT_SECRET', () => {
     expect(decoded.userId).toBe(42);
     expect(decoded.username).toBe('test');
     expect(decoded.role).toBe('teacher');
+  });
+});
+
+describe('JWT_SECRET production guard', () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalEnv.NODE_ENV;
+    process.env.JWT_SECRET = originalEnv.JWT_SECRET;
+    vi.resetModules();
+  });
+
+  it('throws in production when JWT_SECRET is not set', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.JWT_SECRET;
+
+    await expect(import('../../../src/middleware/auth.ts')).rejects.toThrow(
+      'JWT_SECRET 环境变量未设置，生产环境拒绝启动'
+    );
   });
 });

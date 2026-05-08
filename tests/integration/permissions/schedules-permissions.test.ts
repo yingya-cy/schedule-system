@@ -197,3 +197,42 @@ describe('Schedules Permissions', () => {
     });
   });
 });
+
+describe('Reset Departments Security', () => {
+  let app: ReturnType<typeof createAppWithAuth>;
+  let adminToken: string;
+
+  beforeAll(async () => {
+    app = createAppWithAuth();
+    adminToken = (await loginAs(app, 'admin', 'admin123')).token;
+    await createTestUser(app, adminToken, { username: 'perm_stu_rd', name: '学生重置', password: 'test123', role: 'student', department: '网编部' });
+  });
+
+  it('returns 401 without token', async () => {
+    await supertest(app)
+      .get('/api/reset-departments')
+      .expect(401);
+  });
+
+  it('returns 401 with invalid token', async () => {
+    await supertest(app)
+      .get('/api/reset-departments')
+      .set('Authorization', 'Bearer invalid.token.here')
+      .expect(401);
+  });
+
+  it('returns 403 for non-admin user', async () => {
+    const { token } = await loginAs(app, 'perm_stu_rd', 'test123');
+    await supertest(app)
+      .get('/api/reset-departments')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403);
+  });
+
+  it('returns 200 for admin user', async () => {
+    await supertest(app)
+      .get('/api/reset-departments')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+  });
+});

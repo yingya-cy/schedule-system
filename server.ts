@@ -11,7 +11,7 @@ import { testConnection, initializeDatabase } from "./src/config/database.ts";
 import scheduleService from "./src/services/scheduleService.ts";
 import queryService from "./src/services/queryService.ts";
 import excelExportService from "./src/services/excelExportService.ts";
-import { authenticate } from "./src/middleware/auth.ts";
+import { authenticate, requireRole } from "./src/middleware/auth.ts";
 import scoringRouter from "./src/routes/scoring.ts";
 import authRouter from "./src/routes/auth.ts";
 import fileCenterRouter from "./src/routes/file-center.ts";
@@ -119,8 +119,8 @@ async function startServer() {
       res.json(response.data);
     } catch (error) { res.status(500).json({ error: "Service down" }); }
   });
-// ✅ 重置部门数据接口（修复乱码专用）
-app.get("/api/reset-departments", async (req, res) => {
+// 重置部门数据接口（仅 admin 可用）
+app.get("/api/reset-departments", authenticate, requireRole('admin'), async (req, res) => {
   let connection = null;
   try {
     // 从连接池获取连接

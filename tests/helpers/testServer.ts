@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
-import { authenticate } from '../../src/middleware/auth.ts';
+import { authenticate, requireRole } from '../../src/middleware/auth.ts';
 import authRouter from '../../src/routes/auth.ts';
 import scoringRouter from '../../src/routes/scoring.ts';
 import fileCenterRouter from '../../src/routes/file-center.ts';
@@ -259,6 +259,25 @@ export function createAppWithAuth(): express.Express {
       res.json({ success: true, data: departments });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get('/api/reset-departments', authenticate, requireRole('admin'), async (req, res) => {
+    let connection = null;
+    try {
+      const pool = (await import('../../src/config/database.ts')).default;
+      connection = await pool.getConnection();
+      await connection.query('DELETE FROM departments');
+      await connection.query(`
+        INSERT INTO departments (name, sort_order) VALUES
+        ('主任团', 1), ('网编部', 2), ('秘书部', 3),
+        ('策划部', 4), ('咨询部', 5), ('外联部', 6), ('宣传部', 7)
+      `);
+      res.json({ success: true, message: '部门数据已重置' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    } finally {
+      if (connection) connection.release();
     }
   });
 
