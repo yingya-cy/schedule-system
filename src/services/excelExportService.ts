@@ -91,7 +91,7 @@ const thinBorder = {
   left: { style: 'thin' as const }, right: { style: 'thin' as const },
 };
 const centerWrap: Partial<ExcelJS.Alignment> = { horizontal: 'center', vertical: 'middle', wrapText: true };
-const fontName = '微软雅黑';
+const fontName = '宋体';
 const FONT = { data: { name: fontName, size: 14 }, title: { name: fontName, size: 48, bold: true }, header: { name: fontName, size: 22, bold: true } };
 
 // Rotating department background colors
