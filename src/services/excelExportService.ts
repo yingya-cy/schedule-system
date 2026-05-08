@@ -197,15 +197,14 @@ export class ExcelExportService {
         for (let r = 0; r < numRows; r++) {
           const rowNum = deptStart + r;
 
-          // Apply bg color to ALL cells in this row
-          for (let c = 1; c <= totalCols; c++) {
-            sc(ws.getCell(rowNum, c), FONT.data, grp.color);
-          }
+          // Dept column A gets bg color
+          sc(ws.getCell(rowNum, 1), FONT.data, grp.color);
 
           col = 2;
           for (let tpIdx = 0; tpIdx < TIME_PERIODS.length; tpIdx++) {
             const tp = TIME_PERIODS[tpIdx];
             for (let sc2 = 0; sc2 < subCols; sc2++) {
+              sc(ws.getCell(rowNum, col), FONT.data, grp.color);
               const pi = r * subCols + sc2;
               if (pi < grp.people.length) {
                 const person = grp.people[pi];
@@ -214,7 +213,7 @@ export class ExcelExportService {
               }
               col++;
             }
-            if (tpIdx < TIME_PERIODS.length - 1) col++;
+            if (tpIdx < TIME_PERIODS.length - 1) col++; // separator stays white
           }
 
           ws.getRow(rowNum).height = 56.25;
