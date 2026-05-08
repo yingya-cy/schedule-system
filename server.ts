@@ -10,7 +10,6 @@ import rateLimit from "express-rate-limit";
 import { testConnection, initializeDatabase } from "./src/config/database.ts";
 import scheduleService from "./src/services/scheduleService.ts";
 import queryService from "./src/services/queryService.ts";
-import * as XLSX from "xlsx";
 import excelExportService from "./src/services/excelExportService.ts";
 import { authenticate } from "./src/middleware/auth.ts";
 import scoringRouter from "./src/routes/scoring.ts";
@@ -378,16 +377,8 @@ app.get("/api/schedules/:id/file", async (req, res) => {
     try {
       const { term } = req.body as { term?: string };
       const data = await queryService.getAllFreeTimeData();
-      const wb = XLSX.utils.book_new();
-      const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-      for (let day = 1; day <= 7; day++) {
-        const sheet = excelExportService.generateReverseScheduleForDay(data, day, term || '');
-        const ws = XLSX.utils.aoa_to_sheet(sheet.data);
-        ws['!merges'] = sheet.merges;
-        ws['!cols'] = sheet.cols;
-        XLSX.utils.book_append_sheet(wb, ws, dayNames[day - 1]);
-      }
-      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const wb = await excelExportService.generateReverseScheduleWorkbook(data, term || '');
+      const buf = await wb.xlsx.writeBuffer();
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=reverse-schedule.xlsx');
       res.send(Buffer.from(buf));
