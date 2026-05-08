@@ -168,7 +168,6 @@ export class QueryService {
    */
   async getAllFreeTimeData(): Promise<{
     total_schedules: number;
-    free_time_matrix: Record<string, Record<string, Record<string, string[]>>>;
     departments: string[];
     people: { name: string; department: string; courses: { weekday: number; sections: number[]; weeks: number[] }[] }[];
   }> {
@@ -195,26 +194,8 @@ export class QueryService {
     const scheduleNames = Array.from(personMap.keys());
     const departments = [...new Set(Array.from(personMap.values()).map(p => p.department))].sort();
 
-    const freeTimeMatrix: Record<string, Record<string, Record<string, string[]>>> = {};
-    for (let week = 1; week <= 18; week++) {
-      for (let day = 1; day <= 7; day++) {
-        for (let section = 1; section <= 11; section++) {
-          const wk = week.toString(), dk = day.toString(), sk = section.toString();
-          if (!freeTimeMatrix[wk]) freeTimeMatrix[wk] = {};
-          if (!freeTimeMatrix[wk][dk]) freeTimeMatrix[wk][dk] = {};
-          if (!freeTimeMatrix[wk][dk][sk]) freeTimeMatrix[wk][dk][sk] = [];
-          for (const name of scheduleNames) {
-            const courses = personMap.get(name)!.courses;
-            const busy = courses.some(c => c.weekday === day && c.sections.includes(section) && c.weeks.includes(week));
-            if (!busy) freeTimeMatrix[wk][dk][sk].push(name);
-          }
-        }
-      }
-    }
-
     return {
       total_schedules: scheduleNames.length,
-      free_time_matrix: freeTimeMatrix,
       departments,
       people: Array.from(personMap.values()),
     };

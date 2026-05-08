@@ -73,7 +73,8 @@ describe('All Free Time', () => {
 
     expect(res.body.success).toBe(true);
     expect(res.body.data).toHaveProperty('total_schedules');
-    expect(res.body.data).toHaveProperty('free_time_matrix');
+    expect(res.body.data).toHaveProperty('departments');
+    expect(res.body.data).toHaveProperty('people');
   });
 });
 

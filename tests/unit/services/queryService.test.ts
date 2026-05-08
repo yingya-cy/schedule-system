@@ -134,7 +134,7 @@ describe('QueryService', () => {
       expect(result.total_schedules).toBe(0);
     });
 
-    it('builds correct matrix for one schedule', async () => {
+    it('builds correct data for one schedule', async () => {
       const rows = [
         {
           schedule_id: 1,
@@ -149,8 +149,8 @@ describe('QueryService', () => {
       const result = await service.getAllFreeTimeData();
 
       expect(result.total_schedules).toBe(1);
-      // All entries should be populated
-      expect(result.free_time_matrix['1']).toBeDefined();
+      expect(result.departments).toBeDefined();
+      expect(result.people).toHaveLength(1);
     });
   });
 });

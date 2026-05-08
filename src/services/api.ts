@@ -152,7 +152,6 @@ export const api = {
 
   async getAllFreeTimeData(): Promise<{
     total_schedules: number;
-    free_time_matrix: Record<string, Record<string, Record<string, string[]>>>;
   }> {
     const response = await fetch('/api/query/all-free-time', { headers: authHeaders() });
     const result = await response.json();
