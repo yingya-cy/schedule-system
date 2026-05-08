@@ -142,7 +142,7 @@ export class ExcelExportService {
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Academic Ether';
 
-    for (let day = 1; day <= 7; day++) {
+    for (let day = 1; day <= 5; day++) {
       const ws = wb.addWorksheet(dayNames[day - 1]);
 
       // === Row 1: Title ===
