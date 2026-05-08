@@ -18,8 +18,9 @@ export const api = {
     throw new Error(result.error);
   },
 
-  async getSchedules(filters?: { department?: string; name?: string }): Promise<ScheduleData[]> {
+  async getSchedules(filters?: { department?: string; name?: string; term_id?: number }): Promise<ScheduleData[]> {
     const params = new URLSearchParams();
+    if (filters?.term_id) params.append('term_id', String(filters.term_id));
     if (filters?.department) params.append('department', filters.department);
     if (filters?.name) params.append('name', filters.name);
 

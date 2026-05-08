@@ -6,10 +6,15 @@ import { buildInsertQuery, buildUpdateQuery, getInsertId, getAffectedRows } from
 export class ScheduleRepository {
   // ==================== Schedule Operations ====================
 
-  async findAll(filters?: { department?: string; name?: string }): Promise<Schedule[]> {
+  async findAll(filters?: { department?: string; name?: string; term_id?: number }): Promise<Schedule[]> {
     let query = 'SELECT * FROM schedules';
     const params: (string | number)[] = [];
     const conditions: string[] = [];
+
+    if (filters?.term_id) {
+      conditions.push('term_id = ?');
+      params.push(filters.term_id);
+    }
 
     if (filters?.department) {
       conditions.push('department = ?');

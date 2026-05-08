@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+// Mock localStorage before module load (vi.hoisted runs first)
+vi.hoisted(() => {
+  globalThis.localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+  } as any;
+});
+
 // Test the store logic by importing the factory
 // We mock the api module so no real HTTP calls are made
 vi.mock('@/services/api', () => ({

@@ -8,6 +8,7 @@ import { useAppStore } from '@/stores/appStore';
 import { useAuthStore } from '@/stores/authStore';
 import WeekSelector from '@/components/WeekSelector';
 import DaySelector from '@/components/DaySelector';
+import TermTransitionModal from '@/components/TermTransitionModal';
 import TimeSlotSelector from '@/components/TimeSlotSelector';
 import FreeTimeGrid from '@/components/FreeTimeGrid';
 
@@ -33,6 +34,7 @@ export default function DashboardView() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [currentTerm, setCurrentTerm] = useState<string>('');
+  const [showTransition, setShowTransition] = useState(false);
 
   const [useCustomRange, setUseCustomRange] = useState(false);
   const [customStartSection, setCustomStartSection] = useState(1);
@@ -164,6 +166,15 @@ export default function DashboardView() {
             <Download size={14} />
             导出反课表
           </button>
+          {useAuthStore.getState().user?.role === 'admin' && (
+            <button
+              onClick={() => setShowTransition(true)}
+              className="px-4 py-2 bg-amber-100 text-amber-700 rounded-xl text-sm font-medium hover:bg-amber-200 transition-colors flex items-center gap-1.5"
+            >
+              <RefreshCw size={14} />
+              换届
+            </button>
+          )}
         </div>
       </section>
 
@@ -291,6 +302,17 @@ export default function DashboardView() {
           </div>
         </div>
       </div>
+
+      <TermTransitionModal
+        isOpen={showTransition}
+        onClose={() => setShowTransition(false)}
+        onTransitioned={() => {
+          fetch('/api/terms/current')
+            .then(r => r.json())
+            .then(json => { if (json.success && json.data) setCurrentTerm(json.data.name); })
+            .catch(() => {});
+        }}
+      />
     </div>
   );
 }

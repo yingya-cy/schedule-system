@@ -784,6 +784,7 @@ export default function FileCenterView() {
                                 <p className="text-xs text-on-surface-variant mt-0.5">
                                   {categoryLabels[f.file_category] || f.file_category}
                                   {f.file_size > 0 && ` · ${formatSize(f.file_size)}`}
+                                  {f.created_at && ` · ${new Date(f.created_at).toLocaleDateString('zh-CN')}`}
                                 </p>
                                 {f.description && (
                                   <p className="text-xs text-outline mt-1 truncate">{f.description}</p>

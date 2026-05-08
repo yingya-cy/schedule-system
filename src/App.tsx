@@ -20,6 +20,7 @@ const FileCenterView = lazy(() => import('./components/views/FileCenterView'));
 function AppContent() {
   const refreshDepartments = useAppStore((s) => s.refreshDepartments);
   const refreshSchedules = useAppStore((s) => s.refreshSchedules);
+  const refreshTerms = useAppStore((s) => s.refreshTerms);
   const departmentsLoaded = useAppStore((s) => s.departmentsLoaded);
   const schedulesLoaded = useAppStore((s) => s.schedulesLoaded);
   const initialize = useAuthStore((s) => s.initialize);
@@ -32,7 +33,9 @@ function AppContent() {
   useEffect(() => {
     if (isAuthenticated) {
       if (!departmentsLoaded) refreshDepartments();
-      if (!schedulesLoaded) refreshSchedules();
+      refreshTerms().then(() => {
+        if (!schedulesLoaded) refreshSchedules();
+      });
     }
   }, [isAuthenticated]);
 

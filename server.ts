@@ -176,10 +176,16 @@ app.get("/api/reset-departments", authenticate, requireRole('admin'), async (req
 
   app.get("/api/schedules", async (req, res) => {
     try {
-      const { department, name } = req.query;
+      const { department, name, term_id } = req.query;
+      let termId = term_id ? parseInt(term_id as string) : undefined;
+      if (!termId) {
+        const [terms] = await pool.query("SELECT id FROM terms WHERE status = 'active' LIMIT 1");
+        termId = (terms as any[])[0]?.id;
+      }
       const schedules = await scheduleService.getAllSchedules({
         department: department as string,
-        name: name as string
+        name: name as string,
+        term_id: termId,
       });
       res.json({ success: true, data: schedules });
     } catch (error: unknown) {

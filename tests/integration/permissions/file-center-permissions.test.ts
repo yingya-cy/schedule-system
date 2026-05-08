@@ -209,3 +209,43 @@ describe('File Center Permissions', () => {
     });
   });
 });
+
+describe('File Center items have timestamps', () => {
+  let app: ReturnType<typeof createAppWithAuth>;
+  let token: string;
+
+  beforeAll(async () => {
+    app = createAppWithAuth();
+    token = (await loginAs(app, 'fc_tw', 'test123')).token;
+  });
+
+  it('file items include created_at', async () => {
+    // Get activities
+    const actRes = await supertest(app)
+      .get('/api/file-center/activities')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const activities = actRes.body.data;
+    if (activities.length === 0) return;
+
+    const a = activities[0];
+    const fRes = await supertest(app)
+      .get(`/api/file-center/activities/${a.id}/folders`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const folders = fRes.body.data;
+    if (!folders || folders.length === 0) return;
+
+    const itemsRes = await supertest(app)
+      .get(`/api/file-center/folders/${folders[0].id}/items`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const items = itemsRes.body.data;
+    if (items.files && items.files.length > 0) {
+      expect(items.files[0]).toHaveProperty('created_at');
+    }
+    if (items.tweets && items.tweets.length > 0) {
+      expect(items.tweets[0]).toHaveProperty('created_at');
+    }
+  });
+});

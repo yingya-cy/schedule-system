@@ -19,6 +19,10 @@ export default function FilesView() {
   const refreshSchedules = useAppStore((s) => s.refreshSchedules);
   const removeSchedule = useAppStore((s) => s.removeSchedule);
   const departments = useAppStore((s) => s.departments);
+  const availableTerms = useAppStore((s) => s.availableTerms);
+  const currentTermId = useAppStore((s) => s.currentTermId);
+  const setCurrentTermId = useAppStore((s) => s.setCurrentTermId);
+  const refreshTerms = useAppStore((s) => s.refreshTerms);
 
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -317,6 +321,21 @@ export default function FilesView() {
       <AnimatePresence mode="wait">
         {viewMode === 'list' && (
           <div key="list-content" className="w-full">
+            {/* Term selector */}
+            {availableTerms.length > 1 && (
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs text-outline">届:</span>
+                <select
+                  value={currentTermId || ''}
+                  onChange={e => setCurrentTermId(Number(e.target.value))}
+                  className="px-2 py-1 text-xs rounded-lg bg-surface-container-low border border-surface-container-high"
+                >
+                  {availableTerms.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}{t.status === 'active' ? ' (当前)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {/* List View */}
             <ScheduleListView
               schedules={allSchedules}
