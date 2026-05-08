@@ -32,20 +32,20 @@ function isFree(person: PersonData, day: number, section: number, week: number):
   return !hasCourse(person, day, section, week);
 }
 
-function consolidateWeeks(weeks: number[]): string {
+function formatWeekGroups(weeks: number[]): string {
   if (weeks.length === 0) return '';
   const sorted = [...weeks].sort((a, b) => a - b);
-  const ranges: string[] = [];
+  const parts: string[] = [];
   let start = sorted[0], prev = sorted[0];
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i] === prev + 1) { prev = sorted[i]; }
     else {
-      ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+      parts.push(start === prev ? `(${start})` : `(${start}-${prev})`);
       start = sorted[i]; prev = sorted[i];
     }
   }
-  ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
-  return ranges.join(',');
+  parts.push(start === prev ? `(${start})` : `(${start}-${prev})`);
+  return parts.join('/');
 }
 
 function detectParity(weeks: number[]): '' | '单' | '双' {
@@ -75,11 +75,11 @@ function formatFreeTimeForPeriod(person: PersonData, day: number, periodSections
   for (const s of periodSections) {
     const weeks = sectionOnly.get(s);
     if (!weeks || weeks.length === 0) continue;
-    parts.push(`${s}${detectParity(weeks)}(${consolidateWeeks(weeks)})`);
+    parts.push(`${s}${detectParity(weeks)}${formatWeekGroups(weeks)}`);
   }
 
   if (allFree.length > 0) {
-    parts.push(`(${consolidateWeeks(allFree)})`);
+    parts.push(formatWeekGroups(allFree));
   }
 
   return parts.join('/');
