@@ -204,13 +204,15 @@ export class ExcelExportService {
           for (let tpIdx = 0; tpIdx < TIME_PERIODS.length; tpIdx++) {
             const tp = TIME_PERIODS[tpIdx];
             for (let sc2 = 0; sc2 < subCols; sc2++) {
-              sc(ws.getCell(rowNum, col), FONT.data, grp.color);
               const pi = r * subCols + sc2;
               if (pi < grp.people.length) {
                 const person = grp.people[pi];
                 const freeNotation = formatFreeTimeForPeriod(person, day, tp.sections);
-                ws.getCell(rowNum, col).value = person.name + freeNotation;
+                if (freeNotation) {
+                  ws.getCell(rowNum, col).value = person.name + freeNotation;
+                }
               }
+              sc(ws.getCell(rowNum, col), FONT.data, grp.color);
               col++;
             }
             if (tpIdx < TIME_PERIODS.length - 1) col++; // separator stays white
