@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { columnLetter } from '../utils/formatters.ts';
 
 interface PersonData {
   name: string;
@@ -166,13 +167,6 @@ function sc(cell: ExcelJS.Cell, font: any, fill?: string) {
   cell.alignment = centerWrap;
   cell.border = thinBorder;
   if (fill) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
-}
-
-function colLetter(n: number): string {
-  let s = '';
-  n--;
-  while (n >= 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; }
-  return s;
 }
 
 export class ExcelExportService {

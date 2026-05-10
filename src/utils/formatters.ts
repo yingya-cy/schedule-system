@@ -70,3 +70,12 @@ export function formatWeekInfo(week: WeekInput): string {
   }
   return JSON.stringify(week);
 }
+
+export function columnLetter(col: number): string {
+  let s = '';
+  while (col > 0) {
+    s = String.fromCharCode(65 + ((col - 1) % 26)) + s;
+    col = Math.floor((col - 1) / 26);
+  }
+  return s;
+}

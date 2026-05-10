@@ -5,6 +5,7 @@ import multer from 'multer';
 import axios from 'axios';
 import FormData from 'form-data';
 import ExcelJS from 'exceljs';
+import { columnLetter } from '../utils/formatters.ts';
 import crypto from 'crypto';
 import judgeRouter from './scoring-judge.ts';
 
@@ -1145,15 +1146,6 @@ router.get('/competitions/:id/export', async (req, res) => {
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 });
-
-function columnLetter(col: number): string {
-  let s = '';
-  while (col > 0) {
-    s = String.fromCharCode(65 + ((col - 1) % 26)) + s;
-    col = Math.floor((col - 1) / 26);
-  }
-  return s;
-}
 
 // 大屏轮询接口
 router.get('/competitions/:id/live-results', async (req, res) => {
