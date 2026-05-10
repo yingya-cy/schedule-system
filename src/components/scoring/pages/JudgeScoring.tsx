@@ -613,7 +613,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
                         value={currentScores[0] ?? ''}
                         onChange={(e) => {
                           const v = parseFloat(e.target.value);
-                          if (e.target.value === '') setCurrentScores({ 0: undefined as any });
+                          if (e.target.value === '') setCurrentScores(prev => { const next = { ...prev }; delete next[0]; return next; });
                           else setCurrentScores({ 0: clamp(v, 0, 100) });
                         }}
                         className="w-full px-4 py-3 bg-surface-container-low border border-surface-container-high rounded-xl text-on-surface text-lg placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all focus-ring"

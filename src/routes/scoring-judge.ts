@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../config/database.ts';
 import { judgeAuth, JWT_SECRET } from '../middleware/auth.ts';
+import { RowDataPacket, ResultSetHeader } from '../utils/db-types';
 import { validate, submitScoreSchema } from '../utils/validation.ts';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
@@ -29,18 +30,18 @@ router.post('/judge/login', async (req, res) => {
        WHERE j.name = ? AND j.competition_id = ? AND j.code = ?`,
       [name, competition_id, code]
     );
-    if ((rows as any[]).length === 0) {
+    if ((rows as RowDataPacket[]).length === 0) {
       res.status(401).json({ success: false, error: '评委姓名或评委码错误' });
       return;
     }
-    const judge = (rows as any[])[0];
+    const judge = (rows as RowDataPacket[])[0];
 
     const tokenPayload = { judgeId: judge.id, competitionId: judge.competition_id, type: 'judge' };
     const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '12h' });
 
     res.json({ success: true, data: { ...judge, token } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -56,11 +57,11 @@ router.get('/judge/contestants', judgeAuth, async (req, res) => {
       'SELECT * FROM judges WHERE id = ?',
       [judgeId]
     );
-    if ((judgeRows as any[]).length === 0) {
+    if ((judgeRows as RowDataPacket[]).length === 0) {
       res.status(404).json({ success: false, error: '评委不存在' });
       return;
     }
-    const judge = (judgeRows as any[])[0];
+    const judge = (judgeRows as RowDataPacket[])[0];
 
     const [contestants] = await pool.query(
       'SELECT * FROM contestants WHERE competition_id = ? ORDER BY number',
@@ -68,22 +69,22 @@ router.get('/judge/contestants', judgeAuth, async (req, res) => {
     );
 
     const contestantsWithScore = await Promise.all(
-      (contestants as any[]).map(async (c: any) => {
+      (contestants as RowDataPacket[]).map(async (c: any) => {
         const [scores] = await pool.query(
           'SELECT * FROM scores WHERE contestant_id = ? AND judge_id = ?',
           [c.id, judge.id]
         );
         return {
           ...c,
-          scored: (scores as any[]).length > 0,
-          score: (scores as any[]).length > 0 ? (scores as any[])[0] : null
+          scored: (scores as RowDataPacket[]).length > 0,
+          score: (scores as RowDataPacket[]).length > 0 ? (scores as RowDataPacket[])[0] : null
         };
       })
     );
 
     res.json({ success: true, data: contestantsWithScore });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -100,7 +101,7 @@ router.get('/judge/scores/:contestantId', judgeAuth, async (req, res) => {
     );
     res.json({ success: true, data: scoreRows });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -117,25 +118,25 @@ router.post('/judge/scores', judgeAuth, validate(submitScoreSchema), async (req,
       'SELECT * FROM judges WHERE id = ?',
       [judgeId]
     );
-    if ((judgeRows as any[]).length === 0) {
+    if ((judgeRows as RowDataPacket[]).length === 0) {
       throw new Error('评委不存在');
     }
-    const judge = (judgeRows as any[])[0];
+    const judge = (judgeRows as RowDataPacket[])[0];
 
     const [contestantRows] = await connection.query(
       'SELECT * FROM contestants WHERE id = ?',
       [contestant_id]
     );
-    if ((contestantRows as any[]).length === 0) {
+    if ((contestantRows as RowDataPacket[]).length === 0) {
       throw new Error('选手不存在');
     }
-    const contestant = (contestantRows as any[])[0];
+    const contestant = (contestantRows as RowDataPacket[])[0];
 
     const [compRows] = await connection.query(
       'SELECT status FROM competitions WHERE id = ?',
       [contestant.competition_id]
     );
-    if ((compRows as any[]).length > 0 && (compRows as any[])[0].status === 'completed') {
+    if ((compRows as RowDataPacket[]).length > 0 && (compRows as RowDataPacket[])[0].status === 'completed') {
       throw new Error('比赛已结束，无法提交评分');
     }
 
@@ -159,8 +160,8 @@ router.post('/judge/scores', judgeAuth, validate(submitScoreSchema), async (req,
     );
 
     let scoreId: number;
-    if ((existingScores as any[]).length > 0) {
-      scoreId = (existingScores as any[])[0].id;
+    if ((existingScores as RowDataPacket[]).length > 0) {
+      scoreId = (existingScores as RowDataPacket[])[0].id;
       await connection.query(
         'UPDATE scores SET total_score = ?, ip_address = ? WHERE id = ?',
         [totalScore, req.ip, scoreId]
@@ -171,19 +172,26 @@ router.post('/judge/scores', judgeAuth, validate(submitScoreSchema), async (req,
         'INSERT INTO scores (competition_id, contestant_id, judge_id, total_score, ip_address) VALUES (?, ?, ?, ?, ?)',
         [contestant.competition_id, contestant_id, judge.id, totalScore, req.ip]
       );
-      scoreId = (insertResult as any).insertId;
+      scoreId = (insertResult as ResultSetHeader).insertId;
     }
 
-    for (const s of scoreDetails) {
-      if (s.subdimension_id) {
+    // Batch INSERT score_details (避免 N+1)
+    if (scoreDetails.length > 0) {
+      const detailValues: (number | undefined)[] = [];
+      const detailPlaceholders: string[] = [];
+      for (const s of scoreDetails) {
+        if (s.subdimension_id) {
+          detailPlaceholders.push('(?, ?, NULL, ?)');
+          detailValues.push(scoreId, s.subdimension_id, s.score);
+        } else if (s.dimension_id) {
+          detailPlaceholders.push('(?, NULL, ?, ?)');
+          detailValues.push(scoreId, s.dimension_id, s.score);
+        }
+      }
+      if (detailPlaceholders.length > 0) {
         await connection.query(
-          'INSERT INTO score_details (score_id, subdimension_id, score) VALUES (?, ?, ?)',
-          [scoreId, s.subdimension_id, s.score]
-        );
-      } else if (s.dimension_id) {
-        await connection.query(
-          'INSERT INTO score_details (score_id, dimension_id, score) VALUES (?, ?, ?)',
-          [scoreId, s.dimension_id, s.score]
+          `INSERT INTO score_details (score_id, subdimension_id, dimension_id, score) VALUES ${detailPlaceholders.join(', ')}`,
+          detailValues
         );
       }
     }
@@ -192,7 +200,7 @@ router.post('/judge/scores', judgeAuth, validate(submitScoreSchema), async (req,
     res.json({ success: true, data: { total_score: totalScore } });
   } catch (error: unknown) {
     await connection.rollback();
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   } finally {
     connection.release();
   }

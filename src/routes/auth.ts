@@ -6,6 +6,7 @@ import pool from '../config/database.ts';
 import { authenticate, requireRole, AuthUser, JWT_SECRET } from '../middleware/auth.ts';
 import { sendVerificationEmail } from '../services/emailService.ts';
 import { validate, loginSchema, registerSchema } from '../utils/validation.ts';
+import { RowDataPacket, ResultSetHeader, getErrorMessage, isDuplicateEntry } from '../utils/db-types';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
       'SELECT id, username, name, email, email_verify_token, email_verified_at, role, department, avatar_url, password_hash, is_active FROM users WHERE (username = ? OR email = ?)',
       [username, username]
     );
-    const users = rows as any[];
+    const users = rows as RowDataPacket[];
 
     if (users.length === 0) {
       res.status(401).json({ success: false, error: '用户名或密码错误' });
@@ -73,7 +74,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
       },
     });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -97,11 +98,11 @@ router.post('/register', validate(registerSchema), async (req, res) => {
 
     res.json({ success: true, data: { message: '注册成功，请查收验证邮件' } });
   } catch (error: unknown) {
-    if ((error as any).code === 'ER_DUP_ENTRY') {
+    if (isDuplicateEntry(error)) {
       res.status(400).json({ success: false, error: '用户名或邮箱已被注册' });
       return;
     }
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -118,12 +119,12 @@ router.get('/verify-email', async (req, res) => {
       'SELECT id, email_verify_token_expires FROM users WHERE email_verify_token = ? AND email_verified_at IS NULL',
       [token]
     );
-    if ((rows as any[]).length === 0) {
+    if ((rows as RowDataPacket[]).length === 0) {
       const [verified] = await pool.query(
         'SELECT id FROM users WHERE email_verify_token = ? AND email_verified_at IS NOT NULL',
         [token]
       );
-      if ((verified as any[]).length > 0) {
+      if ((verified as RowDataPacket[]).length > 0) {
         res.json({ success: true, data: { message: '邮箱已验证，请登录', alreadyVerified: true } });
         return;
       }
@@ -131,7 +132,7 @@ router.get('/verify-email', async (req, res) => {
       return;
     }
 
-    const user = (rows as any[])[0];
+    const user = (rows as RowDataPacket[])[0];
     if (user.email_verify_token_expires && new Date(user.email_verify_token_expires) < new Date()) {
       res.status(400).json({ success: false, error: '验证链接已过期，请重新发送验证邮件' });
       return;
@@ -139,12 +140,12 @@ router.get('/verify-email', async (req, res) => {
 
     await pool.query(
       'UPDATE users SET email_verified_at = NOW() WHERE id = ?',
-      [(rows as any[])[0].id]
+      [(rows as RowDataPacket[])[0].id]
     );
 
     res.json({ success: true, data: { message: '邮箱验证成功，请登录' } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -161,7 +162,7 @@ router.post('/verify-email/resend', async (req, res) => {
       'SELECT id, username, name, email_verified_at FROM users WHERE email = ?',
       [email]
     );
-    const users = rows as any[];
+    const users = rows as RowDataPacket[];
     if (users.length === 0) {
       res.status(400).json({ success: false, error: '该邮箱未注册' });
       return;
@@ -182,7 +183,7 @@ router.post('/verify-email/resend', async (req, res) => {
 
     res.json({ success: true, data: { message: '验证邮件已重新发送' } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -197,14 +198,14 @@ router.get('/me', authenticate, async (req, res) => {
       'SELECT id, username, name, email, role, department, avatar_url, last_login, created_at FROM users WHERE id = ?',
       [req.user!.userId]
     );
-    const users = rows as any[];
+    const users = rows as RowDataPacket[];
     if (users.length === 0) {
       res.status(404).json({ success: false, error: '用户不存在' });
       return;
     }
     res.json({ success: true, data: users[0] });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -216,9 +217,9 @@ router.put('/me', authenticate, async (req, res) => {
       'UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), department = COALESCE(?, department) WHERE id = ?',
       [name, email, department, req.user!.userId]
     );
-    res.json({ success: true, data: { updated: (result as any).affectedRows > 0 } });
+    res.json({ success: true, data: { updated: (result as ResultSetHeader).affectedRows > 0 } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -236,7 +237,7 @@ router.put('/password', authenticate, async (req, res) => {
     }
 
     const [rows] = await pool.query('SELECT password_hash FROM users WHERE id = ?', [req.user!.userId]);
-    const users = rows as any[];
+    const users = rows as RowDataPacket[];
     const valid = await bcrypt.compare(oldPassword, users[0].password_hash);
     if (!valid) {
       res.status(400).json({ success: false, error: '旧密码错误' });
@@ -247,7 +248,7 @@ router.put('/password', authenticate, async (req, res) => {
     await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, req.user!.userId]);
     res.json({ success: true, data: { message: '密码修改成功' } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -267,12 +268,12 @@ router.get('/users', authenticate, async (req, res) => {
 
     const { search, role, page = '1', limit = '20' } = req.query;
     let sql = 'SELECT id, username, name, email, role, department, is_active, last_login, created_at FROM users WHERE 1=1';
-    const params: any[] = [];
+    const params: (string | number)[] = [];
 
     // Department head can only see their department
     if (user.role === 'department_head') {
       sql += ' AND department = ?';
-      params.push(user.department);
+      params.push(user.department ?? '');
     }
 
     if (search) {
@@ -281,7 +282,7 @@ router.get('/users', authenticate, async (req, res) => {
     }
     if (role) {
       sql += ' AND role = ?';
-      params.push(role);
+      params.push(String(role));
     }
 
     const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
@@ -291,10 +292,10 @@ router.get('/users', authenticate, async (req, res) => {
     const [rows] = await pool.query(sql, params);
 
     let countSql = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
-    const countParams: any[] = [];
+    const countParams: (string | number)[] = [];
     if (user.role === 'department_head') {
       countSql += ' AND department = ?';
-      countParams.push(user.department);
+      countParams.push(user.department ?? '');
     }
     if (search) {
       countSql += ' AND (username LIKE ? OR name LIKE ? OR department LIKE ?)';
@@ -302,17 +303,17 @@ router.get('/users', authenticate, async (req, res) => {
     }
     if (role) {
       countSql += ' AND role = ?';
-      countParams.push(role);
+      countParams.push(String(role));
     }
     const [countRows] = await pool.query(countSql, countParams);
 
     res.json({
       success: true,
       data: rows,
-      meta: { total: (countRows as any[])[0].total, page: parseInt(page as string), limit: parseInt(limit as string) },
+      meta: { total: (countRows as RowDataPacket[])[0].total, page: parseInt(page as string), limit: parseInt(limit as string) },
     });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -335,13 +336,13 @@ router.post('/users', authenticate, requireRole('admin'), async (req, res) => {
       'INSERT INTO users (username, name, email, role, department, password_hash, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
       [username, name, email || null, role, department || null, passwordHash]
     );
-    res.json({ success: true, data: { id: (result as any).insertId } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
-    if ((error as any).code === 'ER_DUP_ENTRY') {
+    if (isDuplicateEntry(error)) {
       res.status(400).json({ success: false, error: '用户名或邮箱已存在' });
       return;
     }
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -358,7 +359,7 @@ router.put('/users/:id', authenticate, async (req, res) => {
 
     // Check target user
     const [targetRows] = await pool.query('SELECT id, department FROM users WHERE id = ?', [req.params.id]);
-    const target = (targetRows as any[])[0];
+    const target = (targetRows as RowDataPacket[])[0];
     if (!target) {
       res.status(404).json({ success: false, error: '用户不存在' });
       return;
@@ -384,7 +385,7 @@ router.put('/users/:id', authenticate, async (req, res) => {
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -392,13 +393,13 @@ router.put('/users/:id', authenticate, async (req, res) => {
 router.delete('/users/:id', authenticate, requireRole('admin'), async (req, res) => {
   try {
     const [result] = await pool.query('DELETE FROM users WHERE id = ?', [req.params.id]);
-    if ((result as any).affectedRows === 0) {
+    if ((result as ResultSetHeader).affectedRows === 0) {
       res.status(404).json({ success: false, error: '用户不存在' });
       return;
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -412,13 +413,13 @@ router.put('/users/:id/reset-password', authenticate, requireRole('admin'), asyn
     }
     const newHash = await bcrypt.hash(newPassword, 10);
     const [result] = await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, req.params.id]);
-    if ((result as any).affectedRows === 0) {
+    if ((result as ResultSetHeader).affectedRows === 0) {
       res.status(404).json({ success: false, error: '用户不存在' });
       return;
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 

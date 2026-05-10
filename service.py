@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from dotenv import load_dotenv
+load_dotenv()
 import os
 import tempfile
 import logging
@@ -16,7 +18,7 @@ from utils.cleaner import clean_schedule_ultimate, enrich_footer_courses
 from utils.pdf_plumber_parser import parse_vertical_pdf_with_plumber
 from utils.rule_parser import parse_by_rules
 from utils.image_utils import calculate_dynamic_timeout, auto_detect_schedule_type, encode_image_to_base64
-from utils.ai_client import create_ark_client, DOUBAO_MODEL
+from utils.ai_client import create_ark_client, AI_MODEL, strip_thinking
 from utils.excel_parser import parse_excel_for_template, parse_excel_for_contestants, fill_template_with_results
 
 app = Flask(__name__)
@@ -54,7 +56,7 @@ def extract_direct_json(image_path, schedule_type='standard', timeout=300.0):
         dynamic_client = create_ark_client(timeout)
         
         response = dynamic_client.chat.completions.create(
-            model=DOUBAO_MODEL,
+            model=AI_MODEL,
             messages=[
                 {
                     "role": "user",
@@ -73,9 +75,10 @@ def extract_direct_json(image_path, schedule_type='standard', timeout=300.0):
         )
         
         content = response.choices[0].message.content
-        logger.info(f"Doubao Direct-JSON Raw: {content[:300]}...")
-        
-        json_match = re.search(r'(\[[\s\S]*\])', content)
+        logger.info(f"AI Raw response: {content[:300]}...")
+
+        cleaned = strip_thinking(content)
+        json_match = re.search(r'(\[[\s\S]*\])', cleaned)
         if json_match:
             raw_json_text = json_match.group(1)
             courses = json.loads(raw_json_text)

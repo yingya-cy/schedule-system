@@ -134,7 +134,7 @@ def parse_excel_for_template(file_path: str) -> dict[str, Any]:
         ]
     }
     """
-    from utils.ai_client import create_ark_client, DOUBAO_MODEL
+    from utils.ai_client import create_ark_client, AI_MODEL, strip_thinking
     from prompts.scoring_prompts import TEMPLATE_PARSE_PROMPT
     import tempfile
     import os
@@ -146,17 +146,18 @@ def parse_excel_for_template(file_path: str) -> dict[str, Any]:
     prompt = TEMPLATE_PARSE_PROMPT.format(excel_content=excel_data["text"])
 
     # 调用 AI
-    client = create_ark_client(timeout=60.0)
+    client = create_ark_client(timeout=180.0)
     response = client.chat.completions.create(
-        model=DOUBAO_MODEL,
+        model=AI_MODEL,
         messages=[{"role": "user", "content": [{"type": "text", "text": prompt}]}],
         temperature=0.01
     )
 
     content = response.choices[0].message.content
 
-    # 提取 JSON
-    json_match = re.search(r'(\{[\s\S]*\})', content)
+    # 提取 JSON（先去除思考标签）
+    cleaned = strip_thinking(content)
+    json_match = re.search(r'(\{[\s\S]*\})', cleaned)
     if json_match:
         result = json.loads(json_match.group(1))
         return result
@@ -176,7 +177,7 @@ def parse_excel_for_contestants(file_path: str) -> dict[str, Any]:
         ]
     }
     """
-    from utils.ai_client import create_ark_client, DOUBAO_MODEL
+    from utils.ai_client import create_ark_client, AI_MODEL, strip_thinking
     from prompts.scoring_prompts import CONTESTANTS_PARSE_PROMPT
     import re
 
@@ -187,17 +188,18 @@ def parse_excel_for_contestants(file_path: str) -> dict[str, Any]:
     prompt = CONTESTANTS_PARSE_PROMPT.format(excel_content=excel_data["text"])
 
     # 调用 AI
-    client = create_ark_client(timeout=60.0)
+    client = create_ark_client(timeout=180.0)
     response = client.chat.completions.create(
-        model=DOUBAO_MODEL,
+        model=AI_MODEL,
         messages=[{"role": "user", "content": [{"type": "text", "text": prompt}]}],
         temperature=0.01
     )
 
     content = response.choices[0].message.content
 
-    # 提取 JSON
-    json_match = re.search(r'(\{[\s\S]*\})', content)
+    # 提取 JSON（先去除思考标签）
+    cleaned = strip_thinking(content)
+    json_match = re.search(r'(\{[\s\S]*\})', cleaned)
     if json_match:
         result = json.loads(json_match.group(1))
         return result
@@ -235,7 +237,7 @@ def fill_template_with_results(
     Returns:
         填充后的 Excel 文件二进制
     """
-    from utils.ai_client import create_ark_client, DOUBAO_MODEL
+    from utils.ai_client import create_ark_client, AI_MODEL, strip_thinking
     from prompts.scoring_prompts import TEMPLATE_FORMAT_ANALYSIS_PROMPT
     from openpyxl import load_workbook
     from openpyxl.styles import Font, Alignment, Border, Side
@@ -266,15 +268,16 @@ def fill_template_with_results(
 
     client = create_ark_client(timeout=120.0)
     response = client.chat.completions.create(
-        model=DOUBAO_MODEL,
+        model=AI_MODEL,
         messages=[{"role": "user", "content": [{"type": "text", "text": prompt}]}],
         temperature=0.01
     )
 
     content = response.choices[0].message.content
 
-    # 3. 解析 AI 返回的格式配置
-    json_match = re.search(r'(\{[\s\S]*\})', content)
+    # 3. 解析 AI 返回的格式配置（先去除思考标签）
+    cleaned = strip_thinking(content)
+    json_match = re.search(r'(\{[\s\S]*\})', cleaned)
     if not json_match:
         raise ValueError(f"AI 返回格式错误: {content[:200]}")
 

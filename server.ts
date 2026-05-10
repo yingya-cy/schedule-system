@@ -29,8 +29,10 @@ async function startServer() {
   const PORT = 3001;
   app.use(express.json({ limit: '10mb' }));
 
-  // 安全头
-  app.use(helmet());
+  // 安全头（开发环境禁用 CSP，否则会阻止 Vite 内联脚本和 HMR WebSocket）
+  app.use(helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+  }));
 
   // CORS：仅允许应用自身访问 API
   app.use(cors({

@@ -5,7 +5,7 @@ const BASE_URL = 'http://localhost:3001';
 async function login(page: Page) {
   await page.goto(`${BASE_URL}/login`);
   await page.waitForLoadState('networkidle');
-  await page.fill('input[placeholder="请输入用户名"]', 'admin');
+  await page.fill('input[placeholder="用户名或邮箱"]', 'admin');
   await page.fill('input[placeholder="请输入密码"]', 'admin123');
   await page.click('button[type="submit"]');
   await page.waitForURL((url: URL) => !url.pathname.includes('/login'));

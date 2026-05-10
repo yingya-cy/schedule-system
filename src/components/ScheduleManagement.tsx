@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Trash2, Edit, Eye, Users, Calendar, Loader2, Search, Filter } from 'lucide-react';
+import { Database, Trash2, Edit, Eye, Users, Calendar, Loader2, Search, Filter, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import ConfirmDialog from './ConfirmDialog';
+import MessageDialog from './MessageDialog';
 
 interface Schedule {
   id: number;
@@ -38,6 +40,8 @@ export default function ScheduleManagement() {
   const [filterDepartment, setFilterDepartment] = useState('');
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [msgDialog, setMsgDialog] = useState<{ open: boolean; type: 'success' | 'error' | 'info'; title: string; message?: string }>({ open: false, type: 'info', title: '' });
 
   useEffect(() => {
     fetchData();
@@ -63,30 +67,33 @@ export default function ScheduleManagement() {
       }
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      alert('加载数据失败，请重试');
+      setMsgDialog({ open: true, type: 'error', title: '加载失败', message: '请重试' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('确定要删除这个课表吗？')) return;
+  const handleDeleteClick = (id: number) => {
+    setDeleteTarget(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget;
+    setDeleteTarget(null);
 
     try {
-      const response = await fetch(`/api/schedules/${id}`, {
-        method: 'DELETE'
-      });
-
+      const response = await fetch(`/api/schedules/${id}`, { method: 'DELETE' });
       const result = await response.json();
       if (result.success) {
-        alert('删除成功');
+        setMsgDialog({ open: true, type: 'success', title: '删除成功' });
         fetchData();
       } else {
-        alert(`删除失败: ${result.error}`);
+        setMsgDialog({ open: true, type: 'error', title: '删除失败', message: result.error });
       }
     } catch (error) {
       console.error('Delete error:', error);
-      alert('删除失败，请重试');
+      setMsgDialog({ open: true, type: 'error', title: '删除失败', message: '请重试' });
     }
   };
 
@@ -99,11 +106,11 @@ export default function ScheduleManagement() {
         setSelectedSchedule(result.data);
         setShowDetailModal(true);
       } else {
-        alert(`加载详情失败: ${result.error}`);
+        setMsgDialog({ open: true, type: 'error', title: '加载详情失败', message: result.error });
       }
     } catch (error) {
       console.error('View detail error:', error);
-      alert('加载详情失败，请重试');
+      setMsgDialog({ open: true, type: 'error', title: '加载详情失败', message: '请重试' });
     }
   };
 
@@ -227,7 +234,7 @@ export default function ScheduleManagement() {
                     <Eye className="w-4 h-4 text-purple-600" />
                   </button>
                   <button
-                    onClick={() => handleDelete(schedule.id)}
+                    onClick={() => handleDeleteClick(schedule.id)}
                     className="p-2 hover:bg-red-100 rounded-lg transition-colors"
                     title="删除"
                   >
@@ -292,7 +299,7 @@ export default function ScheduleManagement() {
                   onClick={() => setShowDetailModal(false)}
                   className="p-2 hover:bg-stone-100 rounded-full transition-colors"
                 >
-                  <Trash2 className="w-5 h-5 text-stone-500" />
+                  <X className="w-5 h-5 text-stone-500" />
                 </button>
               </div>
 
@@ -364,6 +371,25 @@ export default function ScheduleManagement() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        title="确认删除"
+        message="确定要删除这个课表吗？此操作不可撤销。"
+        confirmText="删除"
+        cancelText="取消"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+        type="danger"
+      />
+
+      <MessageDialog
+        isOpen={msgDialog.open}
+        type={msgDialog.type}
+        title={msgDialog.title}
+        message={msgDialog.message}
+        onClose={() => setMsgDialog(p => ({ ...p, open: false }))}
+      />
     </div>
   );
 }

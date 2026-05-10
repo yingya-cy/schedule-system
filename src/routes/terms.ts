@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../config/database.ts';
 import { authenticate, requireRole } from '../middleware/auth.ts';
+import { RowDataPacket, ResultSetHeader } from '../utils/db-types';
 
 const router = Router();
 
@@ -10,7 +11,7 @@ router.get('/', authenticate, async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM terms ORDER BY sequence_number DESC');
     res.json({ success: true, data: rows });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -18,10 +19,10 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/current', async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT * FROM terms WHERE status = 'active' LIMIT 1");
-    const terms = rows as any[];
+    const terms = rows as RowDataPacket[];
     res.json({ success: true, data: terms[0] || null });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -34,14 +35,14 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
       return;
     }
     const [maxRow] = await pool.query('SELECT MAX(sequence_number) as maxSeq FROM terms');
-    const seq = ((maxRow as any[])[0].maxSeq || 0) + 1;
+    const seq = ((maxRow as RowDataPacket[])[0].maxSeq || 0) + 1;
     const [result] = await pool.query(
       'INSERT INTO terms (name, academic_year, semester, sequence_number) VALUES (?, ?, ?, ?)',
       [name, academic_year, semester, seq]
     );
-    res.json({ success: true, data: { id: (result as any).insertId } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -60,7 +61,7 @@ router.post('/transition', authenticate, requireRole('admin'), async (req, res) 
 
     // Archive current active term
     const [currentRows] = await conn.query("SELECT * FROM terms WHERE status = 'active' LIMIT 1");
-    const currentTerms = currentRows as any[];
+    const currentTerms = currentRows as RowDataPacket[];
     if (currentTerms.length > 0) {
       await conn.query("UPDATE terms SET status = 'archived' WHERE id = ?", [currentTerms[0].id]);
     }
@@ -72,7 +73,7 @@ router.post('/transition', authenticate, requireRole('admin'), async (req, res) 
       'INSERT INTO terms (name, academic_year, semester, sequence_number, status) VALUES (?, ?, ?, ?, ?)',
       [newName, academic_year, semester, newSeq, 'active']
     );
-    const newTermId = (result as any).insertId;
+    const newTermId = (result as ResultSetHeader).insertId;
 
     // Deactivate removed users
     if (remove_user_ids.length > 0) {
@@ -93,7 +94,7 @@ router.post('/transition', authenticate, requireRole('admin'), async (req, res) 
     });
   } catch (error: unknown) {
     await conn.rollback();
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   } finally {
     conn.release();
   }

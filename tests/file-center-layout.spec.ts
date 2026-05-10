@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 async function login(page: any) {
   await page.goto('http://localhost:3001/login');
-  await page.fill('input[placeholder="请输入用户名"]', 'admin');
+  await page.fill('input[placeholder="用户名或邮箱"]', 'admin');
   await page.fill('input[placeholder="请输入密码"]', 'admin123');
   await page.click('button[type="submit"]');
   await page.waitForURL('**/dashboard', { timeout: 10000 });

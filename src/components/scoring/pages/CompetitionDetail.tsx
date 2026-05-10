@@ -935,7 +935,7 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
                             return dim.subs.reduce((sum, sub) => sum + (contestantScores[sub.id] ?? 0), 0);
                           } else {
                             // 无子维度时，dimId 是字符串，scoreMap 的 key 也是字符串
-                            return contestantScores[dimId] ?? 0;
+                            return contestantScores[Number(dimId)] ?? 0;
                           }
                         });
                         const judgeGrandTotal = hasDetails ? judgeDimTotals.reduce((a, b) => a + b, 0) : totalScore;
@@ -971,7 +971,7 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
                                 ) : (
                                   /* 无子维度时，直接显示维度评分（无小计列） */
                                   (() => {
-                                    const score = contestantScores[dimId];
+                                    const score = contestantScores[Number(dimId)];
                                     const hasScore = score !== undefined && score > 0;
                                     return (
                                       <td className={`px-2 py-3 text-center text-sm border-l border-surface-container-high/50 ${

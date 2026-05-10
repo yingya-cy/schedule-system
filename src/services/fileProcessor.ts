@@ -15,7 +15,7 @@ export const detectPdfType = async (file: File): Promise<PdfType> => {
 };
 
 export const detectScheduleType = async (file: File): Promise<ScheduleType> => {
-  const img = new Image() as any;
+  const img = new Image();
   img.src = URL.createObjectURL(file);
   await new Promise((resolve) => {
     img.onload = resolve;
@@ -56,7 +56,7 @@ export const processImageFile = async (file: File, signal?: AbortSignal): Promis
       throw new Error(result.error || '图片识别未提取到课程数据');
     }
   } catch (error: unknown) {
-    if ((error as any).name === 'AbortError') {
+    if (error instanceof DOMException && error.name === 'AbortError') {
       return {
         filename: file.name,
         success: false,
@@ -100,7 +100,7 @@ export const processVerticalPdf = async (file: File, signal?: AbortSignal): Prom
       throw new Error(result.error || '竖型PDF解析未提取到课程数据');
     }
   } catch (error: unknown) {
-    if ((error as any).name === 'AbortError') {
+    if (error instanceof DOMException && error.name === 'AbortError') {
       return {
         filename: file.name,
         success: false,
@@ -164,7 +164,7 @@ export const processHorizontalPdf = async (file: File, signal?: AbortSignal): Pr
       throw new Error(aiResult.error || '横型PDFAI处理未提取到课程数据');
     }
   } catch (error: unknown) {
-    if ((error as any).name === 'AbortError') {
+    if (error instanceof DOMException && error.name === 'AbortError') {
       return {
         filename: file.name,
         success: false,

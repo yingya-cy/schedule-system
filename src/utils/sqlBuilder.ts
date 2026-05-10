@@ -4,6 +4,8 @@
 
 // SQL 参数支持的类型（mysql2 的 execute 方法接受这些类型）
 export type SqlValue = string | number | boolean | null | undefined | Buffer;
+/** SQL param without undefined — used for execute() call args */
+export type SqlParam = string | number | boolean | null | Buffer;
 
 /**
  * @deprecated 使用 SqlValue 代替
@@ -22,7 +24,7 @@ export function buildUpdateQuery(
   dto: Record<string, UpdateValue>,
   whereClause: string,
   whereParams: UpdateValue[]
-): { query: string; params: UpdateValue[] } {
+): { query: string; params: SqlParam[] } {
   const entries = Object.entries(dto).filter(([, v]) => v !== undefined);
 
   if (entries.length === 0) {
@@ -30,7 +32,7 @@ export function buildUpdateQuery(
   }
 
   const setClause = entries.map(([k]) => `${k} = ?`).join(', ');
-  const params = [...entries.map(([, v]) => v), ...whereParams] as UpdateValue[];
+  const params = [...entries.map(([, v]) => v), ...whereParams] as SqlParam[];
 
   return {
     query: `UPDATE ${table} SET ${setClause} WHERE ${whereClause}`,
@@ -47,11 +49,11 @@ export function buildUpdateQuery(
 export function buildInsertQuery(
   table: string,
   dto: Record<string, UpdateValue>
-): { query: string; params: UpdateValue[]; fields: string[]; placeholders: string[] } {
+): { query: string; params: SqlParam[]; fields: string[]; placeholders: string[] } {
   const entries = Object.entries(dto).filter(([, v]) => v !== undefined);
   const fields = entries.map(([k]) => k);
   const placeholders = entries.map(() => '?');
-  const params = entries.map(([, v]) => v) as UpdateValue[];
+  const params = entries.map(([, v]) => v) as SqlParam[];
 
   return {
     query: `INSERT INTO ${table} (${fields.join(', ')}) VALUES (${placeholders.join(', ')})`,

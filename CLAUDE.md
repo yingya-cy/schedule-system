@@ -125,3 +125,48 @@ npm run dev
 - `tdd-workflow` / `e2e-testing` / `frontend-design` / `frontend-patterns` / `backend-patterns`
 - `api-design` / `database-migrations` / `docker-patterns` / `deployment-patterns`
 - `security-review` / `search-first` / `coding-standards`
+
+## 组件拆分规则
+
+**阈值：** 单文件超过 500 行必须拆分，超过 300 行需要考虑拆分。
+
+**拆分策略：**
+
+| 提取内容 | 文件命名 | 说明 |
+|----------|----------|------|
+| 类型/接口 | `XxxTypes.ts` | 类型名前加领域前缀（如 `FileCenterFileItem`），避免与 `src/types.ts` 全局类型冲突 |
+| 工具函数/常量 | `XxxUtils.ts` 或 `.tsx` | 含 JSX 时用 `.tsx` 后缀 |
+| 子组件 | `XxxSubComponent.tsx` | 相对独立的 UI 块（如 Modal、列表项） |
+
+**命名冲突处理：** 当组件内部类型与 `src/types.ts` 全局类型同名时（如 `FileItem`），在组件目录内的类型文件里加领域前缀（`FileCenterFileItem`），不要直接复用全局类型名。历史教训：直接提取同名类型会导致其他文件 import 歧义，最终不得不还原。
+
+**拆分后必须验证：**
+1. `npx tsc --noEmit` — 类型检查
+2. 相应 Playwright E2E 测试 — 确保 UI 功能无回归
+
+## `as any` 禁止规则
+
+**原则：** 项目中禁止新增 `as any`。当前存量已清零（0 处），CR 时发现 `as any` 直接打回。
+
+**各类场景的标准替代：**
+
+| 场景 | ❌ 禁止 | ✅ 正确替代 |
+|------|---------|-------------|
+| DB 查询行 | `(rows as any[])` | `(rows as RowDataPacket[])` — import from `src/utils/db-types` |
+| DB INSERT/UPDATE 结果 | `(result as any).insertId` | `(result as ResultSetHeader).insertId` |
+| 异常信息 | `(e as any).message` | `e instanceof Error ? e.message : '未知错误'` |
+| MySQL 错误码 | `(error as any).code === 'ER_DUP_ENTRY'` | 用 `isDuplicateEntry(error)` — import from `src/utils/db-types` |
+| JWT 解码 | `jwt.verify(...) as any` | `typeof decoded !== 'string'` 窄化后用 `as unknown as TargetType` |
+| 前端 API body | `(body as any).extraField` | `Record<string, string>` 或定义局部 interface |
+| React state 清空 | `setState({ 0: undefined as any })` | `setState(prev => { const n = {...prev}; delete n[0]; return n })` |
+
+**DB 类型工具（`src/utils/db-types.ts`）：**
+```typescript
+import { RowDataPacket, ResultSetHeader, getErrorMessage, isDuplicateEntry } from '../utils/db-types';
+```
+- `RowDataPacket[]` — SELECT 查询行数组
+- `ResultSetHeader` — INSERT/UPDATE/DELETE 结果（有 `insertId`, `affectedRows`）
+- `getErrorMessage(e)` — 安全提取 `unknown` 错误消息
+- `isDuplicateEntry(e)` — 判断是否为 MySQL 唯一键冲突
+
+**项目已启用 `strict: true`**，类型检查会捕获大多数隐式 `any`。

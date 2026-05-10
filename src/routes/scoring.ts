@@ -8,6 +8,7 @@ import ExcelJS from 'exceljs';
 import { columnLetter } from '../utils/formatters.ts';
 import crypto from 'crypto';
 import judgeRouter from './scoring-judge.ts';
+import { RowDataPacket, ResultSetHeader } from '../utils/db-types';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -66,7 +67,7 @@ router.get('/templates/:id', async (req, res) => {
       'SELECT * FROM scoring_templates WHERE id = ?',
       [req.params.id]
     );
-    if ((templates as any[]).length === 0) {
+    if ((templates as RowDataPacket[]).length === 0) {
       return res.status(404).json({ success: false, error: 'Template not found' });
     }
 
@@ -76,7 +77,7 @@ router.get('/templates/:id', async (req, res) => {
     );
 
     const dimensionsWithSubs = await Promise.all(
-      (dimensions as any[]).map(async (dim: any) => {
+      (dimensions as RowDataPacket[]).map(async (dim: RowDataPacket) => {
         const [subs] = await pool.query(
           'SELECT * FROM scoring_subdimensions WHERE dimension_id = ? ORDER BY sort_order',
           [dim.id]
@@ -87,7 +88,7 @@ router.get('/templates/:id', async (req, res) => {
 
     res.json({
       success: true,
-      data: { ...(templates as any[])[0], dimensions: dimensionsWithSubs }
+      data: { ...(templates as RowDataPacket[])[0], dimensions: dimensionsWithSubs }
     });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: (error as Error).message });
@@ -107,7 +108,7 @@ router.post('/templates', requireRole('admin'), async (req, res) => {
       'INSERT INTO scoring_templates (name, description, total_score, category) VALUES (?, ?, ?, ?)',
       [name, description || '', total_score || 100, category || 'general']
     );
-    const templateId = (result as any).insertId;
+    const templateId = (result as ResultSetHeader).insertId;
 
     if (dimensions && dimensions.length > 0) {
       for (let i = 0; i < dimensions.length; i++) {
@@ -116,7 +117,7 @@ router.post('/templates', requireRole('admin'), async (req, res) => {
           'INSERT INTO scoring_dimensions (template_id, name, max_score, sort_order, is_optional, description) VALUES (?, ?, ?, ?, ?, ?)',
           [templateId, dim.name, dim.max_score, i, dim.is_optional ? 1 : 0, dim.description || '']
         );
-        const dimensionId = (dimResult as any).insertId;
+        const dimensionId = (dimResult as ResultSetHeader).insertId;
 
         if (dim.subdimensions && dim.subdimensions.length > 0) {
           for (let j = 0; j < dim.subdimensions.length; j++) {
@@ -168,7 +169,7 @@ router.put('/templates/:id', requireRole('admin'), async (req, res) => {
           'INSERT INTO scoring_dimensions (template_id, name, max_score, sort_order, is_optional, description) VALUES (?, ?, ?, ?, ?, ?)',
           [req.params.id, dim.name, dim.max_score, i, dim.is_optional ? 1 : 0, dim.description || '']
         );
-        const dimensionId = (dimResult as any).insertId;
+        const dimensionId = (dimResult as ResultSetHeader).insertId;
 
         if (dim.subdimensions && dim.subdimensions.length > 0) {
           for (let j = 0; j < dim.subdimensions.length; j++) {
@@ -235,11 +236,11 @@ router.get('/competitions/:id', async (req, res) => {
        WHERE c.id = ?`,
       [req.params.id]
     );
-    if ((competitions as any[]).length === 0) {
+    if ((competitions as RowDataPacket[]).length === 0) {
       return res.status(404).json({ success: false, error: 'Competition not found' });
     }
 
-    const competition = (competitions as any[])[0];
+    const competition = (competitions as RowDataPacket[])[0];
 
     // 获取选手列表
     const [contestants] = await pool.query(
@@ -258,7 +259,7 @@ router.get('/competitions/:id', async (req, res) => {
       'SELECT * FROM scoring_templates WHERE id = ?',
       [competition.template_id]
     );
-    const template = (templateRows as any[])[0];
+    const template = (templateRows as RowDataPacket[])[0];
 
     if (template) {
       const [dimensions] = await pool.query(
@@ -266,7 +267,7 @@ router.get('/competitions/:id', async (req, res) => {
         [template.id]
       );
       const dimensionsWithSubs = await Promise.all(
-        (dimensions as any[]).map(async (dim: any) => {
+        (dimensions as RowDataPacket[]).map(async (dim: RowDataPacket) => {
           const [subs] = await pool.query(
             'SELECT * FROM scoring_subdimensions WHERE dimension_id = ? ORDER BY sort_order',
             [dim.id]
@@ -295,7 +296,7 @@ router.post('/competitions', requireRole('admin'), async (req, res) => {
       'INSERT INTO competitions (name, description, template_id, judging_mode) VALUES (?, ?, ?, ?)',
       [name, description || '', template_id, judging_mode || 'offline']
     );
-    res.json({ success: true, data: { id: (result as any).insertId } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: (error as Error).message });
   }
@@ -365,7 +366,7 @@ router.post('/competitions/:id/contestants', requireRole('admin'), async (req, r
       'INSERT INTO contestants (competition_id, number, name, group_name, description, extra_data) VALUES (?, ?, ?, ?, ?, ?)',
       [req.params.id, number || '', name, group_name || '', description || '', extra_data || null]
     );
-    res.json({ success: true, data: { id: (result as any).insertId } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: (error as Error).message });
   }
@@ -392,7 +393,7 @@ router.post('/competitions/:id/contestants/import', requireRole('admin'), async 
         'INSERT INTO contestants (competition_id, number, name, work_name, group_name, description, extra_data) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [req.params.id, c.number || '', name, workName || null, c.group_name || '', c.description || '', c.extra_data || null]
       );
-      insertedIds.push((result as any).insertId);
+      insertedIds.push((result as ResultSetHeader).insertId);
     }
 
     await connection.commit();
@@ -466,7 +467,7 @@ router.post('/competitions/:id/judges', requireRole('admin'), async (req, res) =
       'INSERT INTO judges (name, code, competition_id, user_id) VALUES (?, ?, ?, ?)',
       [name, code, req.params.id, user_id || null]
     );
-    res.json({ success: true, data: { id: (result as any).insertId } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: (error as Error).message });
   }
@@ -490,7 +491,7 @@ router.post('/competitions/:id/judges/import', requireRole('admin'), async (req,
         'INSERT INTO judges (name, code, competition_id) VALUES (?, ?, ?)',
         [name.trim(), code, req.params.id]
       );
-      insertedIds.push((result as any).insertId);
+      insertedIds.push((result as ResultSetHeader).insertId);
     }
     await connection.commit();
     res.json({ success: true, data: { inserted: insertedIds.length, ids: insertedIds } });
@@ -543,29 +544,59 @@ router.post('/competitions/:id/calculate', requireRole('admin'), async (req, res
       [competitionId]
     );
 
+    // Batch: fetch all scores for all contestants in one query (避免 N+1)
+    const contestantIds = (contestants as RowDataPacket[]).map(c => c.id);
+    const [allScores] = contestantIds.length > 0
+      ? await connection.query<RowDataPacket[]>(
+          `SELECT s.*, j.name as judge_name
+           FROM scores s
+           LEFT JOIN judges j ON s.judge_id = j.id
+           WHERE s.contestant_id IN (?) AND s.is_valid = 1`,
+          [contestantIds]
+        )
+      : [[]];
+
+    // Batch: fetch all score_details for all scores in one query
+    const scoreIds = (allScores as RowDataPacket[]).map(s => s.id);
+    const [allDetails] = scoreIds.length > 0
+      ? await connection.query<RowDataPacket[]>(
+          `SELECT sd.score_id, sd2.name, sd2.dimension_id, d.name as dimension_name, sd.score
+           FROM score_details sd
+           LEFT JOIN scoring_subdimensions sd2 ON sd.subdimension_id = sd2.id
+           LEFT JOIN scoring_dimensions d ON sd2.dimension_id = d.id
+           WHERE sd.score_id IN (?)`,
+          [scoreIds]
+        )
+      : [[]];
+
+    // Group scores by contestant
+    const scoresByContestant: Record<number, RowDataPacket[]> = {};
+    for (const s of allScores as RowDataPacket[]) {
+      if (!scoresByContestant[s.contestant_id]) scoresByContestant[s.contestant_id] = [];
+      scoresByContestant[s.contestant_id].push(s);
+    }
+    // Group details by score
+    const detailsByScore: Record<number, RowDataPacket[]> = {};
+    for (const d of allDetails as RowDataPacket[]) {
+      if (!detailsByScore[d.score_id]) detailsByScore[d.score_id] = [];
+      detailsByScore[d.score_id].push(d);
+    }
+
     const results: any[] = [];
-    for (const contestant of contestants as any[]) {
-      // 获取所有有效评分
-      const [scores] = await connection.query(
-        `SELECT s.*, j.name as judge_name
-         FROM scores s
-         LEFT JOIN judges j ON s.judge_id = j.id
-         WHERE s.contestant_id = ? AND s.is_valid = 1`,
-        [contestant.id]
-      );
+    for (const contestant of contestants as RowDataPacket[]) {
+      const scores = scoresByContestant[contestant.id] || [];
+      if (scores.length === 0) continue;
 
-      if ((scores as any[]).length === 0) continue;
-
-      const totalScore = (scores as any[]).reduce(
-        (sum: number, s: any) => sum + parseFloat(s.total_score || 0),
+      const totalScore = scores.reduce(
+        (sum: number, s: RowDataPacket) => sum + parseFloat(s.total_score || 0),
         0
       );
-      const avgScore = totalScore / (scores as any[]).length;
+      const avgScore = totalScore / scores.length;
 
       // 去掉一个最高分和一个最低分（至少需要3个评分才有效）
       let finalScore = avgScore;
-      if ((scores as any[]).length >= 3) {
-        const sortedScores = (scores as any[])
+      if (scores.length >= 3) {
+        const sortedScores = scores
           .map(s => parseFloat(s.total_score || 0))
           .sort((a, b) => a - b);
         const count = sortedScores.length;
@@ -575,34 +606,27 @@ router.post('/competitions/:id/calculate', requireRole('admin'), async (req, res
 
       // 计算各维度平均分
       const avgScores: Record<string, number> = {};
-      for (const score of scores as any[]) {
-        const [details] = await connection.query(
-          `SELECT sd2.name, sd2.dimension_id, d.name as dimension_name, sd.score
-           FROM score_details sd
-           LEFT JOIN scoring_subdimensions sd2 ON sd.subdimension_id = sd2.id
-           LEFT JOIN scoring_dimensions d ON sd2.dimension_id = d.id
-           WHERE sd.score_id = ?`,
-          [score.id]
-        );
-        for (const d of details as any[]) {
+      for (const score of scores) {
+        const details = detailsByScore[score.id] || [];
+        for (const d of details) {
           if (!avgScores[d.dimension_name]) {
             avgScores[d.dimension_name] = 0;
           }
-          avgScores[d.dimension_name] += parseFloat(d.score || 0) / (scores as any[]).length;
+          avgScores[d.dimension_name] += parseFloat(d.score || 0) / scores.length;
         }
       }
 
       const [resultInsert] = await connection.query(
         'INSERT INTO competition_results (competition_id, contestant_id, total_score, final_score, score_count, avg_scores) VALUES (?, ?, ?, ?, ?, ?)',
-        [competitionId, contestant.id, avgScore, finalScore, (scores as any[]).length, JSON.stringify(avgScores)]
+        [competitionId, contestant.id, avgScore, finalScore, (scores as RowDataPacket[]).length, JSON.stringify(avgScores)]
       );
 
       results.push({
-        id: (resultInsert as any).insertId,
+        id: (resultInsert as ResultSetHeader).insertId,
         contestant,
         total_score: avgScore,
         final_score: finalScore,
-        score_count: (scores as any[]).length
+        score_count: (scores as RowDataPacket[]).length
       });
     }
 
@@ -679,7 +703,7 @@ router.get('/competitions/:id/score-details', async (req, res) => {
       'SELECT c.*, t.name as template_name FROM competitions c LEFT JOIN scoring_templates t ON c.template_id = t.id WHERE c.id = ?',
       [competitionId]
     );
-    const competition = (compRows as any[])[0];
+    const competition = (compRows as RowDataPacket[])[0];
     if (!competition) {
       res.status(404).json({ success: false, error: 'Competition not found' });
       return;
@@ -698,7 +722,7 @@ router.get('/competitions/:id/score-details', async (req, res) => {
 
     // 按维度分组
     const dimensionGroups: Record<number, { name: string; max: number; subs: { id: number; name: string; max: number }[] }> = {};
-    for (const row of dimRows as any[]) {
+    for (const row of dimRows as RowDataPacket[]) {
       if (!dimensionGroups[row.dim_id]) {
         dimensionGroups[row.dim_id] = { name: row.dim_name, max: parseFloat(row.dim_max || 0), subs: [] };
       }
@@ -733,7 +757,7 @@ router.get('/competitions/:id/score-details', async (req, res) => {
     const scoreMap: Record<number, Record<number, Record<number, number>>> = {};
     // 存储总分: contestant -> judge -> total_score
     const totalScoreMap: Record<number, Record<number, number>> = {};
-    for (const s of scoreRows as any[]) {
+    for (const s of scoreRows as RowDataPacket[]) {
       if (!scoreMap[s.contestant_id]) scoreMap[s.contestant_id] = {};
       if (!scoreMap[s.contestant_id][s.judge_id]) scoreMap[s.contestant_id][s.judge_id] = {};
       if (!totalScoreMap[s.contestant_id]) totalScoreMap[s.contestant_id] = {};
@@ -801,7 +825,7 @@ router.get('/competitions/:id/export', async (req, res) => {
     const exportType = (req.query.type as string) || 'summary';
 
     const [compRows] = await pool.query('SELECT * FROM competitions WHERE id = ?', [competitionId]);
-    const competition = (compRows as any[])[0];
+    const competition = (compRows as RowDataPacket[])[0];
     if (!competition) { res.status(404).json({ success: false, error: '比赛不存在' }); return; }
 
     const [dimRows] = await pool.query(
@@ -810,7 +834,7 @@ router.get('/competitions/:id/export', async (req, res) => {
     );
     const dimensions: { id: number; name: string; max_score: number; description: string | null; subs: { id: number; name: string; max_score: number; description: string | null }[] }[] = [];
     const dimMap = new Map<number, typeof dimensions[number]>();
-    for (const r of dimRows as any[]) {
+    for (const r of dimRows as RowDataPacket[]) {
       if (!dimMap.has(r.id)) {
         dimMap.set(r.id, { id: r.id, name: r.name, max_score: r.max_score, description: r.description || null, subs: [] });
         dimensions.push(dimMap.get(r.id)!);
@@ -822,12 +846,12 @@ router.get('/competitions/:id/export', async (req, res) => {
     const [contestantRows] = await pool.query(
       'SELECT id, number, name, group_name FROM contestants WHERE competition_id = ? ORDER BY number, id', [competitionId]
     );
-    const contestants = contestantRows as any[];
+    const contestants = contestantRows as RowDataPacket[];
 
     const [judgeRows] = await pool.query(
       'SELECT id, name FROM judges WHERE competition_id = ? ORDER BY name', [competitionId]
     );
-    const judges = judgeRows as any[];
+    const judges = judgeRows as RowDataPacket[];
 
     // Style helpers
     const thin: Partial<ExcelJS.Border> = { style: 'thin' };
@@ -856,7 +880,7 @@ router.get('/competitions/:id/export', async (req, res) => {
         [competitionId]
       );
       const scoreMap: Record<number, Record<number, Record<number, number>>> = {};
-      for (const r of detailRows as any[]) {
+      for (const r of detailRows as RowDataPacket[]) {
         if (!scoreMap[r.contestant_id]) scoreMap[r.contestant_id] = {};
         if (!scoreMap[r.contestant_id][r.judge_id]) scoreMap[r.contestant_id][r.judge_id] = {};
         scoreMap[r.contestant_id][r.judge_id][r.subdimension_id] = Number(r.score);
@@ -1011,7 +1035,7 @@ router.get('/competitions/:id/export', async (req, res) => {
         'SELECT contestant_id, judge_id, total_score FROM scores WHERE competition_id = ?', [competitionId]
       );
       const totalMap: Record<number, Record<number, number>> = {};
-      for (const r of scoreRows as any[]) {
+      for (const r of scoreRows as RowDataPacket[]) {
         if (!totalMap[r.contestant_id]) totalMap[r.contestant_id] = {};
         totalMap[r.contestant_id][r.judge_id] = Number(r.total_score);
       }
@@ -1019,7 +1043,7 @@ router.get('/competitions/:id/export', async (req, res) => {
         'SELECT contestant_id, avg_scores, `rank` FROM competition_results WHERE competition_id = ?', [competitionId]
       );
       const resultMap = new Map<number, { rank: number }>();
-      for (const r of resultRows as any[]) {
+      for (const r of resultRows as RowDataPacket[]) {
         resultMap.set(r.contestant_id, { rank: r.rank });
       }
 
@@ -1154,7 +1178,7 @@ router.get('/competitions/:id/live-results', async (req, res) => {
       'SELECT * FROM competitions WHERE id = ?',
       [req.params.id]
     );
-    const competition = (competitionRows as any[])[0];
+    const competition = (competitionRows as RowDataPacket[])[0];
 
     const [results] = await pool.query(
       `SELECT cr.*, c.number, c.name as contestant_name, c.group_name

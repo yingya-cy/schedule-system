@@ -157,4 +157,70 @@ describe('User CRUD (admin)', () => {
       .expect(401);
     expect(res.body.success).toBe(false);
   });
+
+  it('PUT /api/auth/users/:id/reset-password returns 400 for short password', async () => {
+    const res = await supertest(app)
+      .put('/api/auth/users/99999/reset-password')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ newPassword: '12' })
+      .expect(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('PUT /api/auth/users/:id/reset-password returns 404 for nonexistent user', async () => {
+    const res = await supertest(app)
+      .put('/api/auth/users/99999/reset-password')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ newPassword: 'newpass123' })
+      .expect(404);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('DELETE /api/auth/users/:id returns 404 for nonexistent user', async () => {
+    const res = await supertest(app)
+      .delete('/api/auth/users/99999')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe('Registration and email verification', () => {
+  it('POST /api/auth/register creates a user', async () => {
+    const uniqueId = Date.now();
+    const res = await supertest(app)
+      .post('/api/auth/register')
+      .send({ username: `reg${uniqueId}`, name: 'Test User', password: 'test123456', email: `reg${uniqueId}@example.com` });
+    expect(res.body).toHaveProperty('success');
+  });
+
+  it('GET /api/auth/verify-email returns 400 without token', async () => {
+    const res = await supertest(app)
+      .get('/api/auth/verify-email')
+      .expect(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('GET /api/auth/verify-email returns 400 for invalid token', async () => {
+    const res = await supertest(app)
+      .get('/api/auth/verify-email?token=invalid-token-123')
+      .expect(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('POST /api/auth/verify-email/resend returns 400 without email', async () => {
+    const res = await supertest(app)
+      .post('/api/auth/verify-email/resend')
+      .send({})
+      .expect(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('POST /api/auth/verify-email/resend returns 400 for unregistered email', async () => {
+    const res = await supertest(app)
+      .post('/api/auth/verify-email/resend')
+      .send({ email: 'noexist@test.com' })
+      .expect(400);
+    expect(res.body.success).toBe(false);
+  });
 });

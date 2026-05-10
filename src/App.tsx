@@ -15,7 +15,7 @@ const ScheduleView = lazy(() => import('./components/views/ScheduleView'));
 const ChatView = lazy(() => import('./components/views/ChatView'));
 const ScoringDashboard = lazy(() => import('./components/scoring'));
 const UserManagementView = lazy(() => import('./components/views/UserManagementView'));
-const FileCenterView = lazy(() => import('./components/views/FileCenterView'));
+const FileCenterView = lazy(() => import('./components/views/FileCenter/FileCenterView'));
 
 function AppContent() {
   const refreshDepartments = useAppStore((s) => s.refreshDepartments);

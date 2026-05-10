@@ -2,18 +2,11 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Download, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
-
-interface FileItem {
-  id: number;
-  original_filename: string;
-  oss_object_key: string | null;
-  mime_type: string | null;
-  oss_url: string | null;
-}
+import { FileCenterFileItem } from './FileCenter/FileCenterTypes';
 
 interface Props {
   isOpen: boolean;
-  file: FileItem | null;
+  file: FileCenterFileItem | null;
   onClose: () => void;
 }
 
@@ -86,8 +79,8 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
           setDisplayUrl(json.data.downloadUrl);
           setDownloadUrl(json.data.downloadUrl);
         }
-      } catch (e: any) {
-        setError(e.message || '加载失败');
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : '加载失败');
       } finally {
         setLoading(false);
       }
@@ -109,7 +102,7 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
 
     switch (previewType) {
       case 'image':
-        return <img src={displayUrl} alt={file.original_filename} className="max-w-full max-h-[70vh] object-contain rounded-lg" />;
+        return <img src={displayUrl} alt={file?.original_filename} className="max-w-full max-h-[70vh] object-contain rounded-lg" />;
       case 'video':
         return <video src={displayUrl} controls className="max-w-full max-h-[70vh] rounded-lg" />;
       case 'pdf':

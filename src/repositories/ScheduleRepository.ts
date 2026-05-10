@@ -2,6 +2,7 @@ import pool from '../config/database';
 import { Schedule, Course } from '../types/database';
 import { CreateScheduleDto, CreateCourseDto, UpdateScheduleDto, UpdateCourseDto } from '../types/database';
 import { buildInsertQuery, buildUpdateQuery, getInsertId, getAffectedRows } from '../utils/sqlBuilder';
+import { RowDataPacket } from '../utils/db-types';
 
 export class ScheduleRepository {
   // ==================== Schedule Operations ====================
@@ -64,10 +65,10 @@ export class ScheduleRepository {
       await connection.beginTransaction();
 
       // Default to active term
-      let termId = (dto as any).term_id;
+      let termId = (dto as CreateScheduleDto & { term_id?: number }).term_id;
       if (!termId) {
         const [terms] = await connection.query("SELECT id FROM terms WHERE status = 'active' LIMIT 1");
-        termId = (terms as any[])[0]?.id;
+        termId = (terms as RowDataPacket[])[0]?.id;
       }
 
       const scheduleInsert = {

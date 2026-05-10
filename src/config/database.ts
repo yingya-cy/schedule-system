@@ -1,5 +1,6 @@
 import mysql from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
+import { RowDataPacket } from '../utils/db-types';
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
@@ -30,7 +31,8 @@ const pool = mysql.createPool(dbConfig);
 // ✅ 每次获取连接时强制设置 utf8mb4
 pool.on('connection', (connection) => {
   // connection.promise() returns a promisified connection wrapper (mysql2)
-  (connection as any).promise().query('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci').catch(() => {});
+  // @ts-expect-error mysql2 types missing promise() on PoolConnection
+  connection.promise().query('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci').catch(() => {});
 });
 
 /**
@@ -47,7 +49,7 @@ async function ensureIndex(
       `SHOW INDEX FROM ${table} WHERE Key_name = ?`,
       [indexName]
     );
-    if ((rows as any[]).length === 0) {
+    if ((rows as RowDataPacket[]).length === 0) {
       await connection.query(`CREATE INDEX ${indexName} ON ${table} ${indexColumns}`);
       console.log(`✅ Created index ${indexName} on ${table}`);
     }
@@ -70,11 +72,10 @@ export async function testConnection() {
 }
 
 export async function initializeDatabase() {
-  let connection = null;
+  let connection: mysql.PoolConnection | null = null;
   try {
     // 首先创建一个没有指定数据库的连接来创建数据库
-    const tempConfig = { ...dbConfig };
-    delete tempConfig.database; // 移除数据库名称，创建通用连接
+    const { database: _db, ...tempConfig } = dbConfig;
 
     const tempPool = mysql.createPool(tempConfig);
     const adminConnection = await tempPool.getConnection();
@@ -143,24 +144,24 @@ export async function initializeDatabase() {
 
     // 检查并添加新字段（如果不存在）
     try {
-      const checkAndAddColumn = async (columnName: string, columnDefinition: string) => {
-        const [columns] = await connection.query(`SHOW COLUMNS FROM schedules LIKE "${columnName}"`);
-        if ((columns as any[]).length === 0) {
-          await connection.query(`ALTER TABLE schedules ADD COLUMN ${columnName} ${columnDefinition}`);
+      const checkAndAddColumn = async (conn: mysql.PoolConnection, columnName: string, columnDefinition: string) => {
+        const [columns] = await conn.query(`SHOW COLUMNS FROM schedules LIKE "${columnName}"`);
+        if ((columns as RowDataPacket[]).length === 0) {
+          await conn.query(`ALTER TABLE schedules ADD COLUMN ${columnName} ${columnDefinition}`);
           console.log(`✅ Added ${columnName} column to schedules table`);
         }
       };
 
-      await checkAndAddColumn('file_data', 'LONGBLOB');
-      await checkAndAddColumn('file_type', 'VARCHAR(100)');
-      await checkAndAddColumn('storage_type', "ENUM('database', 'filesystem', 'object_storage') DEFAULT 'database'");
-      await checkAndAddColumn('file_path', 'VARCHAR(500)');
-      await checkAndAddColumn('file_size', 'BIGINT DEFAULT 0');
-      await checkAndAddColumn('file_hash', 'VARCHAR(64)');
-      await checkAndAddColumn('created_by', 'VARCHAR(100)');
-      await checkAndAddColumn('email_verify_token', 'VARCHAR(64)');
-      await checkAndAddColumn('email_verify_token_expires', 'TIMESTAMP NULL DEFAULT NULL');
-      await checkAndAddColumn('email_verified_at', 'TIMESTAMP NULL DEFAULT NULL');
+      await checkAndAddColumn(connection, 'file_data', 'LONGBLOB');
+      await checkAndAddColumn(connection, 'file_type', 'VARCHAR(100)');
+      await checkAndAddColumn(connection, 'storage_type', "ENUM('database', 'filesystem', 'object_storage') DEFAULT 'database'");
+      await checkAndAddColumn(connection, 'file_path', 'VARCHAR(500)');
+      await checkAndAddColumn(connection, 'file_size', 'BIGINT DEFAULT 0');
+      await checkAndAddColumn(connection, 'file_hash', 'VARCHAR(64)');
+      await checkAndAddColumn(connection, 'created_by', 'VARCHAR(100)');
+      await checkAndAddColumn(connection, 'email_verify_token', 'VARCHAR(64)');
+      await checkAndAddColumn(connection, 'email_verify_token_expires', 'TIMESTAMP NULL DEFAULT NULL');
+      await checkAndAddColumn(connection, 'email_verified_at', 'TIMESTAMP NULL DEFAULT NULL');
 
     } catch (alterError) {
       console.log('ℹ️  Column check/add note:', (alterError as Error).message);
@@ -191,7 +192,7 @@ export async function initializeDatabase() {
 
     // 检查部门表中是否有数据，如果没有则插入默认部门
     const [deptRows] = await connection.query('SELECT COUNT(*) as count FROM departments');
-    const deptCount = (deptRows as any)[0].count;
+    const deptCount = (deptRows as RowDataPacket[])[0].count;
 
     if (deptCount === 0) {
       await connection.query(`
@@ -244,7 +245,7 @@ export async function initializeDatabase() {
     // 检查并添加 scoring_dimensions 表的新字段（如果不存在）
     try {
       const [descColumns] = await connection.query(`SHOW COLUMNS FROM scoring_dimensions LIKE "description"`);
-      if ((descColumns as any[]).length === 0) {
+      if ((descColumns as RowDataPacket[]).length === 0) {
         await connection.query(`ALTER TABLE scoring_dimensions ADD COLUMN description TEXT`);
         console.log('✅ Added description column to scoring_dimensions table');
       }
@@ -308,7 +309,7 @@ export async function initializeDatabase() {
     // 检查并添加 contestants 表的新字段（如果不存在）
     try {
       const [workNameColumns] = await connection.query(`SHOW COLUMNS FROM contestants LIKE "work_name"`);
-      if ((workNameColumns as any[]).length === 0) {
+      if ((workNameColumns as RowDataPacket[]).length === 0) {
         await connection.query(`ALTER TABLE contestants ADD COLUMN work_name VARCHAR(500)`);
         console.log('✅ Added work_name column to contestants table');
       }
@@ -334,7 +335,7 @@ export async function initializeDatabase() {
     // 检查并添加 judges 表的 user_id 字段（兼容已有数据）
     try {
       const [userIdColumns] = await connection.query(`SHOW COLUMNS FROM judges LIKE "user_id"`);
-      if ((userIdColumns as any[]).length === 0) {
+      if ((userIdColumns as RowDataPacket[]).length === 0) {
         await connection.query(`ALTER TABLE judges ADD COLUMN user_id INT DEFAULT NULL`);
         console.log('✅ Added user_id column to judges table');
       }
@@ -380,14 +381,14 @@ export async function initializeDatabase() {
     // 检查并添加 score_details 表的新字段（如果不存在）
     try {
       const [dimColumns] = await connection.query(`SHOW COLUMNS FROM score_details LIKE "dimension_id"`);
-      if ((dimColumns as any[]).length === 0) {
+      if ((dimColumns as RowDataPacket[]).length === 0) {
         await connection.query(`ALTER TABLE score_details ADD COLUMN dimension_id INT DEFAULT NULL`);
         console.log('✅ Added dimension_id column to score_details table');
       }
       // 修改 subdimension_id 为允许 NULL（支持主维度评分）
       // 注意：如果表已存在且 subdimension_id 是 NOT NULL，需要先修改为 NULL 才能插入只有 dimension_id 的记录
       const [subColumns] = await connection.query(`SHOW COLUMNS FROM score_details LIKE "subdimension_id"`);
-      if ((subColumns as any[]).length > 0 && (subColumns as any[])[0].Null === 'NO') {
+      if ((subColumns as RowDataPacket[]).length > 0 && (subColumns as RowDataPacket[])[0].Null === 'NO') {
         await connection.query(`ALTER TABLE score_details MODIFY subdimension_id INT NULL`);
         console.log('✅ Modified subdimension_id to allow NULL');
       }
@@ -416,7 +417,7 @@ export async function initializeDatabase() {
     // 检查并添加 competition_results 表的新字段（如果不存在）
     try {
       const [columns] = await connection.query(`SHOW COLUMNS FROM competition_results LIKE "final_score"`);
-      if ((columns as any[]).length === 0) {
+      if ((columns as RowDataPacket[]).length === 0) {
         await connection.query(`ALTER TABLE competition_results ADD COLUMN final_score DECIMAL(10,2) AFTER total_score`);
       }
     } catch (err) {
@@ -452,7 +453,7 @@ export async function initializeDatabase() {
       'SELECT COUNT(*) as count FROM users WHERE role = ?',
       ['admin']
     );
-    const adminCount = (adminRows as any)[0].count;
+    const adminCount = (adminRows as RowDataPacket[])[0].count;
     if (adminCount === 0) {
       const defaultHash = await bcrypt.hash('admin123', 10);
       await connection.query(
@@ -527,13 +528,13 @@ export async function initializeDatabase() {
     // 添加 file_items 表与课表中心的关联字段
     try {
       const [scheduleIdCols] = await connection.query(`SHOW COLUMNS FROM file_items LIKE "schedule_id"`);
-      if ((scheduleIdCols as any[]).length === 0) {
+      if ((scheduleIdCols as RowDataPacket[]).length === 0) {
         await connection.query(`ALTER TABLE file_items ADD COLUMN schedule_id INT DEFAULT NULL`);
         await connection.query(`ALTER TABLE file_items ADD INDEX idx_schedule_id (schedule_id)`);
         console.log('✅ Added schedule_id column to file_items table');
       }
-    } catch (e: any) {
-      console.log('ℹ️  schedule_id column note:', e.message);
+    } catch (e: unknown) {
+      console.log('ℹ️  schedule_id column note:', e instanceof Error ? e.message : String(e));
     }
 
     await connection.query(`
@@ -589,7 +590,7 @@ export async function initializeDatabase() {
     // =============================================
     // 迁移：清理 file_permissions 表
     // =============================================
-    try { await connection.query('DROP TABLE IF EXISTS file_permissions'); } catch (e: any) {}
+    try { await connection.query('DROP TABLE IF EXISTS file_permissions'); } catch (e: unknown) {}
 
     // =============================================
     // 迁移：添加 term_id 到已有表
@@ -598,11 +599,11 @@ export async function initializeDatabase() {
     for (const table of tablesForTermId) {
       try {
         const [cols] = await connection.query(`SHOW COLUMNS FROM ${table} LIKE 'term_id'`);
-        if ((cols as any[]).length === 0) {
+        if ((cols as RowDataPacket[]).length === 0) {
           await connection.query(`ALTER TABLE ${table} ADD COLUMN term_id INT, ADD INDEX idx_term_id (term_id)`);
           console.log(`✅ Added term_id to ${table}`);
         }
-      } catch (e: any) { console.log(`ℹ️  term_id on ${table}:`, e.message); }
+      } catch (e: unknown) { console.log(`ℹ️  term_id on ${table}:`, e instanceof Error ? e.message : String(e)); }
     }
 
     // =============================================
@@ -610,25 +611,25 @@ export async function initializeDatabase() {
     // =============================================
     try {
       await connection.query("ALTER TABLE users MODIFY COLUMN role ENUM('admin','teacher','student','department_head') DEFAULT 'teacher'");
-    } catch (e: any) { /* already includes department_head */ }
+    } catch (e: unknown) { /* already includes department_head */ }
 
     // =============================================
     // 迁移：创建默认届（若无）
     // =============================================
     try {
       const [termRows] = await connection.query('SELECT COUNT(*) as cnt FROM terms');
-      if ((termRows as any[])[0].cnt === 0) {
+      if ((termRows as RowDataPacket[])[0].cnt === 0) {
         await connection.query(
           "INSERT INTO terms (name, academic_year, semester, sequence_number, status) VALUES ('2024秋·第1届', '2024-2025', '秋', 1, 'active')"
         );
         const [t] = await connection.query('SELECT id FROM terms WHERE sequence_number = 1');
-        const termId = (t as any[])[0].id;
+        const termId = (t as RowDataPacket[])[0].id;
         for (const table of ['schedules', 'file_activities', 'competitions']) {
-          try { await connection.query(`UPDATE ${table} SET term_id = ? WHERE term_id IS NULL`, [termId]); } catch (e: any) {}
+          try { await connection.query(`UPDATE ${table} SET term_id = ? WHERE term_id IS NULL`, [termId]); } catch (e: unknown) {}
         }
         console.log('✅ Default term created (2024秋·第1届)');
       }
-    } catch (e: any) { console.log('ℹ️  Default term:', e.message); }
+    } catch (e: unknown) { console.log('ℹ️  Default term:', e instanceof Error ? e.message : String(e)); }
 
     connection.release();
     console.log('✅ Database initialized successfully');

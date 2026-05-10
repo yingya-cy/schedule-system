@@ -96,8 +96,8 @@ export default function UserManagementView() {
     setSaving(true);
     try {
       if (editingUser) {
-        const body: any = { name: form.name, role: form.role, department: form.department, email: form.email };
-        if (form.password) (body as any).newPassword = form.password;
+        const body: Record<string, string> = { name: form.name, role: form.role, department: form.department, email: form.email };
+        if (form.password) body.newPassword = form.password;
         const res = await fetch(`/api/auth/users/${editingUser.id}`, { method: 'PUT', headers, body: JSON.stringify(body) });
         const json = await res.json();
         if (!json.success) throw new Error(json.error);

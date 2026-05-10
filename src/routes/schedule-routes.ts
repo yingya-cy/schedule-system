@@ -4,6 +4,7 @@ import scheduleService from '../services/scheduleService.ts';
 import queryService from '../services/queryService.ts';
 import excelExportService from '../services/excelExportService.ts';
 import { sendError } from '../utils/errorHandler.ts';
+import { RowDataPacket } from '../utils/db-types';
 import { validate, createScheduleSchema, updateScheduleSchema, createCourseSchema, updateCourseSchema } from '../utils/validation.ts';
 
 export function registerScheduleRoutes(app: Express) {
@@ -22,7 +23,7 @@ export function registerScheduleRoutes(app: Express) {
       let termId = term_id ? parseInt(term_id as string) : undefined;
       if (!termId) {
         const [terms] = await pool.query("SELECT id FROM terms WHERE status = 'active' LIMIT 1");
-        termId = (terms as any[])[0]?.id;
+        termId = (terms as RowDataPacket[])[0]?.id;
       }
       const schedules = await scheduleService.getAllSchedules({
         department: department as string,
@@ -103,7 +104,7 @@ export function registerScheduleRoutes(app: Express) {
       if (req.user) {
         const { role, username, department } = req.user;
         const isPrivileged = role === 'admin' || department === '秘书部' || department === '主任团';
-        const isCreator = (existing as any).created_by === username;
+        const isCreator = (existing as RowDataPacket).created_by === username;
         if (!isPrivileged && !isCreator) {
           res.status(403).json({ success: false, error: '无权编辑此课表' });
           return;
@@ -127,7 +128,7 @@ export function registerScheduleRoutes(app: Express) {
       if (req.user) {
         const { role, username, department } = req.user;
         const isPrivileged = role === 'admin' || department === '秘书部' || department === '主任团';
-        const isCreator = (existing as any).created_by === username;
+        const isCreator = (existing as RowDataPacket).created_by === username;
         if (!isPrivileged && !isCreator) {
           res.status(403).json({ success: false, error: '无权删除此课表' });
           return;
@@ -180,7 +181,7 @@ export function registerScheduleRoutes(app: Express) {
       let termId = term_id ? parseInt(term_id as string) : undefined;
       if (!termId) {
         const [terms] = await pool.query("SELECT id FROM terms WHERE status = 'active' LIMIT 1");
-        termId = (terms as any[])[0]?.id;
+        termId = (terms as RowDataPacket[])[0]?.id;
       }
       const results = await queryService.queryFreeTime({
         week: week ? parseInt(week as string) : undefined,
@@ -245,7 +246,7 @@ export function registerScheduleRoutes(app: Express) {
         term_id ? 'SELECT name FROM terms WHERE id = ?' : "SELECT name FROM terms WHERE status = 'active' LIMIT 1",
         term_id ? [term_id] : []
       );
-      const termName = (terms as any[])[0]?.name || '';
+      const termName = (terms as RowDataPacket[])[0]?.name || '';
       const wb = await excelExportService.generateReverseScheduleWorkbook(data, termName);
       const buf = await wb.xlsx.writeBuffer();
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -300,7 +301,7 @@ export function registerScheduleRoutes(app: Express) {
       let termId = term_id ? parseInt(term_id as string) : undefined;
       if (!termId) {
         const [terms] = await pool.query("SELECT id FROM terms WHERE status = 'active' LIMIT 1");
-        termId = (terms as any[])[0]?.id;
+        termId = (terms as RowDataPacket[])[0]?.id;
       }
       const [[schedCount], [courseCount], [userCount], [deptCount], [fileCount]] = await Promise.all([
         pool.query('SELECT COUNT(*) as total FROM schedules WHERE term_id = ?', [termId]),
@@ -312,11 +313,11 @@ export function registerScheduleRoutes(app: Express) {
       res.json({
         success: true,
         data: {
-          schedules: (schedCount as any[])[0].total,
-          courses: (courseCount as any[])[0].total,
-          users: (userCount as any[])[0].total,
-          departments: (deptCount as any[])[0].total,
-          files: (fileCount as any[])[0].total,
+          schedules: (schedCount as RowDataPacket[])[0].total,
+          courses: (courseCount as RowDataPacket[])[0].total,
+          users: (userCount as RowDataPacket[])[0].total,
+          departments: (deptCount as RowDataPacket[])[0].total,
+          files: (fileCount as RowDataPacket[])[0].total,
         },
       });
     } catch (error: unknown) {

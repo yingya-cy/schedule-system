@@ -1,5 +1,6 @@
 import pool from '../config/database';
 import { FreeTimeQuery, FreeTimeResult, PersonSchedule, Schedule, Course } from '../types/database';
+import { RowDataPacket } from '../utils/db-types';
 
 interface ScheduleRow {
   id: number;
@@ -176,11 +177,12 @@ export class QueryService {
     departments: string[];
     people: { name: string; department: string; courses: { weekday: number; sections: number[]; weeks: number[] }[] }[];
   }> {
-    let tid = termId;
+    let tid: number | undefined = termId;
     if (!tid) {
       const [terms] = await pool.execute("SELECT id FROM terms WHERE status = 'active' LIMIT 1");
-      tid = (terms as any[])[0]?.id;
+      tid = (terms as RowDataPacket[])[0]?.id;
     }
+    if (!tid) return { total_schedules: 0, departments: [], people: [] };
     const [rows] = await pool.execute(`
       SELECT s.id as schedule_id, s.name, s.department, c.weekday, c.sections, c.weeks
       FROM schedules s

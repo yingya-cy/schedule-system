@@ -428,3 +428,23 @@ describe('Bulk Import and Results', () => {
     await auth(supertest(app).delete(`/api/scoring/templates/${templateId}`));
   });
 });
+
+describe('Export results endpoint', () => {
+  let app2: ReturnType<typeof createApp>;
+  let token2: string;
+
+  beforeAll(async () => {
+    app2 = createApp();
+    token2 = (await loginAs(app2, 'admin', 'admin123')).token;
+  });
+
+  it('POST /api/scoring/export-results returns 500 without files (AI not available)', async () => {
+    const res = await supertest(app2)
+      .post('/api/scoring/export-results')
+      .set('Authorization', `Bearer ${token2}`)
+      .field('result_data', JSON.stringify({ test: true }))
+      .expect(500);
+
+    expect(res.body.success).toBe(false);
+  });
+});

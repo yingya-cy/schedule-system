@@ -10,6 +10,7 @@ import {
   getObjectContent,
   buildObjectKey,
 } from '../services/ossService.ts';
+import { RowDataPacket, ResultSetHeader } from '../utils/db-types';
 
 const router = Router();
 
@@ -28,7 +29,7 @@ router.get('/activities', async (req, res) => {
     );
     res.json({ success: true, data: rows });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -36,14 +37,14 @@ router.get('/activities', async (req, res) => {
 router.get('/activities/:id', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM file_activities WHERE id = ?', [req.params.id]);
-    const activities = rows as any[];
+    const activities = rows as RowDataPacket[];
     if (activities.length === 0) {
       res.status(404).json({ success: false, error: '活动不存在' });
       return;
     }
     res.json({ success: true, data: activities[0] });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -55,9 +56,9 @@ router.post('/activities', validate(createActivitySchema), async (req, res) => {
       'INSERT INTO file_activities (name, description, department, cover_url, created_by) VALUES (?, ?, ?, ?, ?)',
       [name, description || null, department, cover_url || null, req.user!.username]
     );
-    res.json({ success: true, data: { id: (result as any).insertId } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -65,7 +66,7 @@ router.post('/activities', validate(createActivitySchema), async (req, res) => {
 router.put('/activities/:id', async (req, res) => {
   try {
     const [act] = await pool.query('SELECT created_by FROM file_activities WHERE id = ?', [req.params.id]);
-    const activities = act as any[];
+    const activities = act as RowDataPacket[];
     if (activities.length === 0) {
       res.status(404).json({ success: false, error: '活动不存在' });
       return;
@@ -79,13 +80,13 @@ router.put('/activities/:id', async (req, res) => {
       'UPDATE file_activities SET name = COALESCE(?, name), description = COALESCE(?, description), department = COALESCE(?, department), cover_url = COALESCE(?, cover_url), status = COALESCE(?, status) WHERE id = ?',
       [name, description, department, cover_url, status, req.params.id]
     );
-    if ((result as any).affectedRows === 0) {
+    if ((result as ResultSetHeader).affectedRows === 0) {
       res.status(404).json({ success: false, error: '活动不存在' });
       return;
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -94,7 +95,7 @@ router.delete('/activities/:id', async (req, res) => {
   try {
     const activityId = req.params.id;
     const [act] = await pool.query('SELECT created_by FROM file_activities WHERE id = ?', [activityId]);
-    const activities = act as any[];
+    const activities = act as RowDataPacket[];
     if (activities.length === 0) {
       res.status(404).json({ success: false, error: '活动不存在' });
       return;
@@ -110,13 +111,13 @@ router.delete('/activities/:id', async (req, res) => {
     await pool.query('UPDATE file_folders SET parent_id = NULL WHERE activity_id = ?', [activityId]);
     await pool.query('DELETE FROM file_folders WHERE activity_id = ?', [activityId]);
     const [result] = await pool.query('DELETE FROM file_activities WHERE id = ?', [activityId]);
-    if ((result as any).affectedRows === 0) {
+    if ((result as ResultSetHeader).affectedRows === 0) {
       res.status(404).json({ success: false, error: '活动不存在' });
       return;
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -133,7 +134,7 @@ router.get('/activities/:id/folders', async (req, res) => {
     );
     res.json({ success: true, data: rows });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -149,9 +150,9 @@ router.post('/activities/:id/folders', async (req, res) => {
       'INSERT INTO file_folders (activity_id, parent_id, name, created_by) VALUES (?, ?, ?, ?)',
       [req.params.id, parent_id || null, name, req.user!.username]
     );
-    res.json({ success: true, data: { id: (result as any).insertId } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -159,7 +160,7 @@ router.post('/activities/:id/folders', async (req, res) => {
 router.put('/folders/:id', async (req, res) => {
   try {
     const [f] = await pool.query('SELECT created_by FROM file_folders WHERE id = ?', [req.params.id]);
-    const folders = f as any[];
+    const folders = f as RowDataPacket[];
     if (folders.length === 0) {
       res.status(404).json({ success: false, error: '文件夹不存在' });
       return;
@@ -173,13 +174,13 @@ router.put('/folders/:id', async (req, res) => {
       'UPDATE file_folders SET name = COALESCE(?, name), sort_order = COALESCE(?, sort_order), parent_id = COALESCE(?, parent_id) WHERE id = ?',
       [name, sort_order, parent_id, req.params.id]
     );
-    if ((result as any).affectedRows === 0) {
+    if ((result as ResultSetHeader).affectedRows === 0) {
       res.status(404).json({ success: false, error: '文件夹不存在' });
       return;
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -187,7 +188,7 @@ router.put('/folders/:id', async (req, res) => {
 router.delete('/folders/:id', async (req, res) => {
   try {
     const [f] = await pool.query('SELECT created_by FROM file_folders WHERE id = ?', [req.params.id]);
-    const folders = f as any[];
+    const folders = f as RowDataPacket[];
     if (folders.length === 0) {
       res.status(404).json({ success: false, error: '文件夹不存在' });
       return;
@@ -201,17 +202,17 @@ router.delete('/folders/:id', async (req, res) => {
     await pool.query('UPDATE file_tweets SET folder_id = NULL WHERE folder_id = ?', [req.params.id]);
     // Re-parent child folders
     const [folder] = await pool.query('SELECT parent_id FROM file_folders WHERE id = ?', [req.params.id]);
-    const parentId = (folder as any[])[0]?.parent_id || null;
+    const parentId = (folder as RowDataPacket[])[0]?.parent_id || null;
     await pool.query('UPDATE file_folders SET parent_id = ? WHERE parent_id = ?', [parentId, req.params.id]);
 
     const [result] = await pool.query('DELETE FROM file_folders WHERE id = ?', [req.params.id]);
-    if ((result as any).affectedRows === 0) {
+    if ((result as ResultSetHeader).affectedRows === 0) {
       res.status(404).json({ success: false, error: '文件夹不存在' });
       return;
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -236,7 +237,7 @@ router.get('/folders/:id/items', async (req, res) => {
     );
     res.json({ success: true, data: { files, tweets, subfolders } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -252,9 +253,9 @@ router.post('/folders/:id/items', async (req, res) => {
       'INSERT INTO file_items (activity_id, folder_id, original_filename, stored_filename, file_size, mime_type, file_category, oss_url, description, schedule_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [activity_id, req.params.id, original_filename, stored_filename || original_filename, file_size || 0, mime_type || null, file_category || 'document', oss_url || null, description || null, schedule_id || null, req.user!.username]
     );
-    res.json({ success: true, data: { id: (result as any).insertId } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -262,7 +263,7 @@ router.post('/folders/:id/items', async (req, res) => {
 router.put('/items/:id', async (req, res) => {
   try {
     const [it] = await pool.query('SELECT created_by FROM file_items WHERE id = ?', [req.params.id]);
-    const items = it as any[];
+    const items = it as RowDataPacket[];
     if (items.length === 0) {
       res.status(404).json({ success: false, error: '文件不存在' });
       return;
@@ -276,13 +277,13 @@ router.put('/items/:id', async (req, res) => {
       'UPDATE file_items SET original_filename = COALESCE(?, original_filename), description = COALESCE(?, description), folder_id = COALESCE(?, folder_id) WHERE id = ?',
       [original_filename, description, folder_id, req.params.id]
     );
-    if ((result as any).affectedRows === 0) {
+    if ((result as ResultSetHeader).affectedRows === 0) {
       res.status(404).json({ success: false, error: '文件不存在' });
       return;
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -294,13 +295,13 @@ router.put('/items/:id/schedule', async (req, res) => {
       'UPDATE file_items SET schedule_id = ? WHERE id = ?',
       [schedule_id || null, req.params.id]
     );
-    if ((result as any).affectedRows === 0) {
+    if ((result as ResultSetHeader).affectedRows === 0) {
       res.status(404).json({ success: false, error: '文件不存在' });
       return;
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -308,7 +309,7 @@ router.put('/items/:id/schedule', async (req, res) => {
 router.delete('/items/:id', async (req, res) => {
   try {
     const [it] = await pool.query('SELECT created_by FROM file_items WHERE id = ?', [req.params.id]);
-    const items = it as any[];
+    const items = it as RowDataPacket[];
     if (items.length === 0) {
       res.status(404).json({ success: false, error: '文件不存在' });
       return;
@@ -318,13 +319,13 @@ router.delete('/items/:id', async (req, res) => {
       return;
     }
     const [result] = await pool.query('DELETE FROM file_items WHERE id = ?', [req.params.id]);
-    if ((result as any).affectedRows === 0) {
+    if ((result as ResultSetHeader).affectedRows === 0) {
       res.status(404).json({ success: false, error: '文件不存在' });
       return;
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -344,9 +345,9 @@ router.post('/folders/:id/tweets', async (req, res) => {
       'INSERT INTO file_tweets (activity_id, folder_id, title, content, summary, cover_image, link_url, author, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [activity_id, req.params.id, title, content || null, summary || null, cover_image || null, link_url || null, author || null, req.user!.username]
     );
-    res.json({ success: true, data: { id: (result as any).insertId } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -354,7 +355,7 @@ router.post('/folders/:id/tweets', async (req, res) => {
 router.put('/tweets/:id', async (req, res) => {
   try {
     const [tw] = await pool.query('SELECT created_by FROM file_tweets WHERE id = ?', [req.params.id]);
-    const tweets = tw as any[];
+    const tweets = tw as RowDataPacket[];
     if (tweets.length === 0) {
       res.status(404).json({ success: false, error: '推文不存在' });
       return;
@@ -368,13 +369,13 @@ router.put('/tweets/:id', async (req, res) => {
       'UPDATE file_tweets SET title = COALESCE(?, title), content = COALESCE(?, content), summary = COALESCE(?, summary), cover_image = COALESCE(?, cover_image), link_url = COALESCE(?, link_url), author = COALESCE(?, author), folder_id = COALESCE(?, folder_id) WHERE id = ?',
       [title, content, summary, cover_image, link_url, author, folder_id, req.params.id]
     );
-    if ((result as any).affectedRows === 0) {
+    if ((result as ResultSetHeader).affectedRows === 0) {
       res.status(404).json({ success: false, error: '推文不存在' });
       return;
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -382,7 +383,7 @@ router.put('/tweets/:id', async (req, res) => {
 router.delete('/tweets/:id', async (req, res) => {
   try {
     const [tw] = await pool.query('SELECT created_by FROM file_tweets WHERE id = ?', [req.params.id]);
-    const tweets = tw as any[];
+    const tweets = tw as RowDataPacket[];
     if (tweets.length === 0) {
       res.status(404).json({ success: false, error: '推文不存在' });
       return;
@@ -392,13 +393,13 @@ router.delete('/tweets/:id', async (req, res) => {
       return;
     }
     const [result] = await pool.query('DELETE FROM file_tweets WHERE id = ?', [req.params.id]);
-    if ((result as any).affectedRows === 0) {
+    if ((result as ResultSetHeader).affectedRows === 0) {
       res.status(404).json({ success: false, error: '推文不存在' });
       return;
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -423,20 +424,20 @@ router.post('/oss/init', async (req, res) => {
       'INSERT INTO file_items (activity_id, folder_id, original_filename, stored_filename, file_size, mime_type, file_category, description, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [activity_id, folder_id, original_filename, original_filename, file_size || 0, mime_type || null, file_category || 'document', description || null, req.user!.username]
     );
-    const fileId = (insertResult as any).insertId;
+    const fileId = (insertResult as ResultSetHeader).insertId;
 
     // 2. Get activity name
     const [activityRows] = await pool.query('SELECT name FROM file_activities WHERE id = ?', [activity_id]);
-    const activityName = (activityRows as any[])[0]?.name || `activity_${activity_id}`;
+    const activityName = (activityRows as RowDataPacket[])[0]?.name || `activity_${activity_id}`;
 
     // 3. Build folder path by traversing parent chain
     const folderParts: string[] = [];
     let currentId: number | null = folder_id;
     while (currentId) {
       const [folderRows] = await pool.query('SELECT id, parent_id, name FROM file_folders WHERE id = ?', [currentId]);
-      if ((folderRows as any[]).length === 0) break;
-      folderParts.unshift((folderRows as any[])[0].name);
-      currentId = (folderRows as any[])[0].parent_id;
+      if ((folderRows as RowDataPacket[]).length === 0) break;
+      folderParts.unshift((folderRows as RowDataPacket[])[0].name);
+      currentId = (folderRows as RowDataPacket[])[0].parent_id;
     }
     const folderPath = folderParts.join('/');
 
@@ -455,7 +456,7 @@ router.post('/oss/init', async (req, res) => {
 
     res.json({ success: true, data: { id: fileId, uploadUrl, objectKey } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -471,7 +472,7 @@ router.post('/oss/presigned-url', async (req, res) => {
     const result = await generatePresignedUploadUrl(objectKey, content_type || undefined);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -488,9 +489,9 @@ router.post('/oss/confirm', async (req, res) => {
       'INSERT INTO file_items (activity_id, folder_id, original_filename, stored_filename, file_size, mime_type, file_category, oss_object_key, oss_url, description, schedule_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [activity_id, folder_id, original_filename, original_filename, file_size || 0, mime_type || null, file_category || 'document', object_key, ossUrl, description || null, schedule_id || null, req.user!.username]
     );
-    res.json({ success: true, data: { id: (result as any).insertId, oss_url: ossUrl } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId, oss_url: ossUrl } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -505,7 +506,7 @@ router.post('/oss/download-url', async (req, res) => {
     const url = await generatePresignedDownloadUrl(object_key);
     res.json({ success: true, data: { downloadUrl: url } });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -524,7 +525,7 @@ router.get('/oss/download', async (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.end(body);
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
@@ -542,7 +543,7 @@ router.get('/oss/preview', async (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.end(body);
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 

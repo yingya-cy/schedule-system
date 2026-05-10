@@ -60,7 +60,7 @@ export default function FilesView() {
   const handleViewSchedule = async (schedule: ScheduleData) => {
     if (user) {
       const isPrivileged = user.role === 'admin' || user.department === '秘书部' || user.department === '主任团';
-      const isCreator = (schedule as any).created_by === user.username;
+      const isCreator = schedule.created_by === user.username;
       setReadOnly(!isPrivileged && !isCreator);
     }
     try {
@@ -195,7 +195,7 @@ export default function FilesView() {
       if (currentEditIndex !== null) {
         setBatchResults(prev => prev.map((r, i) =>
           i === currentEditIndex
-            ? { ...r, saved: true, name: editName.trim(), department: editDepartment, courses: editableCourses, schedule_id: scheduleId }
+            ? { ...r, saved: true, name: editName.trim(), department: editDepartment, courses: editableCourses, schedule_id: scheduleId ?? undefined }
             : r
         ));
       }

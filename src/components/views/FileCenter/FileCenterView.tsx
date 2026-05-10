@@ -4,119 +4,41 @@ import {
   Plus, Trash2, Edit3, X, FolderPlus, FileText, Image, Video, ExternalLink,
   ChevronRight, ChevronDown, FolderOpen, Upload, Search, Eye, Download
 } from 'lucide-react';
-import FilePreviewModal from './FilePreviewModal';
+import FilePreviewModal from '../FilePreviewModal';
 import { useAuthStore } from '@/stores/authStore';
 import ConfirmDialog from '@/components/ConfirmDialog';
-
-interface Activity {
-  id: number;
-  name: string;
-  description: string | null;
-  department: string;
-  cover_url: string | null;
-  status: 'active' | 'archived';
-  created_by: string;
-  created_at: string;
-}
-
-interface Folder {
-  id: number;
-  activity_id: number;
-  parent_id: number | null;
-  name: string;
-  sort_order: number;
-  created_by: string;
-}
-
-interface FileItem {
-  id: number;
-  original_filename: string;
-  stored_filename: string;
-  file_size: number;
-  mime_type: string | null;
-  file_category: string;
-  oss_object_key: string | null;
-  oss_url: string | null;
-  description: string | null;
-  created_by: string;
-  created_at: string;
-  item_type: 'file';
-}
-
-interface TweetItem {
-  id: number;
-  title: string;
-  content: string | null;
-  summary: string | null;
-  cover_image: string | null;
-  link_url: string | null;
-  author: string | null;
-  created_by: string;
-  created_at: string;
-  item_type: 'tweet';
-}
-
-type AnyItem = FileItem | TweetItem;
-
-const categoryIcons: Record<string, React.ReactNode> = {
-  video: <Video size={16} />,
-  image: <Image size={16} />,
-  document: <FileText size={16} />,
-  tweet: <FileText size={16} />,
-};
-
-const categoryLabels: Record<string, string> = {
-  video: '视频',
-  image: '图片',
-  document: '文档',
-  tweet: '推文',
-};
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function detectFileCategory(mimeType: string, filename: string): string {
-  const mime = mimeType.toLowerCase();
-  if (mime.startsWith('image/')) return 'image';
-  if (mime.startsWith('video/')) return 'video';
-  if (mime === 'application/pdf') return 'document';
-  if (mime.startsWith('text/') || mime === 'application/json' || mime === 'application/javascript') return 'document';
-  if (mime.includes('word') || mime.includes('excel') || mime.includes('powerpoint') || mime.includes('document')) return 'document';
-  const ext = filename.split('.').pop()?.toLowerCase() || '';
-  const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
-  const videoExts = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'flv', 'wmv'];
-  if (imageExts.includes(ext)) return 'image';
-  if (videoExts.includes(ext)) return 'video';
-  return 'document';
-}
+import {
+  FileCenterActivity,
+  FileCenterFolder,
+  FileCenterFileItem,
+  FileCenterTweetItem,
+} from './FileCenterTypes';
+import { categoryIcons, categoryLabels, formatSize, detectFileCategory } from './FileCenterUtils';
 
 export default function FileCenterView() {
   const token = useAuthStore((s) => s.token);
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [activities, setActivities] = useState<FileCenterActivity[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState<FileCenterActivity | null>(null);
   const [showActivityModal, setShowActivityModal] = useState(false);
-  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [editingActivity, setEditingActivity] = useState<FileCenterActivity | null>(null);
   const [activityForm, setActivityForm] = useState({ name: '', department: '', description: '', cover_url: '' });
   const [activityError, setActivityError] = useState('');
 
-  const [folders, setFolders] = useState<Folder[]>([]);
+  const [folders, setFolders] = useState<FileCenterFolder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
   const [showFolderModal, setShowFolderModal] = useState(false);
-  const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+  const [editingFolder, setEditingFolder] = useState<FileCenterFolder | null>(null);
   const [folderForm, setFolderForm] = useState({ name: '', parent_id: '' });
   const [folderError, setFolderError] = useState('');
 
-  const [items, setItems] = useState<{ files: FileItem[]; tweets: TweetItem[]; subfolders: Folder[] }>({ files: [], tweets: [], subfolders: [] });
+  const [items, setItems] = useState<{ files: FileCenterFileItem[]; tweets: FileCenterTweetItem[]; subfolders: FileCenterFolder[] }>({ files: [], tweets: [], subfolders: [] });
   const [showItemModal, setShowItemModal] = useState(false);
   const [showTweetModal, setShowTweetModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<FileItem | null>(null);
-  const [editingTweet, setEditingTweet] = useState<TweetItem | null>(null);
+  const [editingItem, setEditingItem] = useState<FileCenterFileItem | null>(null);
+  const [editingTweet, setEditingTweet] = useState<FileCenterTweetItem | null>(null);
   const [itemForm, setItemForm] = useState({ original_filename: '', file_category: 'document', description: '', oss_url: '' });
   const [tweetForm, setTweetForm] = useState({ title: '', content: '', summary: '', cover_image: '', link_url: '', author: '' });
   const [itemError, setItemError] = useState('');
@@ -128,8 +50,8 @@ export default function FileCenterView() {
   const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: number; name: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
-  const [showTweetDetail, setShowTweetDetail] = useState<TweetItem | null>(null);
+  const [previewFile, setPreviewFile] = useState<FileCenterFileItem | null>(null);
+  const [showTweetDetail, setShowTweetDetail] = useState<FileCenterTweetItem | null>(null);
 
   async function fetchActivities() {
     try {
@@ -176,7 +98,7 @@ export default function FileCenterView() {
     setShowActivityModal(true);
   }
 
-  function openEditActivity(a: Activity) {
+  function openEditActivity(a: FileCenterActivity) {
     setEditingActivity(a);
     setActivityForm({ name: a.name, department: a.department, description: a.description || '', cover_url: a.cover_url || '' });
     setActivityError('');
@@ -196,8 +118,8 @@ export default function FileCenterView() {
       }
       setShowActivityModal(false);
       fetchActivities();
-    } catch (e: any) {
-      setActivityError(e.message);
+    } catch (e: unknown) {
+      setActivityError(e instanceof Error ? e.message : '未知错误');
     }
   }
 
@@ -208,7 +130,7 @@ export default function FileCenterView() {
     setShowFolderModal(true);
   }
 
-  function openEditFolder(f: Folder) {
+  function openEditFolder(f: FileCenterFolder) {
     setEditingFolder(f);
     setFolderForm({ name: f.name, parent_id: f.parent_id ? String(f.parent_id) : '' });
     setFolderError('');
@@ -235,8 +157,8 @@ export default function FileCenterView() {
       }
       setShowFolderModal(false);
       if (selectedActivity) fetchFolders(selectedActivity.id);
-    } catch (e: any) {
-      setFolderError(e.message);
+    } catch (e: unknown) {
+      setFolderError(e instanceof Error ? e.message : '未知错误');
     }
   }
 
@@ -248,7 +170,6 @@ export default function FileCenterView() {
 
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
-          // Map 30%–80% range to the upload phase
           setUploadProgress(30 + Math.round((e.loaded / e.total) * 50));
         }
       });
@@ -366,11 +287,13 @@ export default function FileCenterView() {
         setUploading(false);
         return;
       }
-    } catch (e: any) {
-      if (e.name === 'AbortError' || e.message === '上传已取消') {
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        setItemError('');
+      } else if (e instanceof Error && e.message === '上传已取消') {
         setItemError('');
       } else {
-        setItemError(e.message);
+        setItemError(e instanceof Error ? e.message : '未知错误');
       }
     } finally {
       setUploading(false);
@@ -398,12 +321,12 @@ export default function FileCenterView() {
       setShowTweetModal(false);
       setEditingTweet(null);
       if (selectedFolderId) fetchItems(selectedFolderId);
-    } catch (e: any) {
-      setItemError(e.message);
+    } catch (e: unknown) {
+      setItemError(e instanceof Error ? e.message : '未知错误');
     }
   }
 
-  async function handleDownload(file: FileItem) {
+  async function handleDownload(file: FileCenterFileItem) {
     if (!file.oss_object_key) return;
     try {
       const res = await fetch(`/api/file-center/oss/download?key=${encodeURIComponent(file.oss_object_key)}&filename=${encodeURIComponent(file.original_filename)}`, { headers });
@@ -445,14 +368,13 @@ export default function FileCenterView() {
       } else {
         if (selectedFolderId) fetchItems(selectedFolderId);
       }
-    } catch (e: any) {
-      alert(e.message || '删除失败');
+    } catch (e: unknown) {
+      console.error('Delete failed:', e);
       setDeleteTarget(null);
     }
   }
 
-  // Build folder tree
-  function buildTree(parentId: number | null = null): Folder[] {
+  function buildTree(parentId: number | null = null): FileCenterFolder[] {
     return folders
       .filter(f => f.parent_id === parentId)
       .sort((a, b) => a.sort_order - b.sort_order);
@@ -467,7 +389,7 @@ export default function FileCenterView() {
     });
   }
 
-  function renderFolderTree(folders: Folder[], depth = 0) {
+  function renderFolderTree(folders: FileCenterFolder[], depth = 0) {
     return folders.map(f => {
       const children = buildTree(f.id);
       const isExpanded = expandedFolders.has(f.id);

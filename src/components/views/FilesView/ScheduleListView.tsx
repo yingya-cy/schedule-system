@@ -77,7 +77,7 @@ function ScheduleGrid({
     if (!user) return false;
     if (user.role === 'admin') return true;
     if (user.department === '秘书部' || user.department === '主任团') return true;
-    return (schedule as any).created_by === user.username;
+    return schedule.created_by === user.username;
   }
 
   return (

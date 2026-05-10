@@ -38,6 +38,11 @@ function getToken(req: Request): string | null {
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.substring(7);
   }
+  // Support token in query string for window.open() / download links
+  const queryToken = req.query.token;
+  if (typeof queryToken === 'string' && queryToken.length > 0) {
+    return queryToken;
+  }
   return null;
 }
 
@@ -63,12 +68,12 @@ export function judgeAuth(req: Request, res: Response, next: NextFunction): void
     return;
   }
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    if (decoded.type !== 'judge') {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (typeof decoded === 'string' || decoded.type !== 'judge') {
       res.status(401).json({ success: false, error: '无效的评委令牌' });
       return;
     }
-    req.judge = decoded as JudgeUser;
+    req.judge = decoded as unknown as JudgeUser;
     next();
   } catch {
     res.status(401).json({ success: false, error: '评委登录已过期，请重新登录' });
