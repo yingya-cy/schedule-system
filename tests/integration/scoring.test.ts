@@ -146,3 +146,151 @@ describe('Competition and Contestants', () => {
     await auth(supertest(app).delete(`/api/scoring/templates/${templateId}`));
   });
 });
+
+describe('Judge Authentication Flow', () => {
+  let templateId: number;
+  let competitionId: number;
+  let judgeCode: string;
+  let judgeId: number;
+  let contestantId: number;
+  let judgeToken: string;
+
+  beforeAll(async () => {
+    // Create template
+    const tRes = await auth(supertest(app)
+      .post('/api/scoring/templates')
+      .send({
+        name: '评委流程模板',
+        total_score: 100,
+        dimensions: [{ name: '表现', max_score: 50 }, { name: '内容', max_score: 50 }],
+      }));
+    templateId = tRes.body.data.id;
+
+    // Create competition
+    const cRes = await auth(supertest(app)
+      .post('/api/scoring/competitions')
+      .send({ name: '评委流程比赛', template_id: templateId, judging_mode: 'offline' }));
+    competitionId = cRes.body.data.id;
+
+    // Update competition status to scoring
+    await auth(supertest(app)
+      .put(`/api/scoring/competitions/${competitionId}`)
+      .send({ status: 'scoring' }));
+
+    // Add contestant
+    const ctRes = await auth(supertest(app)
+      .post(`/api/scoring/competitions/${competitionId}/contestants`)
+      .send({ name: '选手A', number: '1' }));
+    contestantId = ctRes.body.data.id;
+
+    // Add judge (capture code from response)
+    const jRes = await auth(supertest(app)
+      .post(`/api/scoring/competitions/${competitionId}/judges`)
+      .send({ name: '评委张' }));
+    judgeId = jRes.body.data.id;
+
+    // Get judge list to find the code
+    const listRes = await auth(supertest(app)
+      .get(`/api/scoring/competitions/${competitionId}/judges`));
+    const judge = listRes.body.data.find((j: any) => j.id === judgeId);
+    judgeCode = judge.code;
+  });
+
+  it('rejects judge login without code', async () => {
+    await supertest(app)
+      .post('/api/scoring/judge/login')
+      .send({ name: '评委张', competition_id: competitionId })
+      .expect(400);
+  });
+
+  it('rejects judge login with wrong code', async () => {
+    await supertest(app)
+      .post('/api/scoring/judge/login')
+      .send({ name: '评委张', competition_id: competitionId, code: 'WRONG' })
+      .expect(401);
+  });
+
+  it('logs in judge with correct code and returns token', async () => {
+    const res = await supertest(app)
+      .post('/api/scoring/judge/login')
+      .send({ name: '评委张', competition_id: competitionId, code: judgeCode })
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.token).toBeTruthy();
+    expect(res.body.data.name).toBe('评委张');
+    judgeToken = res.body.data.token;
+  });
+
+  it('rejects contestants access without judge token', async () => {
+    await supertest(app)
+      .get('/api/scoring/judge/contestants')
+      .expect(401);
+  });
+
+  it('returns contestants list with judge token', async () => {
+    const res = await supertest(app)
+      .get('/api/scoring/judge/contestants')
+      .set('Authorization', `Bearer ${judgeToken}`)
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeGreaterThan(0);
+  });
+
+  it('rejects score submission without judge token', async () => {
+    await supertest(app)
+      .post('/api/scoring/judge/scores')
+      .send({ contestant_id: contestantId, scores: [] })
+      .expect(401);
+  });
+
+  it('rejects score submission with empty scores array', async () => {
+    await supertest(app)
+      .post('/api/scoring/judge/scores')
+      .set('Authorization', `Bearer ${judgeToken}`)
+      .send({ contestant_id: contestantId, scores: [] })
+      .expect(400);
+  });
+
+  it('submits scores for a contestant', async () => {
+    const templateRes = await auth(supertest(app)
+      .get(`/api/scoring/templates/${templateId}`));
+    const dims = templateRes.body.data.dimensions;
+
+    const scores = dims.map((d: any) => ({ dimension_id: d.id, score: 40 }));
+    const res = await supertest(app)
+      .post('/api/scoring/judge/scores')
+      .set('Authorization', `Bearer ${judgeToken}`)
+      .send({ contestant_id: contestantId, scores })
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.total_score).toBe(80);
+  });
+
+  it('retrieves submitted scores for a contestant', async () => {
+    const res = await supertest(app)
+      .get(`/api/scoring/judge/scores/${contestantId}`)
+      .set('Authorization', `Bearer ${judgeToken}`)
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBe(2); // 2 dimensions
+  });
+
+  it('rejects submission with expired/invalid judge token', async () => {
+    await supertest(app)
+      .post('/api/scoring/judge/scores')
+      .set('Authorization', 'Bearer invalid.token.here')
+      .send({ contestant_id: contestantId, scores: [{ dimension_id: 1, score: 50 }] })
+      .expect(401);
+  });
+
+  afterAll(async () => {
+    await auth(supertest(app).delete(`/api/scoring/competitions/${competitionId}`));
+    await auth(supertest(app).delete(`/api/scoring/templates/${templateId}`));
+  });
+});

@@ -138,6 +138,17 @@ describe('useAppStore', () => {
       (api.getSchedules as any).mockRejectedValueOnce(new Error('fail'));
       await useAppStore.getState().refreshSchedules();
       expect(useAppStore.getState().schedulesLoading).toBe(false);
+      (api.getSchedules as any).mockResolvedValue([{ id: 1, name: 'S1', department: 'X' }]);
+    });
+  });
+
+  describe('refreshDepartments failure', () => {
+    it('does not crash when fetch fails', async () => {
+      const { api } = await import('@/services/api');
+      (api.getDepartments as any).mockRejectedValueOnce(new Error('network error'));
+      await useAppStore.getState().refreshDepartments();
+      expect(useAppStore.getState().departmentsLoaded).toBe(false);
+      (api.getDepartments as any).mockResolvedValue([{ id: 1, name: '网编部' }]);
     });
   });
 

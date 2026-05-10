@@ -137,3 +137,106 @@ describe('Course CRUD', () => {
     await supertest(app).delete(`/api/schedules/${scheduleId}`);
   });
 });
+
+describe('Dashboard and Contacts', () => {
+  it('GET /api/dashboard/stats returns counts', async () => {
+    const res = await supertest(app)
+      .get('/api/dashboard/stats')
+      .expect(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.schedules).toBeDefined();
+    expect(res.body.data.users).toBeDefined();
+  });
+
+  it('GET /api/courses returns courses list', async () => {
+    const res = await supertest(app)
+      .get('/api/courses')
+      .expect(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/contacts returns user list', async () => {
+    const res = await supertest(app)
+      .get('/api/contacts')
+      .expect(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+});
+
+describe('Export and File endpoints', () => {
+  let scheduleId: number;
+  let courseId: number;
+
+  beforeAll(async () => {
+    const sRes = await supertest(app)
+      .post('/api/schedules')
+      .send({ name: '导出测试课表', department: '网编部', courses: [] });
+    scheduleId = sRes.body.data.id;
+
+    const cRes = await supertest(app)
+      .post(`/api/schedules/${scheduleId}/courses`)
+      .send({ course_name: '测试课程', weekday: 1, sections: [1, 2], weeks: [1, 2, 3] });
+    courseId = cRes.body.data.id;
+  });
+
+  it('GET /api/query/free-time returns results', async () => {
+    const res = await supertest(app)
+      .get('/api/query/free-time?week=1&day=1&section=1')
+      .expect(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('GET /api/query/person-schedule requires name param', async () => {
+    await supertest(app)
+      .get('/api/query/person-schedule')
+      .expect(400);
+  });
+
+  it('GET /api/query/department-stats requires department param', async () => {
+    await supertest(app)
+      .get('/api/query/department-stats')
+      .expect(400);
+  });
+
+  it('POST /api/export/reverse-schedule returns xlsx', async () => {
+    const res = await supertest(app)
+      .post('/api/export/reverse-schedule')
+      .send({})
+      .expect(200);
+    expect(res.headers['content-type']).toContain('spreadsheet');
+  });
+
+  it('POST /api/export/person-schedule requires name', async () => {
+    await supertest(app)
+      .post('/api/export/person-schedule')
+      .send({})
+      .expect(400);
+  });
+
+  it('POST /api/export/department-stats requires department', async () => {
+    await supertest(app)
+      .post('/api/export/department-stats')
+      .send({})
+      .expect(400);
+  });
+
+  it('GET /api/schedules/:id/files returns empty array for new schedule', async () => {
+    const res = await supertest(app)
+      .get(`/api/schedules/${scheduleId}/files`)
+      .expect(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/schedules/:id/file returns 404 for no file', async () => {
+    await supertest(app)
+      .get(`/api/schedules/${scheduleId}/file`)
+      .expect(404);
+  });
+
+  afterAll(async () => {
+    await supertest(app).delete(`/api/schedules/${scheduleId}`);
+  });
+});
