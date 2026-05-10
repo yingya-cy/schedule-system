@@ -139,7 +139,6 @@ export interface ApiResponse<T> {
 }
 
 export interface SubmitScorePayload {
-  judge_id: number;
   contestant_id: number;
   scores: {
     subdimension_id?: number;

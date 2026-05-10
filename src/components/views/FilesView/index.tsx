@@ -321,10 +321,9 @@ export default function FilesView() {
       <AnimatePresence mode="wait">
         {viewMode === 'list' && (
           <div key="list-content" className="w-full">
-            {/* Term selector */}
-            {availableTerms.length > 1 && (
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs text-outline">届:</span>
+            {/* Term selector + export */}
+            <div className="flex items-center gap-2 mb-4">
+              {availableTerms.length > 0 && (
                 <select
                   value={currentTermId || ''}
                   onChange={e => setCurrentTermId(Number(e.target.value))}
@@ -334,8 +333,29 @@ export default function FilesView() {
                     <option key={t.id} value={t.id}>{t.name}{t.status === 'active' ? ' (当前)' : ''}</option>
                   ))}
                 </select>
-              </div>
-            )}
+              )}
+              <button
+                onClick={async () => {
+                  try {
+                    const token = localStorage.getItem('auth_token');
+                    const res = await fetch('/api/export/reverse-schedule', {
+                      method: 'POST',
+                      headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ term_id: currentTermId }),
+                    });
+                    if (!res.ok) throw new Error('导出失败');
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url;
+                    a.download = 'reverse-schedule.xlsx'; a.click();
+                    URL.revokeObjectURL(url);
+                  } catch { /* ignore */ }
+                }}
+                className="px-3 py-1 text-xs font-medium bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
+              >
+                导出反课表
+              </button>
+            </div>
             {/* List View */}
             <ScheduleListView
               schedules={allSchedules}

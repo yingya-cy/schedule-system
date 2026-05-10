@@ -12,6 +12,13 @@ npm test              # vitest 单元+集成
 npx playwright test   # E2E (需先启动 dev server)
 ```
 
+## 服务器
+
+- **IP**: 47.120.29.188
+- **登录**: `ssh root@47.120.29.188`（已配置 SSH key）
+- **部署**: Docker Compose，容器 `schedule-mysql` / `schedule-backend` / `schedule-nginx` / `schedule-ai-service`
+- **数据库**: MySQL 8.0，端口 3307（映射），密码 `753412`
+
 ## 架构
 
 ```
@@ -82,6 +89,15 @@ const isPrivileged = role === 'admin' || department === '秘书部' || departmen
 - Express/PM2: 2 实例，1.5GB 限制
 - Flask/Gunicorn: 3 sync workers，5 分钟超时
 - Docker: 每容器 1.5GB
+
+## 后端修改后必须重启
+
+修改 `server.ts`、`src/services/`、`src/repositories/`、`src/routes/`、`src/middleware/` 下的文件后，**必须主动重启 dev server**（`npm run dev`），不能依赖热重载。
+
+```bash
+powershell -Command "Stop-Process -Id (Get-NetTCPConnection -LocalPort 3001).OwningProcess -Force" 2>/dev/null
+npm run dev
+```
 
 ## 代码质量强制规则
 

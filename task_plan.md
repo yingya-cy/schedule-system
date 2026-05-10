@@ -226,8 +226,16 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - [x] 15.11 `getAllFreeTimeData` 按活跃届过滤 — JOIN terms WHERE status='active'
 - [x] 15.12 `useUnknownInCatchVariables: true` + 105 处 `catch (error: any)` → `unknown`
 - [x] 15.13 死代码清理 — QueryPanel.tsx、errors.ts、useInitializeStore、api.getAllFreeTimeData
-- [x] 15.14 测试 — 权限矩阵(7) + 届 API(4) + 部长权限(3) = 14 新测试，总计 235
-- **Status:** in progress（前端届选择器、换届 UI 待实现）
+- [x] 15.14 测试 — 权限矩阵(7) + 届 API(4) + 部长权限(3) = 14 新测试，总计 243
+- [x] 15.15 届选择器 — 仪表盘 + 课表中心届下拉切换，schedules/free-time/stats 按届过滤
+- [x] 15.16 换届操作 UI — TermTransitionModal，选学年/学期，勾留任/离任，按钮在用户管理（仅 admin）
+- [x] 15.17 导出跟届同步 — 课表中心导出按钮传 term_id，反课表导出与届选择联动
+- [x] 15.18 反课表导出按钮 — 从仪表盘移至课表中心，换届按钮移至用户管理
+- [x] 15.19 文件时间戳 — 文件列表显示 created_at
+- [x] 15.20 列宽统一 — 部门列 13.0、人员列 20.0、分隔列 1.6
+- [x] 15.21 过渡测试清理 — afterAll 恢复 DB，不再污染数据
+- [x] 15.22 allFree 单双周标注 — formatFreeTimeForPeriod 补 detectParity
+- **Status:** completed
 
 ## Key Questions
 1. 登录系统是独立用户体系还是对接学校 SSO/LDAP？→ **独立用户体系（用户名+密码+JWT），不开放注册，管理员后台创建**

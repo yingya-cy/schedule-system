@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Edit3, X, Shield, Search } from 'lucide-react';
+import { Plus, Trash2, Edit3, X, Shield, Search, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import TermTransitionModal from '@/components/TermTransitionModal';
+import { useAppStore } from '@/stores/appStore';
 import type { UserInfo } from '@/types/auth';
 
 interface UserFormData {
@@ -33,6 +35,7 @@ export default function UserManagementView() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<UserInfo | null>(null);
+  const [showTransition, setShowTransition] = useState(false);
 
   const token = useAuthStore((s) => s.token);
   const currentUser = useAuthStore((s) => s.user);
@@ -136,15 +139,26 @@ export default function UserManagementView() {
           <h2 className="text-2xl font-extrabold text-on-surface font-headline">用户管理</h2>
           <p className="text-sm text-on-surface-variant mt-1">管理系统用户账号和权限</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-on-primary rounded-xl font-bold text-sm shadow-lg shadow-primary/20"
-        >
+        <div className="flex items-center gap-2">
+          {currentUser?.role === 'admin' && (
+            <button
+              onClick={() => setShowTransition(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-amber-100 text-amber-700 rounded-xl font-bold text-sm hover:bg-amber-200 transition-colors"
+            >
+              <RefreshCw size={18} />
+              换届
+            </button>
+          )}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-on-primary rounded-xl font-bold text-sm shadow-lg shadow-primary/20"
+          >
           <Plus size={18} />
           创建用户
         </motion.button>
+        </div>
       </div>
 
       {/* Search */}
@@ -364,6 +378,15 @@ export default function UserManagementView() {
           </>
         )}
       </AnimatePresence>
+
+      <TermTransitionModal
+        isOpen={showTransition}
+        onClose={() => setShowTransition(false)}
+        onTransitioned={() => {
+          useAppStore.getState().refreshTerms();
+          fetchUsers();
+        }}
+      />
 
       {/* Delete Confirm */}
       <ConfirmDialog

@@ -127,7 +127,8 @@ describe('QueryService', () => {
 
   describe('getAllFreeTimeData', () => {
     it('returns empty matrix when no schedules exist', async () => {
-      mockExecute.mockResolvedValueOnce([[]]);
+      mockExecute.mockResolvedValueOnce([[{ id: 1 }]]); // term query
+      mockExecute.mockResolvedValueOnce([[]]);            // schedule query
 
       const result = await service.getAllFreeTimeData();
 
@@ -144,7 +145,8 @@ describe('QueryService', () => {
           weeks: JSON.stringify([1, 2]),
         },
       ];
-      mockExecute.mockResolvedValueOnce([rows]);
+      mockExecute.mockResolvedValueOnce([[{ id: 1 }]]); // term query
+      mockExecute.mockResolvedValueOnce([rows]);          // schedule query
 
       const result = await service.getAllFreeTimeData();
 

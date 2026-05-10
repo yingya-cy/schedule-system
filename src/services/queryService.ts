@@ -36,6 +36,11 @@ export class QueryService {
     const params: (string | number)[] = [];
     const conditions: string[] = [];
 
+    if (query.term_id) {
+      conditions.push('term_id = ?');
+      params.push(query.term_id);
+    }
+
     if (query.department) {
       conditions.push('department = ?');
       params.push(query.department);
@@ -166,18 +171,23 @@ export class QueryService {
    * 获取所有空闲时间矩阵
    * 优化：一次性加载所有数据，内存中计算
    */
-  async getAllFreeTimeData(): Promise<{
+  async getAllFreeTimeData(termId?: number): Promise<{
     total_schedules: number;
     departments: string[];
     people: { name: string; department: string; courses: { weekday: number; sections: number[]; weeks: number[] }[] }[];
   }> {
+    let tid = termId;
+    if (!tid) {
+      const [terms] = await pool.execute("SELECT id FROM terms WHERE status = 'active' LIMIT 1");
+      tid = (terms as any[])[0]?.id;
+    }
     const [rows] = await pool.execute(`
       SELECT s.id as schedule_id, s.name, s.department, c.weekday, c.sections, c.weeks
       FROM schedules s
       JOIN terms t ON s.term_id = t.id
       LEFT JOIN courses c ON s.id = c.schedule_id
-      WHERE t.status = 'active'
-    `);
+      WHERE t.id = ?
+    `, [tid]);
 
     const personMap = new Map<string, { name: string; department: string; courses: { weekday: number; sections: number[]; weeks: number[] }[] }>();
     for (const row of rows as { schedule_id: number; name: string; department: string; weekday: number; sections: number[]; weeks: number[] }[]) {

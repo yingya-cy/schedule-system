@@ -89,14 +89,14 @@ describe('File Center Permissions', () => {
         .expect(200);
     });
 
-    it('should allow non-creator teacher to PUT activity', async () => {
+    it('should return 403 when non-creator teacher tries to PUT activity', async () => {
       await createTestUser(app, adminToken, { username: 'fc_t2', name: '其他教师', password: 'test123', role: 'teacher', department: '网编部' });
       const { token } = await loginAs(app, 'fc_t2', 'test123');
       await supertest(app)
         .put(`/api/file-center/activities/${activityId}`)
         .set('Authorization', `Bearer ${token}`)
         .send({ name: 'teacher updated' })
-        .expect(200);
+        .expect(403);
     });
   });
 

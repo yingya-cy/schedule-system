@@ -22,6 +22,7 @@ export default function ScoringDashboard() {
   const [nav, setNav] = useState<NavState>({ view: 'home' });
   const [showJudgeDialog, setShowJudgeDialog] = useState(false);
   const [judgeNameInput, setJudgeNameInput] = useState('');
+  const [judgeCodeInput, setJudgeCodeInput] = useState('');
   const [judgeNameError, setJudgeNameError] = useState('');
   const [competitionList, setCompetitionList] = useState<Competition[]>([]);
   const [selectedCompetitionId, setSelectedCompetitionId] = useState<number>(0);
@@ -33,7 +34,8 @@ export default function ScoringDashboard() {
 
   async function handleJudgeNameSubmit() {
     const name = judgeNameInput.trim();
-    if (!name) return;
+    const code = judgeCodeInput.trim();
+    if (!name || !code) return;
     if (!selectedCompetitionId) {
       setJudgeNameError('请先选择一个比赛');
       return;
@@ -41,9 +43,11 @@ export default function ScoringDashboard() {
     setJudgingLoading(true);
     setJudgeNameError('');
     try {
-      const judge = await competitionApi.getJudgeByName(selectedCompetitionId, name);
+      const judge = await competitionApi.getJudgeByName(selectedCompetitionId, name, code);
+      localStorage.setItem('judge_token', judge.token);
       setShowJudgeDialog(false);
       setJudgeNameInput('');
+      setJudgeCodeInput('');
       setSelectedCompetitionId(0);
       navigate('judge', selectedCompetitionId, judge.id, judge.name);
     } catch (e: unknown) {
@@ -56,6 +60,7 @@ export default function ScoringDashboard() {
   function handleJudgeNameCancel() {
     setShowJudgeDialog(false);
     setJudgeNameInput('');
+    setJudgeCodeInput('');
     setJudgeNameError('');
     setSelectedCompetitionId(0);
   }
@@ -164,10 +169,20 @@ export default function ScoringDashboard() {
                   type="text"
                   value={judgeNameInput}
                   onChange={(e) => setJudgeNameInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleJudgeNameSubmit()}
                   placeholder="请输入您的姓名"
                   className="w-full px-4 py-3 bg-surface-container-low border border-surface-container-high rounded-xl text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 text-base"
                   autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-on-surface-variant">评委码</label>
+                <input
+                  type="text"
+                  value={judgeCodeInput}
+                  onChange={(e) => setJudgeCodeInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleJudgeNameSubmit()}
+                  placeholder="请输入评委码（由管理员提供）"
+                  className="w-full px-4 py-3 bg-surface-container-low border border-surface-container-high rounded-xl text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 text-base"
                 />
               </div>
               {judgeNameError && (

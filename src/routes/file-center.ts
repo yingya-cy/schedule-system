@@ -2,6 +2,7 @@ import { Router } from 'express';
 import pool from '../config/database.ts';
 import { authenticate } from '../middleware/auth.ts';
 import { canModifyResource } from '../middleware/permissions.ts';
+import { validate, createActivitySchema } from '../utils/validation.ts';
 import {
   generatePresignedUploadUrl,
   generatePresignedDownloadUrl,
@@ -47,13 +48,9 @@ router.get('/activities/:id', async (req, res) => {
 });
 
 // POST /api/file-center/activities
-router.post('/activities', async (req, res) => {
+router.post('/activities', validate(createActivitySchema), async (req, res) => {
   try {
     const { name, description, department, cover_url } = req.body;
-    if (!name || !department) {
-      res.status(400).json({ success: false, error: '名称和部门为必填项' });
-      return;
-    }
     const [result] = await pool.query(
       'INSERT INTO file_activities (name, description, department, cover_url, created_by) VALUES (?, ?, ?, ?, ?)',
       [name, description || null, department, cover_url || null, req.user!.username]

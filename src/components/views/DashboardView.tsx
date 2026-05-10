@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { RefreshCw, Calendar, Users, Clock, BookOpen, FolderOpen, Layers, Download } from 'lucide-react';
+import { RefreshCw, Calendar, Users, Clock, BookOpen, FolderOpen, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FreeTimeResult, TIME_SLOTS, WEEKDAYS } from '@/types';
 import { api } from '@/services/api';
@@ -8,7 +8,6 @@ import { useAppStore } from '@/stores/appStore';
 import { useAuthStore } from '@/stores/authStore';
 import WeekSelector from '@/components/WeekSelector';
 import DaySelector from '@/components/DaySelector';
-import TermTransitionModal from '@/components/TermTransitionModal';
 import TimeSlotSelector from '@/components/TimeSlotSelector';
 import FreeTimeGrid from '@/components/FreeTimeGrid';
 
@@ -33,23 +32,9 @@ export default function DashboardView() {
   const [freeTimeData, setFreeTimeData] = useState<FreeTimeResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [currentTerm, setCurrentTerm] = useState<string>('');
-  const [showTransition, setShowTransition] = useState(false);
-
   const [useCustomRange, setUseCustomRange] = useState(false);
   const [customStartSection, setCustomStartSection] = useState(1);
   const [customEndSection, setCustomEndSection] = useState(2);
-
-  useEffect(() => {
-    fetch('/api/dashboard/stats', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(json => { if (json.success) setStats(json.data); })
-      .catch(() => {});
-    fetch('/api/terms/current')
-      .then(r => r.json())
-      .then(json => { if (json.success && json.data) setCurrentTerm(json.data.name); })
-      .catch(() => {});
-  }, [token]);
 
   useEffect(() => {
     const saved = localStorage.getItem(CURRENT_WEEK_KEY);
@@ -58,16 +43,26 @@ export default function DashboardView() {
     }
   }, []);
 
+  const currentTermId = useAppStore((s) => s.currentTermId);
+  const availableTerms = useAppStore((s) => s.availableTerms);
+  const setCurrentTermId = useAppStore((s) => s.setCurrentTermId);
+
   useEffect(() => {
-    loadFreeTimeData();
-  }, [currentWeek, selectedDepartment]);
+    const params = new URLSearchParams();
+    if (currentTermId) params.append('term_id', String(currentTermId));
+    fetch(`/api/dashboard/stats?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(json => { if (json.success) setStats(json.data); })
+      .catch(() => {});
+  }, [token, currentTermId]);
 
   const loadFreeTimeData = async () => {
     try {
       setLoading(true);
       const data = await api.queryFreeTime({
         week: currentWeek,
-        department: selectedDepartment || undefined
+        department: selectedDepartment || undefined,
+        term_id: currentTermId || undefined,
       });
       setFreeTimeData(data);
     } catch (err) {
@@ -76,6 +71,10 @@ export default function DashboardView() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadFreeTimeData();
+  }, [currentWeek, selectedDepartment, currentTermId]);
 
   const handleSetCurrentWeek = (week: number) => {
     setActualCurrentWeek(week);
@@ -125,7 +124,17 @@ export default function DashboardView() {
         <div className="space-y-1">
           <h1 className="text-4xl font-extrabold text-on-surface font-headline tracking-tight">空闲统计</h1>
           <p className="text-on-surface-variant font-medium">查看各部门成员的空闲时间分布</p>
-          {currentTerm && <span className="inline-block mt-1 text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">{currentTerm}</span>}
+          {availableTerms.length > 0 && (
+            <select
+              value={currentTermId || ''}
+              onChange={e => setCurrentTermId(Number(e.target.value))}
+              className="mt-2 px-2 py-1 text-xs rounded-lg bg-surface-container-low border border-surface-container-high"
+            >
+              {availableTerms.map(t => (
+                <option key={t.id} value={t.id}>{t.name}{t.status === 'active' ? ' (当前)' : ''}</option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <select
@@ -145,36 +154,6 @@ export default function DashboardView() {
           >
             <RefreshCw className={cn(loading && "animate-spin")} size={18} />
           </button>
-          <button
-            onClick={async () => {
-              try {
-                const token = localStorage.getItem('auth_token');
-                const res = await fetch('/api/export/reverse-schedule', {
-                  method: 'POST',
-                  headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
-                });
-                if (!res.ok) throw new Error('导出失败');
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url;
-                a.download = 'reverse-schedule.xlsx'; a.click();
-                URL.revokeObjectURL(url);
-              } catch { /* ignore */ }
-            }}
-            className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors flex items-center gap-1.5"
-          >
-            <Download size={14} />
-            导出反课表
-          </button>
-          {useAuthStore.getState().user?.role === 'admin' && (
-            <button
-              onClick={() => setShowTransition(true)}
-              className="px-4 py-2 bg-amber-100 text-amber-700 rounded-xl text-sm font-medium hover:bg-amber-200 transition-colors flex items-center gap-1.5"
-            >
-              <RefreshCw size={14} />
-              换届
-            </button>
-          )}
         </div>
       </section>
 
@@ -303,16 +282,6 @@ export default function DashboardView() {
         </div>
       </div>
 
-      <TermTransitionModal
-        isOpen={showTransition}
-        onClose={() => setShowTransition(false)}
-        onTransitioned={() => {
-          fetch('/api/terms/current')
-            .then(r => r.json())
-            .then(json => { if (json.success && json.data) setCurrentTerm(json.data.name); })
-            .catch(() => {});
-        }}
-      />
     </div>
   );
 }

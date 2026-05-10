@@ -98,7 +98,11 @@ export async function getObjectContent(objectKey: string): Promise<{ body: Buffe
  * Sanitize a path segment for use in OSS key (remove dangerous chars).
  */
 function safePathSegment(name: string): string {
-  return name.replace(/[/\\:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim() || 'unknown';
+  return name
+    .replace(/\.\./g, '_')
+    .replace(/[/\\:*?"<>|]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim() || 'unknown';
 }
 
 /**

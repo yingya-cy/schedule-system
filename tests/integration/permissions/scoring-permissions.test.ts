@@ -38,17 +38,23 @@ describe('Scoring Permissions', () => {
     if (templateId) await auth(supertest(app).delete(`/api/scoring/templates/${templateId}`));
   });
 
-  // ---- Public endpoints ----
-  describe('Public endpoints', () => {
-    it('should allow judge login without token', async () => {
+  // ---- Judge auth (judge endpoints now require code + token) ----
+  describe('Judge authentication', () => {
+    it('should return 400 for judge login without code', async () => {
       const res = await supertest(app)
         .post('/api/scoring/judge/login')
         .send({ name: '评委1', competition_id: competitionId });
-      expect(res.status).not.toBe(401);
+      expect(res.status).toBe(400);
     });
-    it('should allow judge contestants access without token', async () => {
-      const res = await supertest(app).get('/api/scoring/judge/999/contestants');
-      expect(res.status).not.toBe(401);
+    it('should return 401 for judge contestants without judge token', async () => {
+      const res = await supertest(app).get('/api/scoring/judge/contestants');
+      expect(res.status).toBe(401);
+    });
+    it('should return 401 for judge score submission without judge token', async () => {
+      const res = await supertest(app)
+        .post('/api/scoring/judge/scores')
+        .send({ contestant_id: 999, scores: [] });
+      expect(res.status).toBe(401);
     });
   });
 

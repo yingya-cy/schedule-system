@@ -18,10 +18,17 @@ export interface AuthUser {
   department?: string;
 }
 
+export interface JudgeUser {
+  judgeId: number;
+  competitionId: number;
+  type: 'judge';
+}
+
 declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      judge?: JudgeUser;
     }
   }
 }
@@ -30,10 +37,6 @@ function getToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.substring(7);
-  }
-  const q = req.query.token;
-  if (typeof q === 'string' && q.length > 0) {
-    return q;
   }
   return null;
 }
@@ -50,6 +53,25 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
     next();
   } catch {
     res.status(401).json({ success: false, error: '登录已过期，请重新登录' });
+  }
+}
+
+export function judgeAuth(req: Request, res: Response, next: NextFunction): void {
+  const token = getToken(req);
+  if (!token) {
+    res.status(401).json({ success: false, error: '评委未登录' });
+    return;
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    if (decoded.type !== 'judge') {
+      res.status(401).json({ success: false, error: '无效的评委令牌' });
+      return;
+    }
+    req.judge = decoded as JudgeUser;
+    next();
+  } catch {
+    res.status(401).json({ success: false, error: '评委登录已过期，请重新登录' });
   }
 }
 

@@ -137,6 +137,7 @@ export const api = {
     section?: number;
     department?: string;
     name?: string;
+    term_id?: number;
   }): Promise<FreeTimeResult[]> {
     const searchParams = new URLSearchParams();
     if (params.week) searchParams.append('week', params.week.toString());
@@ -144,6 +145,7 @@ export const api = {
     if (params.section) searchParams.append('section', params.section.toString());
     if (params.department) searchParams.append('department', params.department);
     if (params.name) searchParams.append('name', params.name);
+    if (params.term_id) searchParams.append('term_id', String(params.term_id));
 
     const response = await fetch(`/api/query/free-time?${searchParams.toString()}`, { headers: authHeaders() });
     const result = await response.json();

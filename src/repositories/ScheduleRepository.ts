@@ -63,9 +63,17 @@ export class ScheduleRepository {
     try {
       await connection.beginTransaction();
 
+      // Default to active term
+      let termId = (dto as any).term_id;
+      if (!termId) {
+        const [terms] = await connection.query("SELECT id FROM terms WHERE status = 'active' LIMIT 1");
+        termId = (terms as any[])[0]?.id;
+      }
+
       const scheduleInsert = {
         name: dto.name,
         department: dto.department,
+        term_id: termId,
         filename: dto.filename || null,
         file_data: dto.file_data || null,
         file_type: dto.file_type || null,

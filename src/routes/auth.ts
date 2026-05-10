@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import pool from '../config/database.ts';
 import { authenticate, requireRole, AuthUser, JWT_SECRET } from '../middleware/auth.ts';
 import { sendVerificationEmail } from '../services/emailService.ts';
+import { validate, loginSchema, registerSchema } from '../utils/validation.ts';
 
 const router = Router();
 
@@ -17,13 +18,9 @@ function generateToken(user: AuthUser): string {
 // =============================================
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', validate(loginSchema), async (req, res) => {
   try {
     const { username, password } = req.body;
-    if (!username || !password) {
-      res.status(400).json({ success: false, error: '请输入用户名和密码' });
-      return;
-    }
 
     const [rows] = await pool.query(
       'SELECT id, username, name, email, email_verify_token, email_verified_at, role, department, avatar_url, password_hash, is_active FROM users WHERE (username = ? OR email = ?)',
@@ -81,21 +78,9 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/auth/register
-router.post('/register', async (req, res) => {
+router.post('/register', validate(registerSchema), async (req, res) => {
   try {
     const { username, email, password, name } = req.body;
-    if (!username || !email || !password || !name) {
-      res.status(400).json({ success: false, error: '用户名、邮箱、密码和姓名为必填项' });
-      return;
-    }
-    if (password.length < 6) {
-      res.status(400).json({ success: false, error: '密码长度至少6位' });
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      res.status(400).json({ success: false, error: '邮箱格式不正确' });
-      return;
-    }
 
     const verifyToken = crypto.randomBytes(32).toString('hex');
     const passwordHash = await bcrypt.hash(password, 10);

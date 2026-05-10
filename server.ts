@@ -7,26 +7,36 @@ import FormData from "form-data";
 import fs from "fs";
 import dotenv from "dotenv";
 import rateLimit from "express-rate-limit";
+import helmet from "helmet";
+import cors from "cors";
 import { testConnection, initializeDatabase } from "./src/config/database.ts";
-import scheduleService from "./src/services/scheduleService.ts";
-import queryService from "./src/services/queryService.ts";
-import excelExportService from "./src/services/excelExportService.ts";
 import { authenticate, requireRole } from "./src/middleware/auth.ts";
 import scoringRouter from "./src/routes/scoring.ts";
 import authRouter from "./src/routes/auth.ts";
 import fileCenterRouter from "./src/routes/file-center.ts";
 import termsRouter from "./src/routes/terms.ts";
+import { registerScheduleRoutes } from "./src/routes/schedule-routes.ts";
+import { sendError } from "./src/utils/errorHandler.ts";
 import pool from './src/config/database.ts';
 
 dotenv.config();
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:5002";
 
 async function startServer() {
   const app = express();
   const PORT = 3001;
   app.use(express.json({ limit: '10mb' }));
+
+  // 安全头
+  app.use(helmet());
+
+  // CORS：仅允许应用自身访问 API
+  app.use(cors({
+    origin: process.env.APP_URL || 'http://localhost:5173',
+    credentials: true,
+  }));
 
   // 全局 API 限流：15 分钟内最多 300 请求
   const apiLimiter = rateLimit({
@@ -95,7 +105,7 @@ async function startServer() {
       res.json(result);
     } catch (error: unknown) {
       console.error(`❌ Proxy Error (${endpoint}):`, (error as Error).message);
-      res.status(500).json({ error: (error as Error).message || "OCR service connection failed" });
+      sendError(res, error);
     }
   };
 
@@ -110,7 +120,7 @@ async function startServer() {
       res.json(response.data);
     } catch (error: unknown) {
       console.error(`❌ Proxy Error (/api/ocr/horizontal_rules):`, (error as Error).message);
-      res.status(500).json({ error: (error as Error).message || "OCR service connection failed" });
+      sendError(res, error);
     }
   });
 
@@ -159,343 +169,14 @@ app.get("/api/reset-departments", authenticate, requireRole('admin'), async (req
     }
   }
 });
-  app.get("/api/departments", async (req, res) => {
-    try {
-      const departments = await scheduleService.getAllDepartments();
-      res.json({ success: true, data: departments });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
   // Auth required for all schedule/query/export/dashboard endpoints
   app.use('/api/schedules', authenticate);
   app.use('/api/query', authenticate);
   app.use('/api/export', authenticate);
   app.use('/api/dashboard', authenticate);
 
-  app.get("/api/schedules", async (req, res) => {
-    try {
-      const { department, name, term_id } = req.query;
-      let termId = term_id ? parseInt(term_id as string) : undefined;
-      if (!termId) {
-        const [terms] = await pool.query("SELECT id FROM terms WHERE status = 'active' LIMIT 1");
-        termId = (terms as any[])[0]?.id;
-      }
-      const schedules = await scheduleService.getAllSchedules({
-        department: department as string,
-        name: name as string,
-        term_id: termId,
-      });
-      res.json({ success: true, data: schedules });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.get("/api/schedules/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const schedule = await scheduleService.getScheduleWithCourses(id);
-      if (!schedule) {
-        return res.status(404).json({ success: false, error: "Schedule not found" });
-      }
-      res.json({ success: true, data: schedule });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.get("/api/schedules/:id/files", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const [rows] = await pool.query(
-        'SELECT * FROM file_items WHERE schedule_id = ? ORDER BY created_at DESC',
-        [id]
-      );
-      res.json({ success: true, data: rows });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-app.get("/api/schedules/:id/file", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const download = req.query.download === 'true';
-      const fileData = await scheduleService.getScheduleFile(id);
-      if (!fileData) {
-        return res.status(404).json({ success: false, error: "File not found" });
-      }
-      
-      res.setHeader('Content-Type', fileData.file_type);
-      if (download) {
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileData.filename)}"`);
-      } else {
-        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileData.filename)}"`);
-      }
-      res.send(fileData.file_data);
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.post("/api/schedules", async (req, res) => {
-    try {
-      const schedule = await scheduleService.createSchedule({
-        ...req.body,
-        created_by: req.user!.username,
-      });
-      res.json({ success: true, data: schedule });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.put("/api/schedules/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const existing = await scheduleService.getScheduleById(id);
-      if (!existing) {
-        return res.status(404).json({ success: false, error: "Schedule not found" });
-      }
-      // Permission: admin, 秘书部/主任团, or teacher who created it. Students cannot edit.
-      const { role, username, department } = req.user!;
-      const isPrivileged = role === 'admin' || department === '秘书部' || department === '主任团';
-      const isCreator = (existing as any).created_by === username;
-      if (!isPrivileged && !isCreator) {
-        return res.status(403).json({ success: false, error: '无权编辑此课表' });
-      }
-      const schedule = await scheduleService.updateSchedule(id, req.body);
-      res.json({ success: true, data: schedule });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.delete("/api/schedules/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const existing = await scheduleService.getScheduleById(id);
-      if (!existing) {
-        return res.status(404).json({ success: false, error: "Schedule not found" });
-      }
-      const { role, username, department } = req.user!;
-      const isPrivileged = role === 'admin' || department === '秘书部' || department === '主任团';
-      const isCreator = (existing as any).created_by === username;
-      if (!isPrivileged && !isCreator) {
-        return res.status(403).json({ success: false, error: '无权删除此课表' });
-      }
-      const deleted = await scheduleService.deleteSchedule(id);
-      res.json({ success: true, deleted });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.post("/api/schedules/:scheduleId/courses", async (req, res) => {
-    try {
-      const scheduleId = parseInt(req.params.scheduleId);
-      const course = await scheduleService.createCourse(scheduleId, req.body);
-      res.json({ success: true, data: course });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.put("/api/courses/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const course = await scheduleService.updateCourse(id, req.body);
-      if (!course) {
-        return res.status(404).json({ success: false, error: "Course not found" });
-      }
-      res.json({ success: true, data: course });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.delete("/api/courses/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const deleted = await scheduleService.deleteCourse(id);
-      res.json({ success: true, deleted });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.get("/api/query/free-time", async (req, res) => {
-    try {
-      const { week, day, section, department, name } = req.query;
-      const results = await queryService.queryFreeTime({
-        week: week ? parseInt(week as string) : undefined,
-        day: day ? parseInt(day as string) : undefined,
-        section: section ? parseInt(section as string) : undefined,
-        department: department as string,
-        name: name as string
-      });
-      res.json({ success: true, data: results });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.get("/api/query/person-schedule", async (req, res) => {
-    try {
-      const { name } = req.query;
-      if (!name) {
-        return res.status(400).json({ success: false, error: "Name parameter is required" });
-      }
-      const result = await queryService.getPersonSchedule(name as string);
-      if (!result) {
-        return res.status(404).json({ success: false, error: "Person not found" });
-      }
-      res.json({ success: true, data: result });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.get("/api/query/department-stats", async (req, res) => {
-    try {
-      const { department } = req.query;
-      if (!department) {
-        return res.status(400).json({ success: false, error: "Department parameter is required" });
-      }
-      const result = await queryService.getDepartmentStats(department as string);
-      res.json({ success: true, data: result });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.get("/api/query/all-free-time", async (req, res) => {
-    try {
-      const result = await queryService.getAllFreeTimeData();
-      res.json({ success: true, data: result });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.post("/api/export/reverse-schedule", async (req, res) => {
-    try {
-      const data = await queryService.getAllFreeTimeData();
-      const [terms] = await pool.query("SELECT name FROM terms WHERE status = 'active' LIMIT 1");
-      const termName = (terms as any[])[0]?.name || '';
-      const wb = await excelExportService.generateReverseScheduleWorkbook(data, termName);
-      const buf = await wb.xlsx.writeBuffer();
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', 'attachment; filename=reverse-schedule.xlsx');
-      res.send(Buffer.from(buf));
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.post("/api/export/person-schedule", async (req, res) => {
-    try {
-      const { name } = req.body;
-      if (!name) {
-        return res.status(400).json({ success: false, error: "Name parameter is required" });
-      }
-      
-      const result = await queryService.getPersonSchedule(name);
-      if (!result) {
-        return res.status(404).json({ success: false, error: "Person not found" });
-      }
-      
-      const excelBuffer = excelExportService.generatePersonScheduleExcel(name, result.all_courses);
-      
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename=${name}-schedule.xlsx`);
-      res.send(excelBuffer);
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  app.post("/api/export/department-stats", async (req, res) => {
-    try {
-      const { department } = req.body;
-      if (!department) {
-        return res.status(400).json({ success: false, error: "Department parameter is required" });
-      }
-      
-      const result = await queryService.getDepartmentStats(department);
-      const excelBuffer = excelExportService.generateDepartmentStatsExcel(department, result.schedules);
-      
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename=${department}-stats.xlsx`);
-      res.send(excelBuffer);
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  // 仪表盘聚合统计 API
-  app.get("/api/dashboard/stats", async (req, res) => {
-    try {
-      const [[schedCount], [courseCount], [userCount], [deptCount], [fileCount]] = await Promise.all([
-        pool.query('SELECT COUNT(*) as total FROM schedules'),
-        pool.query('SELECT COUNT(*) as total FROM courses'),
-        pool.query('SELECT COUNT(*) as total FROM users WHERE is_active = 1'),
-        pool.query('SELECT COUNT(*) as total FROM departments'),
-        pool.query('SELECT COUNT(*) as total FROM file_items'),
-      ]);
-      res.json({
-        success: true,
-        data: {
-          schedules: (schedCount as any[])[0].total,
-          courses: (courseCount as any[])[0].total,
-          users: (userCount as any[])[0].total,
-          departments: (deptCount as any[])[0].total,
-          files: (fileCount as any[])[0].total,
-        },
-      });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  // 课程目录 API（跨课表聚合）
-  app.get("/api/courses", async (req, res) => {
-    try {
-      const { category } = req.query;
-      let sql = `SELECT c.*, s.name as schedule_name, s.department
-                 FROM courses c JOIN schedules s ON c.schedule_id = s.id`;
-      const params: any[] = [];
-      if (category) {
-        sql += ' WHERE s.department = ?';
-        params.push(category);
-      }
-      sql += ' ORDER BY c.weekday ASC, c.id DESC LIMIT 200';
-      const [rows] = await pool.query(sql, params);
-      res.json({ success: true, data: rows });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
-
-  // 联系人目录 API
-  app.get("/api/contacts", async (req, res) => {
-    try {
-      const { department } = req.query;
-      let sql = 'SELECT id, username, name, role, department, avatar_url, email FROM users WHERE is_active = 1';
-      const params: any[] = [];
-      if (department) {
-        sql += ' AND department = ?';
-        params.push(department);
-      }
-      sql += ' ORDER BY role, name LIMIT 200';
-      const [rows] = await pool.query(sql, params);
-      res.json({ success: true, data: rows });
-    } catch (error: unknown) {
-      res.status(500).json({ success: false, error: (error as Error).message });
-    }
-  });
+  // 注册课表/查询/导出/仪表盘路由（共享模块）
+  registerScheduleRoutes(app);
 
   // 用户认证 API
   app.use('/api/auth', authRouter);

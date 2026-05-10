@@ -91,6 +91,7 @@ export interface FreeTimeQuery {
   section?: number;
   department?: string;
   name?: string;
+  term_id?: number;
 }
 
 export interface FreeTimeResult {

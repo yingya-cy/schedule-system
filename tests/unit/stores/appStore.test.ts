@@ -124,4 +124,46 @@ describe('useAppStore', () => {
       expect(state.departments.length).toBeGreaterThan(0);
     });
   });
+
+  describe('refreshSchedules', () => {
+    it('sets schedulesLoaded to true after fetch', async () => {
+      await useAppStore.getState().refreshSchedules();
+      const state = useAppStore.getState();
+      expect(state.schedulesLoaded).toBe(true);
+      expect(state.schedules.length).toBeGreaterThan(0);
+    });
+
+    it('sets schedulesLoading=false even on failure', async () => {
+      const { api } = await import('@/services/api');
+      (api.getSchedules as any).mockRejectedValueOnce(new Error('fail'));
+      await useAppStore.getState().refreshSchedules();
+      expect(useAppStore.getState().schedulesLoading).toBe(false);
+    });
+  });
+
+  describe('setCurrentTermId', () => {
+    it('updates term id', () => {
+      useAppStore.getState().setCurrentTermId(5);
+      expect(useAppStore.getState().currentTermId).toBe(5);
+    });
+  });
+
+  describe('terms', () => {
+    it('refreshTerms populates availableTerms', async () => {
+      useAppStore.setState({ currentTermId: null });
+      const mockResolve = vi.fn().mockResolvedValue({
+        json: () => Promise.resolve({ success: true, data: [{ id: 1, name: '2024秋', status: 'active' }] }),
+      });
+      vi.stubGlobal('fetch', mockResolve);
+      const { useAuthStore } = await import('@/stores/authStore');
+      useAuthStore.setState({ token: 'test-token' });
+
+      await useAppStore.getState().refreshTerms();
+      const state = useAppStore.getState();
+      expect(state.availableTerms.length).toBeGreaterThan(0);
+      expect(state.currentTermId).toBe(1);
+
+      vi.unstubAllGlobals();
+    });
+  });
 });

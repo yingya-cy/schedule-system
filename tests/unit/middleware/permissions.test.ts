@@ -14,8 +14,12 @@ describe('canModifyResource', () => {
     expect(canModifyResource(makeUser({ role: 'admin' }), 'other_user', '秘书部')).toBe(true);
   });
 
-  it('teacher can always modify', () => {
-    expect(canModifyResource(makeUser({ role: 'teacher' }), 'other_user', '秘书部')).toBe(true);
+  it('teacher cannot modify other user resource', () => {
+    expect(canModifyResource(makeUser({ role: 'teacher' }), 'other_user', '秘书部')).toBe(false);
+  });
+
+  it('teacher can modify own resource', () => {
+    expect(canModifyResource(makeUser({ role: 'teacher', username: 'me' }), 'me', '秘书部')).toBe(true);
   });
 
   it('creator can modify own resource', () => {

@@ -16,12 +16,32 @@ function getAuthHeaders(): Record<string, string> {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 
+function getJudgeHeaders(): Record<string, string> {
+  const token = localStorage.getItem('judge_token');
+  if (!token) return { 'Content-Type': 'application/json' };
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${url}`, {
     headers: getAuthHeaders(),
     ...options,
   });
-  // Handle non-2xx responses that may carry success:false in body
+  let json: ApiResponse<T>;
+  try {
+    json = await res.json();
+  } catch {
+    throw new Error(`请求失败 (${res.status})`);
+  }
+  if (!json.success) throw new Error(json.error || '请求失败');
+  return json.data as T;
+}
+
+async function judgeRequest<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE_URL}${url}`, {
+    headers: getJudgeHeaders(),
+    ...options,
+  });
   let json: ApiResponse<T>;
   try {
     json = await res.json();
@@ -107,14 +127,14 @@ export const competitionApi = {
       totalScoreMap: Record<number, Record<number, number>>;
     }>(`/competitions/${competitionId}/score-details`),
 
-  getJudgeByName: (competitionId: number, name: string) =>
-    request<Judge>('/judge/login', {
+  getJudgeByName: (competitionId: number, name: string, code: string) =>
+    request<Judge & { token: string }>('/judge/login', {
       method: 'POST',
-      body: JSON.stringify({ name, competition_id: competitionId }),
+      body: JSON.stringify({ name, competition_id: competitionId, code }),
     }),
 
-  getJudgeContestants: (judgeId: number) =>
-    request<Contestant[]>(`/judge/${judgeId}/contestants`),
+  getJudgeContestants: () =>
+    judgeRequest<Contestant[]>('/judge/contestants'),
 
   create: (data: {
     name: string;
@@ -208,20 +228,20 @@ export const judgeApi = {
       method: 'DELETE',
     }),
 
-  login: (name: string, competitionId: number) =>
-    request<Judge>('/judge/login', {
+  login: (name: string, competitionId: number, code: string) =>
+    request<Judge & { token: string }>('/judge/login', {
       method: 'POST',
-      body: JSON.stringify({ name, competition_id: competitionId }),
+      body: JSON.stringify({ name, competition_id: competitionId, code }),
     }),
 
-  getContestants: (judgeId: number) =>
-    request<Contestant[]>(`/judge/${judgeId}/contestants`),
+  getContestants: () =>
+    judgeRequest<Contestant[]>('/judge/contestants'),
 
-  getScoresByContestant: (contestantId: string, judgeId: string) =>
-    request<{ subdimension_id?: number; dimension_id?: number; score: number }[]>(`/judge/scores/${contestantId}/${judgeId}`),
+  getScoresByContestant: (contestantId: string) =>
+    judgeRequest<{ subdimension_id?: number; dimension_id?: number; score: number }[]>(`/judge/scores/${contestantId}`),
 
-  submitScore: (payload: SubmitScorePayload) =>
-    request<{ total_score: number }>('/judge/scores', {
+  submitScore: (payload: { contestant_id: number; scores: { subdimension_id?: number; dimension_id?: number; score: number }[] }) =>
+    judgeRequest<{ total_score: number }>('/judge/scores', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

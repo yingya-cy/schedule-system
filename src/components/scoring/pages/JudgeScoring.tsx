@@ -116,7 +116,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
         setExpandedDims(initialExpanded);
       }
 
-      const data = await competitionApi.getJudgeContestants(judgeId);
+      const data = await competitionApi.getJudgeContestants();
       setContestants(data);
 
       if (data.length > 0) {
@@ -135,7 +135,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   // 加载指定选手的已有评分
   async function loadContestantScores(contestantId: number) {
     try {
-      const rows = await judgeApi.getScoresByContestant(String(contestantId), String(judgeId));
+      const rows = await judgeApi.getScoresByContestant(String(contestantId));
       setLoadScoreError('');
       const loaded: Record<number, number> = {};
       for (const row of rows) {
@@ -171,7 +171,6 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
     }
     try {
       await judgeApi.submitScore({
-        judge_id: judgeId,
         contestant_id: activeContestant.id,
         scores: scoreList,
       });
@@ -341,7 +340,6 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
 
     setSubmitting(true);
     judgeApi.submitScore({
-      judge_id: judgeId,
       contestant_id: activeContestant.id,
       scores: scoreList,
     })
@@ -432,7 +430,6 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
       }
       try {
         await judgeApi.submitScore({
-          judge_id: judgeId,
           contestant_id: c.id,
           scores: scoreList,
         });
