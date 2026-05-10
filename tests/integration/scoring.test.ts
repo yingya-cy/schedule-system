@@ -294,3 +294,137 @@ describe('Judge Authentication Flow', () => {
     await auth(supertest(app).delete(`/api/scoring/templates/${templateId}`));
   });
 });
+
+describe('Bulk Import and Results', () => {
+  let templateId: number;
+  let competitionId: number;
+  let judgeId: number;
+  let judgeCode: string;
+  let contestantIds: number[] = [];
+
+  beforeAll(async () => {
+    const tRes = await auth(supertest(app)
+      .post('/api/scoring/templates')
+      .send({
+        name: '批量测试模板',
+        total_score: 100,
+        dimensions: [{ name: '评分项', max_score: 100 }],
+      }));
+    templateId = tRes.body.data.id;
+
+    const cRes = await auth(supertest(app)
+      .post('/api/scoring/competitions')
+      .send({ name: '批量测试比赛', template_id: templateId }));
+    competitionId = cRes.body.data.id;
+
+    await auth(supertest(app)
+      .put(`/api/scoring/competitions/${competitionId}`)
+      .send({ status: 'scoring' }));
+  });
+
+  it('bulk imports contestants', async () => {
+    const res = await auth(supertest(app)
+      .post(`/api/scoring/competitions/${competitionId}/contestants/import`)
+      .send({ contestants: [
+        { number: '1', name: '选手1' },
+        { number: '2', name: '选手2' },
+        { number: '3', name: '选手3' },
+      ]}))
+      .expect(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.inserted).toBe(3);
+    contestantIds = res.body.data.ids;
+  });
+
+  it('bulk imports judges', async () => {
+    const res = await auth(supertest(app)
+      .post(`/api/scoring/competitions/${competitionId}/judges/import`)
+      .send({ names: ['评委A', '评委B'] }))
+      .expect(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.inserted).toBe(2);
+
+    const listRes = await auth(supertest(app)
+      .get(`/api/scoring/competitions/${competitionId}/judges`));
+    judgeId = listRes.body.data[0].id;
+    judgeCode = listRes.body.data[0].code;
+  });
+
+  it('gets score details matrix', async () => {
+    const res = await auth(supertest(app)
+      .get(`/api/scoring/competitions/${competitionId}/score-details`))
+      .expect(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.judges).toBeDefined();
+  });
+
+  it('calculates results after judge submits scores', async () => {
+    const loginRes = await supertest(app)
+      .post('/api/scoring/judge/login')
+      .send({ name: '评委A', competition_id: competitionId, code: judgeCode });
+    const judgeToken = loginRes.body.data.token;
+    const templateRes = await auth(supertest(app)
+      .get(`/api/scoring/templates/${templateId}`));
+    const dimId = templateRes.body.data.dimensions[0].id;
+
+    for (const cid of contestantIds) {
+      await supertest(app)
+        .post('/api/scoring/judge/scores')
+        .set('Authorization', `Bearer ${judgeToken}`)
+        .send({ contestant_id: cid, scores: [{ dimension_id: dimId, score: 80 }] });
+    }
+
+    const res = await auth(supertest(app)
+      .post(`/api/scoring/competitions/${competitionId}/calculate`))
+      .expect(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('publishes results', async () => {
+    const res = await auth(supertest(app)
+      .post(`/api/scoring/competitions/${competitionId}/publish`))
+      .expect(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('returns published results', async () => {
+    const res = await auth(supertest(app)
+      .get(`/api/scoring/competitions/${competitionId}/results`))
+      .expect(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('returns live results', async () => {
+    const res = await auth(supertest(app)
+      .get(`/api/scoring/competitions/${competitionId}/live-results`))
+      .expect(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('exports results as xlsx', async () => {
+    const res = await auth(supertest(app)
+      .get(`/api/scoring/competitions/${competitionId}/export`))
+      .expect(200);
+    expect(res.headers['content-type']).toContain('spreadsheet');
+  });
+
+  it('returns scoring history', async () => {
+    const res = await auth(supertest(app)
+      .get('/api/scoring/history'))
+      .expect(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('clears all data for competition', async () => {
+    const res = await auth(supertest(app)
+      .delete(`/api/scoring/competitions/${competitionId}/clear-all`))
+      .expect(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  afterAll(async () => {
+    await auth(supertest(app).delete(`/api/scoring/competitions/${competitionId}`));
+    await auth(supertest(app).delete(`/api/scoring/templates/${templateId}`));
+  });
+});

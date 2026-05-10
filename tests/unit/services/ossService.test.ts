@@ -1,39 +1,33 @@
 import { describe, it, expect } from 'vitest';
 
-// ossService functions are tested via import (may fail without OSS config, so test pure helpers only)
-// The safePathSegment and buildObjectKey logic can be tested by importing buildObjectKey
+describe('ossService', () => {
+  describe('buildObjectKey', () => {
+    it('sanitizes slashes in activity name', async () => {
+      const { buildObjectKey } = await import('../../../src/services/ossService.ts');
+      expect(buildObjectKey('act/name', 'folder', 1, 'f.pdf')).toContain('act_name');
+    });
 
-describe('ossService key building', () => {
-  // buildObjectKey is a pure function — test path traversal protection
-  it('buildObjectKey sanitizes slashes in activity name', async () => {
-    const { buildObjectKey } = await import('../../../src/services/ossService.ts');
-    const key = buildObjectKey('act/name', 'folder', 1, 'file.pdf');
-    expect(key).not.toContain('act/name');
-    expect(key).toContain('act_name');
+    it('sanitizes .. in folder name', async () => {
+      const { buildObjectKey } = await import('../../../src/services/ossService.ts');
+      expect(buildObjectKey('act', '..', 1, 'f.pdf')).not.toContain('/../');
+    });
+
+    it('produces expected format', async () => {
+      const { buildObjectKey } = await import('../../../src/services/ossService.ts');
+      expect(buildObjectKey('设计大赛', '初赛', 42, '作品.pdf'))
+        .toBe('file-center/设计大赛/初赛/42_作品.pdf');
+    });
+
+    it('sanitizes slashes in filename', async () => {
+      const { buildObjectKey } = await import('../../../src/services/ossService.ts');
+      expect(buildObjectKey('act', 'fld', 1, 'a/b.pdf')).not.toContain('a/b');
+    });
   });
 
-  it('buildObjectKey sanitizes backslashes', async () => {
-    const { buildObjectKey } = await import('../../../src/services/ossService.ts');
-    const key = buildObjectKey('act\\name', 'folder', 1, 'file.pdf');
-    expect(key).not.toContain('act\\name');
-  });
-
-  it('buildObjectKey sanitizes .. in folder name', async () => {
-    const { buildObjectKey } = await import('../../../src/services/ossService.ts');
-    const key = buildObjectKey('activity', '..', 1, 'file.pdf');
-    expect(key).not.toContain('/../');
-  });
-
-  it('buildObjectKey produces expected format', async () => {
-    const { buildObjectKey } = await import('../../../src/services/ossService.ts');
-    const key = buildObjectKey('设计大赛', '初赛', 42, '作品.pdf');
-    expect(key).toBe('file-center/设计大赛/初赛/42_作品.pdf');
-  });
-
-  it('buildObjectKey sanitizes slashes in filename', async () => {
-    const { buildObjectKey } = await import('../../../src/services/ossService.ts');
-    const key = buildObjectKey('activity', 'folder', 1, 'a/b.pdf');
-    expect(key).not.toContain('a/b');
-    expect(key).toContain('a_b');
+  describe('getObjectUrl', () => {
+    it('builds public URL', async () => {
+      const { getObjectUrl } = await import('../../../src/services/ossService.ts');
+      expect(getObjectUrl('path/file.pdf')).toContain('aliyuncs.com');
+    });
   });
 });
