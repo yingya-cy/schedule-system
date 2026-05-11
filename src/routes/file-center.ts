@@ -547,4 +547,81 @@ router.get('/oss/preview', async (req, res) => {
   }
 });
 
+// POST /api/file-center/items/batch-delete
+router.post('/items/batch-delete', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ success: false, error: 'ids 为必填项' });
+      return;
+    }
+
+    // Verify permissions for all items
+    const [items] = await pool.query<RowDataPacket[]>(
+      `SELECT id, created_by FROM file_items WHERE id IN (${ids.map(() => '?').join(',')})`,
+      ids
+    );
+    for (const item of items) {
+      if (!canModifyResource(req.user!, item.created_by)) {
+        res.status(403).json({ success: false, error: `无权删除文件 #${item.id}` });
+        return;
+      }
+    }
+
+    const [result] = await pool.query<ResultSetHeader>(
+      `DELETE FROM file_items WHERE id IN (${ids.map(() => '?').join(',')})`,
+      ids
+    );
+    res.json({ success: true, data: { deleted: result.affectedRows } });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
+  }
+});
+
+// POST /api/file-center/items/batch-download
+router.post('/items/batch-download', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ success: false, error: 'ids 为必填项' });
+      return;
+    }
+
+    const [items] = await pool.query<RowDataPacket[]>(
+      `SELECT id, original_filename, oss_object_key, stored_filename FROM file_items WHERE id IN (${ids.map(() => '?').join(',')})`,
+      ids
+    );
+
+    if (items.length === 0) {
+      res.status(404).json({ success: false, error: '未找到文件' });
+      return;
+    }
+
+    // Download from OSS and zip
+    const archiver = (await import('archiver')).default;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="batch-download-${Date.now()}.zip"`);
+
+    const archive = archiver('zip', { zlib: { level: 5 } });
+    archive.pipe(res);
+
+    for (const item of items) {
+      try {
+        if (item.oss_object_key) {
+          const { body } = await getObjectContent(item.oss_object_key);
+          archive.append(body, { name: item.original_filename || item.stored_filename });
+        }
+      } catch {
+        // Skip files that can't be fetched
+      }
+    }
+
+    await archive.finalize();
+  } catch (error: unknown) {
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
+    }
+  }
+});
+
 export default router;

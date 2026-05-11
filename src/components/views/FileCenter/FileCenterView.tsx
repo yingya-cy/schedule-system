@@ -44,10 +44,18 @@ export default function FileCenterView() {
   const [itemError, setItemError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadFileName, setUploadFileName] = useState('');
+  const [uploadStartTime, setUploadStartTime] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [sortBy, setSortBy] = useState<'name' | 'size' | 'date'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const abortRef = useRef<AbortController | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: number; name: string } | null>(null);
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<number>>(new Set());
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [previewFile, setPreviewFile] = useState<FileCenterFileItem | null>(null);
@@ -229,9 +237,11 @@ export default function FileCenterView() {
         abortRef.current = controller;
         const total = selectedFiles.length;
         let completed = 0;
+        setUploadStartTime(Date.now());
 
         const uploadOne = async (file: File) => {
           const filename = file.name;
+          setUploadFileName(`上传中 ${completed + 1}/${total}: ${filename}`);
           const contentType = file.type || 'application/octet-stream';
 
           const initRes = await fetch('/api/file-center/oss/init', {
@@ -372,6 +382,113 @@ export default function FileCenterView() {
       console.error('Delete failed:', e);
       setDeleteTarget(null);
     }
+  }
+
+  function toggleFileSelection(fileId: number) {
+    setSelectedFileIds(prev => {
+      const next = new Set(prev);
+      if (next.has(fileId)) next.delete(fileId); else next.add(fileId);
+      return next;
+    });
+  }
+
+  function clearSelection() { setSelectedFileIds(new Set()); }
+
+  async function handleBatchDelete() {
+    if (selectedFileIds.size === 0) return;
+    try {
+      const res = await fetch('/api/file-center/items/batch-delete', {
+        method: 'POST', headers,
+        body: JSON.stringify({ ids: Array.from(selectedFileIds) }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      clearSelection();
+      if (selectedFolderId) fetchItems(selectedFolderId);
+    } catch (e: unknown) {
+      console.error('Batch delete failed:', e);
+    }
+  }
+
+  async function handleBatchDownloadZip() {
+    if (selectedFileIds.size === 0) return;
+    const res = await fetch('/api/file-center/items/batch-download', {
+      method: 'POST', headers,
+      body: JSON.stringify({ ids: Array.from(selectedFileIds) }),
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'files.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleBatchDownloadIndividual() {
+    if (selectedFileIds.size === 0) return;
+    const files = items.files.filter(f => selectedFileIds.has(f.id) && f.oss_object_key);
+    for (const f of files) {
+      try {
+        const res = await fetch(`/api/file-center/oss/download?key=${encodeURIComponent(f.oss_object_key!)}&filename=${encodeURIComponent(f.original_filename)}`, { headers });
+        if (!res.ok) continue;
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = f.original_filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      } catch { /* skip failed files */ }
+    }
+    clearSelection();
+  }
+
+  // Drag & drop
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault(); e.stopPropagation();
+    setIsDragOver(true);
+  }
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault(); e.stopPropagation();
+    setIsDragOver(false);
+  }
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault(); e.stopPropagation();
+    setIsDragOver(false);
+    if (!selectedFolderId) return;
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      setSelectedFiles(files);
+      setItemForm({ original_filename: '', file_category: detectFileCategory(files[0].type, files[0].name), description: '', oss_url: '' });
+      setItemError(''); setUploadProgress(0); setEditingItem(null);
+      setShowItemModal(true);
+    }
+  }
+
+  // Breadcrumb path for current folder
+  function getFolderPath(): FileCenterFolder[] {
+    const path: FileCenterFolder[] = [];
+    let currentId: number | null = selectedFolderId;
+    while (currentId) {
+      const f = folders.find(f => f.id === currentId);
+      if (!f) break;
+      path.unshift(f);
+      currentId = f.parent_id;
+    }
+    return path;
+  }
+
+  // Sort files
+  function sortedFiles(): FileCenterFileItem[] {
+    const files = [...items.files];
+    files.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === 'name') cmp = a.original_filename.localeCompare(b.original_filename);
+      else if (sortBy === 'size') cmp = a.file_size - b.file_size;
+      else cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      return sortOrder === 'desc' ? -cmp : cmp;
+    });
+    return files;
   }
 
   function buildTree(parentId: number | null = null): FileCenterFolder[] {
@@ -538,7 +655,16 @@ export default function FileCenterView() {
             </div>
           </div>
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+            {isDragOver && (
+              <div className="fixed inset-0 z-50 bg-primary/10 border-2 border-dashed border-primary rounded-2xl flex items-center justify-center pointer-events-none">
+                <div className="bg-surface rounded-2xl shadow-xl px-8 py-6 text-center">
+                  <Upload size={40} className="mx-auto mb-3 text-primary" />
+                  <p className="text-lg font-bold text-on-surface">释放文件以上传</p>
+                  <p className="text-sm text-on-surface-variant mt-1">文件将上传到当前文件夹</p>
+                </div>
+              </div>
+            )}
             <div className="bg-surface rounded-2xl border border-surface-container-high p-4">
               <div className="flex items-center justify-between mb-3 pb-3 border-b border-surface-container-high">
                 <div className="flex items-center gap-2 min-w-0">
@@ -575,12 +701,42 @@ export default function FileCenterView() {
                 </div>
               </div>
 
+              {/* Breadcrumb */}
+              {selectedFolderId && (
+                <div className="flex items-center gap-1 mb-3 text-xs text-outline">
+                  <button onClick={() => setSelectedFolderId(null)} className="hover:text-primary transition-colors">全部文件</button>
+                  {getFolderPath().map(f => (
+                    <span key={f.id} className="flex items-center gap-1">
+                      <ChevronRight size={10} />
+                      <button onClick={() => setSelectedFolderId(f.id)} className="hover:text-primary transition-colors truncate max-w-[120px]">{f.name}</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-on-surface font-headline">
-                  {selectedFolderId
-                    ? folders.find(f => f.id === selectedFolderId)?.name || '文件夹'
-                    : '全部文件'}
-                </h3>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-sm font-bold text-on-surface font-headline">
+                    {selectedFolderId
+                      ? folders.find(f => f.id === selectedFolderId)?.name || '文件夹'
+                      : '全部文件'}
+                  </h3>
+                  {/* Sort controls */}
+                  {items.files.length > 1 && (
+                    <div className="flex items-center gap-1 text-[10px]">
+                      <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                        className="px-1.5 py-0.5 rounded bg-surface-container-low border border-surface-container-high text-on-surface-variant">
+                        <option value="date">时间</option>
+                        <option value="name">名称</option>
+                        <option value="size">大小</option>
+                      </select>
+                      <button onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+                        className="px-1.5 py-0.5 rounded bg-surface-container-low border border-surface-container-high text-on-surface-variant">
+                        {sortOrder === 'desc' ? '↓' : '↑'}
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => { setShowItemModal(true); setEditingItem(null); setItemForm({ original_filename: '', file_category: 'document', description: '', oss_url: '' }); setItemError(''); setSelectedFiles([]); setUploadProgress(0); }}
@@ -691,12 +847,27 @@ export default function FileCenterView() {
 
                   {items.files.length > 0 && (
                     <div className="mb-4">
-                      <p className="text-xs font-bold text-outline uppercase tracking-wider mb-2">文件</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="text-xs font-bold text-outline uppercase tracking-wider">文件</p>
+                        <button
+                          onClick={() => {
+                            if (selectedFileIds.size === items.files.length) clearSelection();
+                            else setSelectedFileIds(new Set(items.files.map(f => f.id)));
+                          }}
+                          className="text-[10px] text-primary hover:underline"
+                        >
+                          {selectedFileIds.size === items.files.length ? '取消全选' : '全选'}
+                        </button>
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {items.files.map(f => (
-                          <div key={f.id} className="group relative bg-surface-container-lowest rounded-xl border border-surface-container-high p-3 hover:border-primary/30 transition-all cursor-pointer"
+                        {sortedFiles().map(f => (
+                          <div key={f.id} className={`group relative bg-surface-container-lowest rounded-xl border p-3 hover:border-primary/30 transition-all cursor-pointer ${selectedFileIds.has(f.id) ? 'border-primary/50 bg-primary/5' : 'border-surface-container-high'}`}
                             onClick={() => setPreviewFile(f)}
                           >
+                            <div className="absolute top-2 left-2 z-10" onClick={e => e.stopPropagation()}>
+                              <input type="checkbox" checked={selectedFileIds.has(f.id)} onChange={() => toggleFileSelection(f.id)}
+                                className="w-4 h-4 rounded accent-primary cursor-pointer opacity-0 group-hover:opacity-100 checked:opacity-100 transition-opacity" />
+                            </div>
                             <div className="flex items-start gap-3">
                               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
                                 {categoryIcons[f.file_category] || <FileText size={16} />}
@@ -803,6 +974,44 @@ export default function FileCenterView() {
           </div>
         </div>
       )}
+
+      {/* Batch action bar */}
+      <AnimatePresence>
+        {selectedFileIds.size > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-surface rounded-2xl border border-surface-container-high shadow-xl px-5 py-3 flex items-center gap-4"
+          >
+            <span className="text-sm font-medium text-on-surface">{selectedFileIds.size} 个文件已选</span>
+            <div className="relative">
+              <button onClick={() => setShowDownloadMenu(!showDownloadMenu)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-on-primary hover:bg-primary/90 transition-colors">
+                批量下载
+              </button>
+              {showDownloadMenu && (
+                <>
+                  <div className="fixed inset-0 z-50" onClick={() => setShowDownloadMenu(false)} />
+                  <div className="absolute bottom-full mb-1 left-0 bg-surface rounded-xl border border-surface-container-high shadow-lg py-1 min-w-[140px] z-50">
+                    <button onClick={() => { setShowDownloadMenu(false); handleBatchDownloadZip(); }} className="w-full px-3 py-2 text-left text-xs hover:bg-surface-container-low transition-colors">
+                      打包为 ZIP
+                    </button>
+                    <button onClick={() => { setShowDownloadMenu(false); handleBatchDownloadIndividual(); }} className="w-full px-3 py-2 text-left text-xs hover:bg-surface-container-low transition-colors">
+                      分别下载
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <button onClick={() => setBatchDeleteConfirm(true)} className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors">
+              批量删除
+            </button>
+            <button onClick={clearSelection} className="px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:text-on-surface transition-colors">
+              取消
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Activity Modal */}
       <AnimatePresence>
@@ -931,7 +1140,7 @@ export default function FileCenterView() {
                         <div className="text-center">
                           <Upload size={24} className="mx-auto mb-1 text-outline" />
                           <p className="text-sm text-on-surface-variant">点击选择文件（支持批量）</p>
-                          <p className="text-xs text-outline mt-0.5">支持图片、视频、文档</p>
+                          <p className="text-xs text-outline mt-0.5">支持图片、视频、文档、压缩包、音频等</p>
                         </div>
                       )}
                     </label>
@@ -940,10 +1149,16 @@ export default function FileCenterView() {
 
                   {uploading && (
                     <div className="space-y-2">
+                      <p className="text-xs text-on-surface truncate">{uploadFileName}</p>
                       <div className="h-2 rounded-full bg-surface-container-high overflow-hidden">
                         <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                       </div>
-                      <p className="text-xs text-on-surface-variant">上传中... {uploadProgress}%</p>
+                      <div className="flex items-center justify-between text-[10px] text-outline">
+                        <span>{uploadProgress}%</span>
+                        {uploadStartTime > 0 && uploadProgress > 0 && uploadProgress < 100 && (
+                          <span>剩余约 {Math.ceil((100 - uploadProgress) * (Date.now() - uploadStartTime) / uploadProgress / 1000)}s</span>
+                        )}
+                      </div>
                       <button
                         onClick={cancelUpload}
                         className="w-full py-2 text-sm font-medium text-error bg-error/5 rounded-xl hover:bg-error/10 transition-colors"
@@ -1087,6 +1302,17 @@ export default function FileCenterView() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Batch Delete Confirm */}
+      <ConfirmDialog
+        isOpen={batchDeleteConfirm}
+        onCancel={() => setBatchDeleteConfirm(false)}
+        onConfirm={() => { setBatchDeleteConfirm(false); handleBatchDelete(); }}
+        title="批量删除"
+        message={`确定要删除选中的 ${selectedFileIds.size} 个文件吗？此操作不可撤销。`}
+        confirmText="删除"
+        type="danger"
+      />
 
       {/* Delete Confirm */}
       <ConfirmDialog

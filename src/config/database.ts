@@ -508,7 +508,7 @@ export async function initializeDatabase() {
         stored_filename VARCHAR(255) NOT NULL,
         file_size BIGINT DEFAULT 0,
         mime_type VARCHAR(100),
-        file_category ENUM('video', 'image', 'document', 'tweet') NOT NULL DEFAULT 'document',
+        file_category ENUM('video', 'image', 'document', 'archive', 'audio', 'other', 'tweet') NOT NULL DEFAULT 'document',
         file_hash VARCHAR(64),
         oss_object_key VARCHAR(500),
         oss_url VARCHAR(1000),
@@ -536,6 +536,12 @@ export async function initializeDatabase() {
     } catch (e: unknown) {
       console.log('ℹ️  schedule_id column note:', e instanceof Error ? e.message : String(e));
     }
+
+    // 迁移：file_items.file_category 扩展 ENUM 值
+    try {
+      await connection.query("ALTER TABLE file_items MODIFY COLUMN file_category ENUM('video','image','document','archive','audio','other','tweet') NOT NULL DEFAULT 'document'");
+      console.log('✅ Extended file_category ENUM with archive/audio/other');
+    } catch (e: unknown) { /* already updated or OK */ }
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS file_tweets (

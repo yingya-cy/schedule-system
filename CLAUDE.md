@@ -170,3 +170,30 @@ import { RowDataPacket, ResultSetHeader, getErrorMessage, isDuplicateEntry } fro
 - `isDuplicateEntry(e)` — 判断是否为 MySQL 唯一键冲突
 
 **项目已启用 `strict: true`**，类型检查会捕获大多数隐式 `any`。
+
+## 文件下载/预览规则（防止 401）
+
+**原则：** 需要认证的接口，禁止用 `<a>` 标签或 `window.open()` 直接导航。浏览器导航请求**无法携带 `Authorization` header**。
+
+| ❌ 错误 | ✅ 正确 |
+|---------|--------|
+| `<a href="/api/...">` 直接跳转 | `fetch(url, { headers })` → blob → `URL.createObjectURL` → `<a>` 下载 |
+| `window.open('/api/...')` 新窗口 | 同上，或用 `?token=xxx` query string（仅限已支持该方式的端点） |
+
+**标准下载模式（fetch + blob）：**
+```typescript
+const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+const blob = await res.blob();
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url; a.download = filename;
+document.body.appendChild(a); a.click(); a.remove();
+URL.revokeObjectURL(url);
+```
+
+**历史教训（3 次重复踩坑）：**
+1. 课表"查看源文件" — `window.open(url?token=xxx)` → 中间件不读 query token → 401
+2. 课表"下载源文件" — `<a href=...?token=xxx>` → 同上
+3. 文件中心"分别下载" — `<a href=...>` 不带 token → 401
+
+**检查清单：** 任何新增的下载/预览功能，确认是否走了 `fetch` + header 认证。
