@@ -30,6 +30,7 @@ services:
       - DB_USER=root
       - DB_PASSWORD=753412
       - DB_NAME=schedule_system
+      - JWT_SECRET=${JWT_SECRET}
       - AI_SERVICE_URL=http://ai-service:5002
     volumes:
       - uploads:/app/uploads
