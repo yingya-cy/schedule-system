@@ -11,7 +11,7 @@ import helmet from "helmet";
 import cors from "cors";
 import { testConnection, initializeDatabase } from "./src/config/database.ts";
 import { authenticate, requireRole } from "./src/middleware/auth.ts";
-import scoringRouter from "./src/routes/scoring.ts";
+import scoringRouter from "./src/routes/scoring/index.ts";
 import authRouter from "./src/routes/auth.ts";
 import fileCenterRouter from "./src/routes/file-center.ts";
 import termsRouter from "./src/routes/terms.ts";

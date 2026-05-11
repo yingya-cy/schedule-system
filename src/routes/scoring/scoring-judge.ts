@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import pool from '../config/database.ts';
-import { judgeAuth, JWT_SECRET } from '../middleware/auth.ts';
-import { RowDataPacket, ResultSetHeader } from '../utils/db-types';
-import { validate, submitScoreSchema } from '../utils/validation.ts';
+import pool from '../../config/database.ts';
+import { judgeAuth, JWT_SECRET } from '../../middleware/auth.ts';
+import { RowDataPacket, ResultSetHeader } from '../../utils/db-types';
+import { validate, submitScoreSchema } from '../../utils/validation.ts';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
