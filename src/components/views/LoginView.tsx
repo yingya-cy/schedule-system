@@ -72,12 +72,12 @@ export default function LoginView() {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto shadow-lg shadow-primary/20 mb-4">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#5590b2] to-[#d4b88a] flex items-center justify-center mx-auto shadow-[0_4px_16px_rgba(85,144,178,0.18)] mb-4">
             <motion.div
               animate={{ rotate: [0, 15, -15, 0] }}
               transition={{ repeat: Infinity, duration: 4 }}
             >
-              <LayoutDashboard size={32} className="text-on-primary" />
+              <LayoutDashboard size={30} className="text-white" />
             </motion.div>
           </div>
           <h1 className="text-2xl font-extrabold text-primary font-headline">学术空间</h1>
@@ -85,7 +85,7 @@ export default function LoginView() {
         </div>
 
         {/* Login Card */}
-        <div className="bg-surface rounded-2xl border border-surface-container-high shadow-sm p-6">
+        <div className="bg-surface-container-lowest/85 backdrop-blur-sm rounded-3xl border border-outline-variant/50 shadow-[0_4px_20px_rgba(139,119,90,0.06)] p-6">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-semibold text-on-surface mb-1.5 font-headline">
@@ -144,11 +144,11 @@ export default function LoginView() {
             )}
 
             <motion.button
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
+              whileHover={{ scale: 1.005 }}
+              whileTap={{ scale: 0.995 }}
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-primary text-on-primary rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all disabled:opacity-60"
+              className="w-full py-3 bg-primary text-on-primary rounded-2xl font-bold text-sm shadow-[0_4px_16px_rgba(85,144,178,0.20)] hover:shadow-[0_6px_22px_rgba(85,144,178,0.28)] hover:brightness-105 transition-all duration-200 disabled:opacity-60"
             >
               {loading ? '登录中...' : '登录'}
             </motion.button>

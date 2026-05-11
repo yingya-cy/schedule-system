@@ -53,10 +53,10 @@ export default function ScheduleItem({ schedule, onView, onDelete, canDelete }: 
       {/* Actions */}
       <div className="flex items-center gap-1.5 pt-4 mt-4 border-t border-surface-container-high/60">
         <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          whileHover={{ scale: 1.005 }}
+          whileTap={{ scale: 0.995 }}
           onClick={() => onView(schedule)}
-          className="focus-ring min-w-0 flex-1 py-2 px-3 bg-primary text-on-primary text-sm font-semibold rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5 shadow-sm whitespace-nowrap"
+          className="focus-ring min-w-0 flex-1 py-2 px-3 bg-primary/12 text-primary text-sm font-semibold rounded-xl hover:bg-primary/20 hover:shadow-[0_2px_8px_rgba(85,144,178,0.10)] transition-all duration-200 flex items-center justify-center gap-1.5 whitespace-nowrap"
         >
           <Eye size={14} />
           <span>查看课表</span>

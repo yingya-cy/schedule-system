@@ -78,7 +78,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-background overflow-x-hidden">
+    <div className="flex min-h-screen overflow-x-hidden">
       {/* Mobile Overlay */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -97,20 +97,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <motion.aside
         initial={{ x: -100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        transition={{ type: 'spring', stiffness: 180, damping: 24 }}
         className={cn(
-          "fixed left-0 top-0 h-full w-64 border-r border-surface-container-high bg-surface flex flex-col p-4 gap-2 z-50",
+          "fixed left-0 top-0 h-full w-64 border-r border-outline-variant/40 bg-surface/90 backdrop-blur-md flex flex-col p-4 gap-2 z-50",
           "lg:translate-x-0",
           isMobile ? "-translate-x-full" : mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex items-center gap-3 px-3 mb-8 mt-2">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-lg shadow-primary/20">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#5590b2] to-[#d4b88a] flex items-center justify-center text-white shadow-sm">
             <motion.div
               animate={{ rotate: [0, 15, -15, 0] }}
               transition={{ repeat: Infinity, duration: 4 }}
             >
-              <LayoutDashboard size={24} />
+              <LayoutDashboard size={22} />
             </motion.div>
           </div>
           <div>
@@ -127,8 +127,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group focus-ring",
                 currentView === `/${item.id}`
-                  ? "bg-white text-primary shadow-sm font-semibold"
-                  : "text-on-surface-variant hover:bg-surface-container-low"
+                  ? "bg-primary/10 text-primary shadow-sm font-semibold"
+                  : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
               )}
             >
               <span className={cn(
@@ -145,7 +145,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="mt-auto space-y-1">
           <button
             onClick={() => { navigate('/files'); setMobileMenuOpen(false); }}
-            className="w-full bg-primary-container text-on-primary py-3 rounded-xl font-bold text-sm mb-6 flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all"
+            className="w-full bg-primary-container text-on-primary py-3 rounded-2xl font-bold text-sm mb-4 flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(85,144,178,0.18)] hover:shadow-[0_6px_20px_rgba(85,144,178,0.25)] hover:brightness-105 active:brightness-95 transition-all duration-200"
           >
             <Plus size={18} />
             新建日程
@@ -164,7 +164,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <div className="flex-1 lg:ml-64 flex flex-col w-full pb-20 lg:pb-0">
         {/* Top Bar */}
-        <header className="sticky top-0 z-40 h-16 bg-white/80 backdrop-blur-xl flex justify-between items-center px-4 lg:px-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <header className="sticky top-0 z-40 h-16 bg-surface-container-lowest/80 backdrop-blur-md flex justify-between items-center px-4 lg:px-8 shadow-[0_4px_20px_rgba(139,119,90,0.06)]">
           <div className="flex items-center gap-4 min-w-0 flex-1">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

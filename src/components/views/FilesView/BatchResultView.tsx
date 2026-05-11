@@ -104,7 +104,7 @@ export default function BatchResultView({
                 {result.success && !result.saved && (
                   <button
                     onClick={() => onEdit(index)}
-                    className="px-4 py-2 bg-primary text-on-primary text-sm font-semibold rounded-lg hover:bg-primary/90 transition-all flex items-center gap-2"
+                    className="px-4 py-2 bg-primary/12 text-primary text-sm font-semibold rounded-xl hover:bg-primary/20 hover:shadow-[0_2px_8px_rgba(85,144,178,0.10)] transition-all duration-200 flex items-center gap-2"
                   >
                     <Edit3 size={16} />
                     编辑保存

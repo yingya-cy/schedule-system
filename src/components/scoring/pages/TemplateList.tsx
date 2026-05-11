@@ -260,11 +260,11 @@ export default function TemplateList({ onBack }: Props) {
             key={t.id}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-surface rounded-2xl border border-surface-container-high p-5 shadow-sm"
+            className="bg-surface rounded-2xl border border-surface-container-high p-5 shadow-sm flex flex-col"
           >
-            <div className="flex items-start justify-between mb-3">
-              <h3 className="font-bold text-on-surface font-headline text-base">{t.name}</h3>
-              <span className="text-sm text-outline font-medium">满分 {t.total_score}</span>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <h3 className="font-bold text-on-surface font-headline text-base min-w-0 truncate">{t.name}</h3>
+              <span className="text-sm text-outline font-medium shrink-0 whitespace-nowrap">满分 {Math.round(Number(t.total_score))}</span>
             </div>
             {t.description && (
               <p className="text-sm text-outline mb-3 line-clamp-2">{t.description}</p>
@@ -272,7 +272,7 @@ export default function TemplateList({ onBack }: Props) {
             <div className="text-xs text-outline mb-4">
               {t.category || 'general'} · {t.dimension_count || 0} 个维度
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 mt-auto">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -352,7 +352,7 @@ function TemplateEditor({ template, onClose, onSaved, onError }: TemplateEditorP
       id: d.id,
       template_id: d.template_id,
       name: d.name,
-      max_score: d.max_score,
+      max_score: Number(d.max_score) || 0,
       sort_order: d.sort_order,
       is_optional: !!d.is_optional,
       description: d.description || '',
@@ -360,7 +360,7 @@ function TemplateEditor({ template, onClose, onSaved, onError }: TemplateEditorP
         id: s.id,
         dimension_id: s.dimension_id,
         name: s.name,
-        max_score: s.max_score,
+        max_score: Number(s.max_score) || 0,
         sort_order: s.sort_order,
         description: s.description,
       })),
@@ -369,7 +369,7 @@ function TemplateEditor({ template, onClose, onSaved, onError }: TemplateEditorP
   const [saving, setSaving] = useState(false);
 
   // Auto-calculate total from dimensions
-  const calculatedTotalScore = dimensions.reduce((sum, d) => sum + (d.max_score || 0), 0);
+  const calculatedTotalScore = dimensions.reduce((sum, d) => sum + (Number(d.max_score) || 0), 0);
 
   function addDimension() {
     setDimensions((prev) => [

@@ -191,12 +191,12 @@ export default function CompetitionList({ onSelect, onBack }: Props) {
             key={comp.id}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-surface rounded-2xl border border-surface-container-high p-5 shadow-sm hover:shadow-md hover:border-primary/20 transition-all cursor-pointer"
+            className="bg-surface rounded-2xl border border-surface-container-high p-5 shadow-sm hover:shadow-md hover:border-primary/20 transition-all cursor-pointer flex flex-col"
             onClick={() => onSelect(comp)}
           >
-            <div className="flex items-start justify-between mb-3">
-              <h3 className="font-bold text-on-surface font-headline text-base">{comp.name}</h3>
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-lg ${statusConfig[comp.status]?.className || 'bg-surface-container-high text-on-surface-variant'}`}>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <h3 className="font-bold text-on-surface font-headline text-base min-w-0 truncate">{comp.name}</h3>
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap ${statusConfig[comp.status]?.className || 'bg-surface-container-high text-on-surface-variant'}`}>
                 {statusConfig[comp.status]?.label || comp.status}
               </span>
             </div>
@@ -206,7 +206,7 @@ export default function CompetitionList({ onSelect, onBack }: Props) {
             <div className="text-sm text-outline mb-4">
               选手 {comp.contestant_count || 0} 人 · 评委 {comp.judge_count || 0} 人
             </div>
-            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-2 mt-auto" onClick={(e) => e.stopPropagation()}>
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
