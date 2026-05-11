@@ -54,9 +54,9 @@ services:
       - "5002:5002"
     environment:
       - TZ=Asia/Shanghai
-      - AI_API_KEY
-      - AI_BASE_URL
-      - AI_MODEL
+      - AI_API_KEY=${AI_API_KEY}
+      - AI_BASE_URL=${AI_BASE_URL}
+      - AI_MODEL=${AI_MODEL}
     deploy:
       resources:
         limits:
