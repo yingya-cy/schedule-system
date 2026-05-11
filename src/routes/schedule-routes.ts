@@ -313,11 +313,11 @@ export function registerScheduleRoutes(app: Express) {
       res.json({
         success: true,
         data: {
-          schedules: (schedCount as RowDataPacket[])[0].total,
-          courses: (courseCount as RowDataPacket[])[0].total,
-          users: (userCount as RowDataPacket[])[0].total,
-          departments: (deptCount as RowDataPacket[])[0].total,
-          files: (fileCount as RowDataPacket[])[0].total,
+          schedules: Number((schedCount as RowDataPacket[])[0].total),
+          courses: Number((courseCount as RowDataPacket[])[0].total),
+          users: Number((userCount as RowDataPacket[])[0].total),
+          departments: Number((deptCount as RowDataPacket[])[0].total),
+          files: Number((fileCount as RowDataPacket[])[0].total),
         },
       });
     } catch (error: unknown) {
