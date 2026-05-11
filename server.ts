@@ -14,7 +14,7 @@ import { initializeDatabase } from "./src/config/database-schema.ts";
 import { authenticate, requireRole } from "./src/middleware/auth.ts";
 import scoringRouter from "./src/routes/scoring/index.ts";
 import authRouter from "./src/routes/auth.ts";
-import fileCenterRouter from "./src/routes/file-center.ts";
+import fileCenterRouter from "./src/routes/file-center/index.ts";
 import termsRouter from "./src/routes/terms.ts";
 import { registerScheduleRoutes } from "./src/routes/schedule-routes.ts";
 import { sendError } from "./src/utils/errorHandler.ts";
