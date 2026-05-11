@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, X, FileSpreadsheet, AlertCircle, Loader, CheckCircle } from 'lucide-react';
 import { importExportApi, resultApi } from '../services/scoringApi.ts';
-import type { Competition } from '../types/scoring.ts';
+import type { Competition, CompetitionResult } from '../types/scoring.ts';
 
 interface ExportExcelModalProps {
   isOpen: boolean;
@@ -83,13 +83,13 @@ export default function ExportExcelModal({ isOpen, onClose, currentCompetition }
           name: competitions.find(c => c.id === selectedCompetitionId)?.name || '',
           template: null,
         },
-        results: results.map((r: any) => ({
+        results: results.map((r: CompetitionResult) => ({
           rank: r.rank,
           number: r.number || '',
           name: r.contestant_name || '',
           group_name: r.group_name || '',
-          total_score: parseFloat(r.final_score ?? r.total_score) || 0,
-          raw_score: parseFloat(r.total_score) || 0,
+          total_score: Number(r.final_score ?? r.total_score) || 0,
+          raw_score: Number(r.total_score) || 0,
           dimension_scores: r.avg_scores || {},
           score_count: r.score_count || 0,
         })),

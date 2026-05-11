@@ -56,8 +56,8 @@ export default function UserManagementView() {
         setUsers([]);
         setTotal(0);
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '未知错误');
     } finally {
       setLoading(false);
     }
@@ -111,8 +111,8 @@ export default function UserManagementView() {
       }
       setShowModal(false);
       fetchUsers();
-    } catch (e: any) {
-      setFormError(e.message);
+    } catch (e: unknown) {
+      setFormError(e instanceof Error ? e.message : '未知错误');
     } finally {
       setSaving(false);
     }
@@ -126,8 +126,8 @@ export default function UserManagementView() {
       if (!json.success) throw new Error(json.error);
       setDeleteTarget(null);
       fetchUsers();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '未知错误');
     }
   }
 

@@ -83,12 +83,12 @@ export default function FilesView() {
       setCurrentEditIndex(null);
       setCurrentScheduleId(schedule.id);
       setViewMode('edit');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMessageDialog({
         isOpen: true,
         type: 'error',
         title: '加载失败',
-        message: err.message || '加载课表失败，请重试'
+        message: err instanceof Error ? err.message : '加载课表失败，请重试'
       });
     }
   };
@@ -107,12 +107,12 @@ export default function FilesView() {
     try {
       await api.deleteSchedule(id);
       removeSchedule(id);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMessageDialog({
         isOpen: true,
         type: 'error',
         title: '删除失败',
-        message: err.message || '删除课表失败，请重试'
+        message: err instanceof Error ? err.message : '删除课表失败，请重试'
       });
     }
   };
@@ -209,13 +209,13 @@ export default function FilesView() {
       }
 
       refreshSchedules();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save schedule:', err);
       setMessageDialog({
         isOpen: true,
         type: 'error',
         title: '保存失败',
-        message: err.message || '保存课表失败，请重试'
+        message: err instanceof Error ? err.message : '保存课表失败，请重试'
       });
     } finally {
       setIsSaving(false);
@@ -292,9 +292,9 @@ export default function FilesView() {
       setViewMode('list');
       refreshSchedules();
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save manual schedule:', err);
-      return { success: false, error: err.message || '保存失败，请重试' };
+      return { success: false, error: err instanceof Error ? err.message : '保存失败，请重试' };
     }
   };
 

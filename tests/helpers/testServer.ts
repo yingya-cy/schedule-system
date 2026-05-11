@@ -4,7 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { authenticate, requireRole } from '../../src/middleware/auth.ts';
 import authRouter from '../../src/routes/auth.ts';
 import scoringRouter from '../../src/routes/scoring/index.ts';
-import fileCenterRouter from '../../src/routes/file-center.ts';
+import fileCenterRouter from '../../src/routes/file-center/index.ts';
 import termsRouter from '../../src/routes/terms.ts';
 import { registerScheduleRoutes } from '../../src/routes/schedule-routes.ts';
 

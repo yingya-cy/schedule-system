@@ -115,7 +115,7 @@ export const competitionApi = {
 
   getScoreDetails: (competitionId: number) =>
     request<{
-      competition: any;
+      competition: Record<string, unknown>;
       judges: { id: number; name: string }[];
       contestants: { id: number; number: string; name: string; work_name?: string; group_name: string }[];
       dimensionGroups: Record<number, {
@@ -323,7 +323,7 @@ export const importExportApi = {
 
   // 导出评分结果（返回 Excel 文件）
   exportResults: (templateFile: File, resultData: {
-    competition: { name: string; template: any };
+    competition: { name: string; template: Record<string, unknown> | null };
     results: Array<{
       rank: number;
       number: string;

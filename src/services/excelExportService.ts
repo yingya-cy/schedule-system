@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { columnLetter } from '../utils/formatters.ts';
+import type { Schedule, Course } from '../types/database.ts';
 
 interface PersonData {
   name: string;
@@ -162,7 +163,7 @@ const deptColors = ['FFD9E1F4', 'FFC5E0B4', 'FFB4C7E7', 'FFF9CBAA', 'FFE3F2D9', 
 let deptColorIdx = 0;
 function nextDeptColor(): string { return deptColors[deptColorIdx++ % deptColors.length]; }
 
-function sc(cell: ExcelJS.Cell, font: any, fill?: string) {
+function sc(cell: ExcelJS.Cell, font: Partial<ExcelJS.Font>, fill?: string) {
   cell.font = font;
   cell.alignment = centerWrap;
   cell.border = thinBorder;
@@ -303,7 +304,7 @@ export class ExcelExportService {
     return wb;
   }
 
-  async generateDepartmentStatsExcel(department: string, schedules: any[]): Promise<Buffer> {
+  async generateDepartmentStatsExcel(department: string, schedules: Schedule[]): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(department);
     ws.addRow(['姓名', '部门', '文件名', '课程数量', '创建时间']);
@@ -315,7 +316,7 @@ export class ExcelExportService {
     return Buffer.from(buf);
   }
 
-  async generatePersonScheduleExcel(personName: string, courses: any[]): Promise<Buffer> {
+  async generatePersonScheduleExcel(personName: string, courses: Course[]): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(personName);
     ws.addRow(['课程名称', '星期', '节次', '周数', '教师', '地点', '备注']);

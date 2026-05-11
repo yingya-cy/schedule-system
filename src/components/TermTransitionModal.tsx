@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import type { UserInfo } from '@/types/auth';
 
 interface Props {
   isOpen: boolean;
@@ -16,7 +17,7 @@ export default function TermTransitionModal({ isOpen, onClose, onTransitioned }:
   const [academicYear, setAcademicYear] = useState('');
   const [semester, setSemester] = useState<'春' | '秋'>('秋');
   const [name, setName] = useState('');
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserInfo[]>([]);
   const [retainIds, setRetainIds] = useState<Set<number>>(new Set());
   const [removeIds, setRemoveIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,7 @@ export default function TermTransitionModal({ isOpen, onClose, onTransitioned }:
         .then(json => {
           if (json.success) {
             setUsers(json.data);
-            setRetainIds(new Set(json.data.map((u: any) => u.id)));
+            setRetainIds(new Set(json.data.map((u: UserInfo) => u.id)));
             setRemoveIds(new Set());
           }
         })
@@ -70,8 +71,8 @@ export default function TermTransitionModal({ isOpen, onClose, onTransitioned }:
       if (!json.success) throw new Error(json.error);
       onTransitioned();
       onClose();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '未知错误');
     } finally {
       setLoading(false);
     }
@@ -137,7 +138,7 @@ export default function TermTransitionModal({ isOpen, onClose, onTransitioned }:
                     留任 {retainIds.size} 人 · 离任 {removeIds.size} 人
                   </div>
                   <div className="max-h-48 overflow-y-auto space-y-1 border border-surface-container-high rounded-lg p-2">
-                    {users.map((u: any) => {
+                    {users.map((u: UserInfo) => {
                       const isRetain = retainIds.has(u.id);
                       const isRemove = removeIds.has(u.id);
                       return (

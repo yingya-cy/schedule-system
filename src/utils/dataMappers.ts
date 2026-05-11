@@ -1,7 +1,7 @@
 import { UnifiedCourse, CourseRecord, BackendCourseData } from '../types';
 import { getWeekdayName, formatSection, formatWeekInfo } from './formatters';
 
-export function parsePeriod(section: any): number[] {
+export function parsePeriod(section: unknown): number[] {
   if (Array.isArray(section)) return section;
   if (!section) return [];
   const match = String(section).match(/(\d+)[-~](\d+)节?/);

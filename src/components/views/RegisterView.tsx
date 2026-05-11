@@ -45,8 +45,8 @@ export default function RegisterView() {
         password: form.password,
       });
       setSuccess(true);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '未知错误');
     } finally {
       setLoading(false);
     }

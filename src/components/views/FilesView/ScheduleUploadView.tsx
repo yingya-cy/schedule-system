@@ -156,8 +156,8 @@ export default function ScheduleUploadView({
             error: result.error || '识别失败'
           });
         }
-      } catch (err: any) {
-        if (err.name === 'AbortError') {
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') {
           break;
         }
         results.push({
@@ -165,7 +165,7 @@ export default function ScheduleUploadView({
           filename: file.name,
           courses: [],
           success: false,
-          error: err.message || '处理失败'
+          error: err instanceof Error ? err.message : '处理失败'
         });
       }
     }

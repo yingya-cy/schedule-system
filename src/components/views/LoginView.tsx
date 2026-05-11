@@ -53,8 +53,8 @@ export default function LoginView() {
       await login(username.trim(), password);
       const returnUrl = searchParams.get('returnUrl') || '/dashboard';
       navigate(returnUrl, { replace: true });
-    } catch (err: any) {
-      const msg = err.message || '登录失败';
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '登录失败';
       // Handle need-verify case with resend link
       setError(msg);
     } finally {

@@ -67,7 +67,7 @@ router.post('/competitions/:id/calculate', requireRole('admin'), async (req, res
       detailsByScore[d.score_id].push(d);
     }
 
-    const results: any[] = [];
+    const results: { id: number; contestant: RowDataPacket; total_score: number; final_score: number; score_count: number }[] = [];
     for (const contestant of contestants as RowDataPacket[]) {
       const scores = scoresByContestant[contestant.id] || [];
       if (scores.length === 0) continue;

@@ -130,6 +130,8 @@ export interface CompetitionResult {
   number?: string;
   contestant_name?: string;
   group_name?: string;
+  work_name?: string;
+  final_score?: number;
 }
 
 export interface ApiResponse<T> {

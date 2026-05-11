@@ -330,7 +330,7 @@ export function registerScheduleRoutes(app: Express) {
       const { category } = req.query;
       let sql = `SELECT c.*, s.name as schedule_name, s.department
                  FROM courses c JOIN schedules s ON c.schedule_id = s.id`;
-      const params: any[] = [];
+      const params: unknown[] = [];
       if (category) {
         sql += ' WHERE s.department = ?';
         params.push(category);
@@ -347,7 +347,7 @@ export function registerScheduleRoutes(app: Express) {
     try {
       const { department } = req.query;
       let sql = 'SELECT id, username, name, role, department, avatar_url, email FROM users WHERE is_active = 1';
-      const params: any[] = [];
+      const params: unknown[] = [];
       if (department) { sql += ' AND department = ?'; params.push(department); }
       sql += ' ORDER BY role, name LIMIT 200';
       const [rows] = await pool.query(sql, params);

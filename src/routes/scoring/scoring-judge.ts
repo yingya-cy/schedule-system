@@ -69,7 +69,7 @@ router.get('/judge/contestants', judgeAuth, async (req, res) => {
     );
 
     const contestantsWithScore = await Promise.all(
-      (contestants as RowDataPacket[]).map(async (c: any) => {
+      (contestants as RowDataPacket[]).map(async (c: RowDataPacket) => {
         const [scores] = await pool.query(
           'SELECT * FROM scores WHERE contestant_id = ? AND judge_id = ?',
           [c.id, judge.id]

@@ -56,7 +56,7 @@ router.get('/competitions/:id/export', async (req, res) => {
     const fontBold16 = { name: '微软雅黑', size: 16, bold: true };
     const fontBold18 = { name: '微软雅黑', size: 18, bold: true };
     const fontBold20 = { name: '微软雅黑', size: 20, bold: true };
-    const styleCell = (cell: ExcelJS.Cell, font?: any, align?: any) => {
+    const styleCell = (cell: ExcelJS.Cell, font?: Partial<ExcelJS.Font>, align?: Partial<ExcelJS.Alignment>) => {
       cell.font = font || font11;
       cell.alignment = align || center;
       cell.border = borderAll;
@@ -239,7 +239,7 @@ router.get('/competitions/:id/export', async (req, res) => {
         resultMap.set(r.contestant_id, { rank: r.rank });
       }
 
-      const ranked: { contestant: any; avg: number; rank: number; judgeScores: Record<number, number> }[] = [];
+      const ranked: { contestant: RowDataPacket; avg: number; rank: number; judgeScores: Record<number, number> }[] = [];
       for (const c of contestants) {
         const judgeScores = totalMap[c.id] || {};
         const scores = Object.values(judgeScores).filter(s => s > 0);

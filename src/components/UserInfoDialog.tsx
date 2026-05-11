@@ -38,7 +38,7 @@ export default function UserInfoDialog({
       if (data.length > 0) {
         setDepartment(data[0].name);
       }
-    } catch (err: any) {
+    } catch {
       setError('加载部门列表失败');
     } finally {
       setLoading(false);
