@@ -8,12 +8,12 @@ import FilePreviewModal from '../FilePreviewModal';
 import { useAuthStore } from '@/stores/authStore';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import {
-  FileCenterActivity,
-  FileCenterFolder,
-  FileCenterFileItem,
-  FileCenterTweetItem,
+  FileCenterActivity, FileCenterFolder, FileCenterFileItem, FileCenterTweetItem,
+  FileCenterActivityForm, FileCenterFolderForm, FileCenterItemForm,
+  FileCenterTweetForm, FileCenterDeleteTarget, FileCenterItemsState,
+  type SortBy, type SortOrder,
 } from './FileCenterTypes';
-import { categoryIcons, categoryLabels, formatSize, detectFileCategory } from './FileCenterUtils';
+import { categoryIcons, categoryLabels, formatSize, detectFileCategory, getFolderPath, sortedFiles, buildTree } from './FileCenterUtils';
 
 export default function FileCenterView() {
   const token = useAuthStore((s) => s.token);
@@ -23,7 +23,7 @@ export default function FileCenterView() {
   const [selectedActivity, setSelectedActivity] = useState<FileCenterActivity | null>(null);
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [editingActivity, setEditingActivity] = useState<FileCenterActivity | null>(null);
-  const [activityForm, setActivityForm] = useState({ name: '', department: '', description: '', cover_url: '' });
+  const [activityForm, setActivityForm] = useState<FileCenterActivityForm>({ name: '', department: '', description: '', cover_url: '' });
   const [activityError, setActivityError] = useState('');
 
   const [folders, setFolders] = useState<FileCenterFolder[]>([]);
@@ -31,16 +31,16 @@ export default function FileCenterView() {
   const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [editingFolder, setEditingFolder] = useState<FileCenterFolder | null>(null);
-  const [folderForm, setFolderForm] = useState({ name: '', parent_id: '' });
+  const [folderForm, setFolderForm] = useState<FileCenterFolderForm>({ name: '', parent_id: '' });
   const [folderError, setFolderError] = useState('');
 
-  const [items, setItems] = useState<{ files: FileCenterFileItem[]; tweets: FileCenterTweetItem[]; subfolders: FileCenterFolder[] }>({ files: [], tweets: [], subfolders: [] });
+  const [items, setItems] = useState<FileCenterItemsState>({ files: [], tweets: [], subfolders: [] });
   const [showItemModal, setShowItemModal] = useState(false);
   const [showTweetModal, setShowTweetModal] = useState(false);
   const [editingItem, setEditingItem] = useState<FileCenterFileItem | null>(null);
   const [editingTweet, setEditingTweet] = useState<FileCenterTweetItem | null>(null);
-  const [itemForm, setItemForm] = useState({ original_filename: '', file_category: 'document', description: '', oss_url: '' });
-  const [tweetForm, setTweetForm] = useState({ title: '', content: '', summary: '', cover_image: '', link_url: '', author: '' });
+  const [itemForm, setItemForm] = useState<FileCenterItemForm>({ original_filename: '', file_category: 'document', description: '', oss_url: '' });
+  const [tweetForm, setTweetForm] = useState<FileCenterTweetForm>({ title: '', content: '', summary: '', cover_image: '', link_url: '', author: '' });
   const [itemError, setItemError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -48,11 +48,11 @@ export default function FileCenterView() {
   const [uploadStartTime, setUploadStartTime] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [sortBy, setSortBy] = useState<'name' | 'size' | 'date'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortBy, setSortBy] = useState<SortBy>('date');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const abortRef = useRef<AbortController | null>(null);
 
-  const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: number; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FileCenterDeleteTarget | null>(null);
   const [selectedFileIds, setSelectedFileIds] = useState<Set<number>>(new Set());
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
@@ -465,38 +465,6 @@ export default function FileCenterView() {
     }
   }
 
-  // Breadcrumb path for current folder
-  function getFolderPath(): FileCenterFolder[] {
-    const path: FileCenterFolder[] = [];
-    let currentId: number | null = selectedFolderId;
-    while (currentId) {
-      const f = folders.find(f => f.id === currentId);
-      if (!f) break;
-      path.unshift(f);
-      currentId = f.parent_id;
-    }
-    return path;
-  }
-
-  // Sort files
-  function sortedFiles(): FileCenterFileItem[] {
-    const files = [...items.files];
-    files.sort((a, b) => {
-      let cmp = 0;
-      if (sortBy === 'name') cmp = a.original_filename.localeCompare(b.original_filename);
-      else if (sortBy === 'size') cmp = a.file_size - b.file_size;
-      else cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      return sortOrder === 'desc' ? -cmp : cmp;
-    });
-    return files;
-  }
-
-  function buildTree(parentId: number | null = null): FileCenterFolder[] {
-    return folders
-      .filter(f => f.parent_id === parentId)
-      .sort((a, b) => a.sort_order - b.sort_order);
-  }
-
   function toggleExpand(folderId: number) {
     setExpandedFolders(prev => {
       const next = new Set(prev);
@@ -508,7 +476,7 @@ export default function FileCenterView() {
 
   function renderFolderTree(folders: FileCenterFolder[], depth = 0) {
     return folders.map(f => {
-      const children = buildTree(f.id);
+      const children = buildTree(folders, f.id);
       const isExpanded = expandedFolders.has(f.id);
       const isSelected = selectedFolderId === f.id;
       return (
@@ -646,10 +614,10 @@ export default function FileCenterView() {
                 </button>
               </div>
               <div className="space-y-0.5 max-h-[65vh] overflow-y-auto">
-                {buildTree().length === 0 ? (
+                {buildTree(folders).length === 0 ? (
                   <p className="text-xs text-on-surface-variant py-2 px-2">暂无文件夹</p>
                 ) : (
-                  renderFolderTree(buildTree())
+                  renderFolderTree(buildTree(folders))
                 )}
               </div>
             </div>
@@ -705,7 +673,7 @@ export default function FileCenterView() {
               {selectedFolderId && (
                 <div className="flex items-center gap-1 mb-3 text-xs text-outline">
                   <button onClick={() => setSelectedFolderId(null)} className="hover:text-primary transition-colors">全部文件</button>
-                  {getFolderPath().map(f => (
+                  {getFolderPath(folders, selectedFolderId).map(f => (
                     <span key={f.id} className="flex items-center gap-1">
                       <ChevronRight size={10} />
                       <button onClick={() => setSelectedFolderId(f.id)} className="hover:text-primary transition-colors truncate max-w-[120px]">{f.name}</button>
@@ -860,7 +828,7 @@ export default function FileCenterView() {
                         </button>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {sortedFiles().map(f => (
+                        {sortedFiles(items.files, sortBy, sortOrder).map(f => (
                           <div key={f.id} className={`group relative bg-surface-container-lowest rounded-xl border p-3 hover:border-primary/30 transition-all cursor-pointer ${selectedFileIds.has(f.id) ? 'border-primary/50 bg-primary/5' : 'border-surface-container-high'}`}
                             onClick={() => setPreviewFile(f)}
                           >

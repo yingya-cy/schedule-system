@@ -47,3 +47,46 @@ export interface FileCenterTweetItem {
 }
 
 export type FileCenterAnyItem = FileCenterFileItem | FileCenterTweetItem;
+
+export interface FileCenterActivityForm {
+  name: string;
+  department: string;
+  description: string;
+  cover_url: string;
+}
+
+export interface FileCenterFolderForm {
+  name: string;
+  parent_id: string;
+}
+
+export interface FileCenterItemForm {
+  original_filename: string;
+  file_category: string;
+  description: string;
+  oss_url: string;
+}
+
+export interface FileCenterTweetForm {
+  title: string;
+  content: string;
+  summary: string;
+  cover_image: string;
+  link_url: string;
+  author: string;
+}
+
+export interface FileCenterDeleteTarget {
+  type: 'activity' | 'folder' | 'file' | 'tweet';
+  id: number;
+  name: string;
+}
+
+export interface FileCenterItemsState {
+  files: FileCenterFileItem[];
+  tweets: FileCenterTweetItem[];
+  subfolders: FileCenterFolder[];
+}
+
+export type SortBy = 'name' | 'size' | 'date';
+export type SortOrder = 'asc' | 'desc';

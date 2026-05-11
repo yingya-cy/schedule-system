@@ -64,3 +64,45 @@ export function detectFileCategory(mimeType: string, filename: string): string {
 
   return 'other';
 }
+
+import type { FileCenterFolder, FileCenterFileItem, SortBy, SortOrder } from './FileCenterTypes';
+
+export function getFolderPath(
+  folders: FileCenterFolder[],
+  selectedFolderId: number | null
+): FileCenterFolder[] {
+  const path: FileCenterFolder[] = [];
+  let currentId = selectedFolderId;
+  while (currentId) {
+    const f = folders.find(f => f.id === currentId);
+    if (!f) break;
+    path.unshift(f);
+    currentId = f.parent_id;
+  }
+  return path;
+}
+
+export function sortedFiles(
+  files: FileCenterFileItem[],
+  sortBy: SortBy,
+  sortOrder: SortOrder
+): FileCenterFileItem[] {
+  const sorted = [...files];
+  sorted.sort((a, b) => {
+    let cmp = 0;
+    if (sortBy === 'name') cmp = a.original_filename.localeCompare(b.original_filename);
+    else if (sortBy === 'size') cmp = a.file_size - b.file_size;
+    else cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    return sortOrder === 'desc' ? -cmp : cmp;
+  });
+  return sorted;
+}
+
+export function buildTree(
+  folders: FileCenterFolder[],
+  parentId: number | null = null
+): FileCenterFolder[] {
+  return folders
+    .filter(f => f.parent_id === parentId)
+    .sort((a, b) => a.sort_order - b.sort_order);
+}
