@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import pool from '../../config/database.ts';
-import { authenticate } from '../../middleware/auth.ts';
+import { authenticate, requireRole } from '../../middleware/auth.ts';
 import { RowDataPacket, ResultSetHeader, getErrorMessage } from '../../utils/db-types';
 
 const router = Router();
@@ -130,6 +130,24 @@ router.put('/:id/cancel', authenticate, async (req, res) => {
       [req.params.id]
     );
     res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
+  }
+});
+
+// GET /api/psychology/appointments/all — admin 查看所有预约
+router.get('/all', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const { status } = req.query;
+    let sql = `SELECT a.*, c.name as counselor_name, u.username as student_name
+               FROM appointments a
+               JOIN counselors c ON a.counselor_id = c.id
+               JOIN users u ON a.student_user_id = u.id`;
+    const params: (string | number)[] = [];
+    if (status) { sql += ' WHERE a.status = ?'; params.push(String(status)); }
+    sql += ' ORDER BY a.slot_date DESC, a.slot_start DESC LIMIT 500';
+    const [rows] = await pool.query(sql, params);
+    res.json({ success: true, data: rows });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: getErrorMessage(error) });
   }

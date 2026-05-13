@@ -8,6 +8,8 @@ const CounselorListPage = lazy(() => import('./pages/CounselorListPage'));
 const CounselorDetailPage = lazy(() => import('./pages/CounselorDetailPage'));
 const MyAppointmentsPage = lazy(() => import('./pages/MyAppointmentsPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
+const WorkbenchPage = lazy(() => import('./pages/WorkbenchPage'));
+const AdminAppointmentsPage = lazy(() => import('./pages/AdminAppointmentsPage'));
 
 function SubNav({ view, onView }: { view: PsychView; onView: (v: PsychView) => void }) {
   const user = useAuthStore((s) => s.user);
@@ -60,7 +62,7 @@ export default function PsychologyView() {
 
   // Set default view based on role
   useEffect(() => {
-    if (counselorProfile === undefined) return; // still loading
+    if (counselorProfile === undefined) return;
     if (user?.role === 'admin') {
       setView('manage');
     } else if (counselorProfile !== null) {
@@ -81,11 +83,11 @@ export default function PsychologyView() {
       case 'my-appointments':
         return <Suspense fallback={<div className="skeleton h-64 rounded-xl" />}><MyAppointmentsPage /></Suspense>;
       case 'workbench':
-        return <div className="empty-state"><p className="empty-state-title">工作台</p><p className="empty-state-description">页面开发中...</p></div>;
+        return <Suspense fallback={<div className="skeleton h-64 rounded-xl" />}><WorkbenchPage /></Suspense>;
       case 'manage':
         return <Suspense fallback={<div className="skeleton h-64 rounded-xl" />}><CounselorManagePage /></Suspense>;
       case 'appointments-overview':
-        return <div className="empty-state"><p className="empty-state-title">预约总览</p><p className="empty-state-description">页面开发中...</p></div>;
+        return <Suspense fallback={<div className="skeleton h-64 rounded-xl" />}><AdminAppointmentsPage /></Suspense>;
       default:
         return <div className="empty-state"><p className="empty-state-title">未知页面</p></div>;
     }
