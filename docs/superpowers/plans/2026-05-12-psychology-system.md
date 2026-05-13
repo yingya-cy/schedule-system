@@ -14,8 +14,8 @@
 
 - [x] 数据库 schema.sql 已包含 5 张新表
 - [x] 服务器启动验证通过（`npm run dev:server`）
-- [ ] 确保 `npm install ws` 已安装 WebSocket 库
-- [ ] 确保 `.gitignore` 包含 `docs/superpowers/`
+- [x] 确保 `npm install ws` 已安装 WebSocket 库
+- [x] 确保 `.gitignore` 包含 `docs/superpowers/`
 
 ---
 
@@ -607,8 +607,9 @@ git commit -m "feat: add psychology appointments with transaction locking"
 
 | Task | 状态 |
 |------|------|
-| Task 1: WebSocket 依赖 | pending |
-| Task 2: counselors 路由 | pending |
-| Task 3: chat REST 路由 | pending |
-| Task 4: WebSocket 端点 | pending |
-| Task 5: appointments 路由 | pending |
+| Task 1: WebSocket 依赖 | completed |
+| Task 2: counselors 路由 | completed |
+| Task 3: chat REST 路由 | completed |
+| Task 4: WebSocket 端点 | completed |
+| Task 5: appointments 路由 | completed |
+| `as any` 清理 | completed (19→0) |

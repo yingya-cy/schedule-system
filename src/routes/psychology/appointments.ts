@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../../config/database.ts';
 import { authenticate } from '../../middleware/auth.ts';
+import { RowDataPacket, ResultSetHeader, getErrorMessage } from '../../utils/db-types';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.get('/', authenticate, async (req, res) => {
     );
     res.json({ success: true, data: rows });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -24,22 +25,23 @@ router.get('/manage', authenticate, async (req, res) => {
     const [counselors] = await pool.query(
       'SELECT id FROM counselors WHERE user_id = ?', [req.user!.userId]
     );
-    if ((counselors as any[]).length === 0) {
+    const counselorRows = counselors as RowDataPacket[];
+    if (counselorRows.length === 0) {
       res.status(403).json({ success: false, error: '不是咨询师' });
       return;
     }
-    const counselorId = (counselors as any[])[0].id;
+    const counselorId = counselorRows[0].id;
     const { status } = req.query;
     let sql = `SELECT a.*, u.username as student_name
                FROM appointments a JOIN users u ON a.student_user_id = u.id
                WHERE a.counselor_id = ?`;
-    const params: any[] = [counselorId];
-    if (status) { sql += ' AND a.status = ?'; params.push(status); }
+    const params: (string | number)[] = [counselorId];
+    if (status) { sql += ' AND a.status = ?'; params.push(String(status)); }
     sql += ' ORDER BY a.slot_date ASC, a.slot_start ASC LIMIT 200';
     const [rows] = await pool.query(sql, params);
     res.json({ success: true, data: rows });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -55,7 +57,8 @@ router.post('/', authenticate, async (req, res) => {
        AND status NOT IN ('cancelled') FOR UPDATE`,
       [counselor_id, slot_date, slot_start]
     );
-    if ((existing as any[]).length > 0) {
+    const existingRows = existing as RowDataPacket[];
+    if (existingRows.length > 0) {
       await conn.rollback();
       conn.release();
       res.status(409).json({ success: false, error: '该时段已被预约' });
@@ -70,52 +73,55 @@ router.post('/', authenticate, async (req, res) => {
 
     await conn.commit();
     conn.release();
-    res.json({ success: true, data: { id: (result as any).insertId } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
     await conn.rollback();
     conn.release();
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
 router.put('/:id/confirm', authenticate, async (req, res) => {
   try {
     const [counselors] = await pool.query('SELECT id FROM counselors WHERE user_id = ?', [req.user!.userId]);
-    if ((counselors as any[]).length === 0) {
+    const counselorRows = counselors as RowDataPacket[];
+    if (counselorRows.length === 0) {
       res.status(403).json({ success: false, error: '不是咨询师' });
       return;
     }
     await pool.query(
       "UPDATE appointments SET status = 'confirmed' WHERE id = ? AND counselor_id = ? AND status = 'pending'",
-      [req.params.id, (counselors as any[])[0].id]
+      [req.params.id, counselorRows[0].id]
     );
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
 router.put('/:id/complete', authenticate, async (req, res) => {
   try {
     const [counselors] = await pool.query('SELECT id FROM counselors WHERE user_id = ?', [req.user!.userId]);
-    if ((counselors as any[]).length === 0) {
+    const counselorRows = counselors as RowDataPacket[];
+    if (counselorRows.length === 0) {
       res.status(403).json({ success: false, error: '不是咨询师' });
       return;
     }
     await pool.query(
       "UPDATE appointments SET status = 'completed', notes = ? WHERE id = ? AND counselor_id = ?",
-      [req.body.notes || null, req.params.id, (counselors as any[])[0].id]
+      [req.body.notes || null, req.params.id, counselorRows[0].id]
     );
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
 router.put('/:id/cancel', authenticate, async (req, res) => {
   try {
     const [appt] = await pool.query('SELECT * FROM appointments WHERE id = ?', [req.params.id]);
-    if ((appt as any[]).length === 0) {
+    const apptRows = appt as RowDataPacket[];
+    if (apptRows.length === 0) {
       res.status(404).json({ success: false, error: '预约不存在' });
       return;
     }
@@ -125,7 +131,7 @@ router.put('/:id/cancel', authenticate, async (req, res) => {
     );
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 

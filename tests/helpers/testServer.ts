@@ -6,6 +6,7 @@ import authRouter from '../../src/routes/auth.ts';
 import scoringRouter from '../../src/routes/scoring/index.ts';
 import fileCenterRouter from '../../src/routes/file-center/index.ts';
 import termsRouter from '../../src/routes/terms.ts';
+import psychologyRouter from '../../src/routes/psychology/index.ts';
 import { registerScheduleRoutes } from '../../src/routes/schedule-routes.ts';
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -26,6 +27,7 @@ function setupBase(app: express.Express) {
   app.use('/api/scoring', scoringRouter);
   app.use('/api/file-center', fileCenterRouter);
   app.use('/api/terms', termsRouter);
+  app.use('/api/psychology', psychologyRouter);
 }
 
 export function createApp(): express.Express {

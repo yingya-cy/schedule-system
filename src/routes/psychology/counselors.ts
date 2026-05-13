@@ -1,8 +1,34 @@
 import { Router } from 'express';
 import pool from '../../config/database.ts';
 import { authenticate } from '../../middleware/auth.ts';
+import { RowDataPacket, getErrorMessage } from '../../utils/db-types';
 
 const router = Router();
+
+type CounselorRow = RowDataPacket & {
+  id: number;
+  user_id: number;
+  name: string;
+  title: string;
+  bio: string;
+  avatar_url: string;
+  is_active: number;
+  created_at: string;
+  slots_raw: string;
+};
+
+function parseSlots(slotsRaw: string | null) {
+  if (!slotsRaw) return [];
+  return slotsRaw.split(';').map((s) => {
+    const colonIdx = s.indexOf(':');
+    const day = s.substring(0, colonIdx);
+    const range = s.substring(colonIdx + 1);
+    const dashIdx = range.indexOf('-');
+    const start = range.substring(0, dashIdx);
+    const end = range.substring(dashIdx + 1);
+    return { day_of_week: parseInt(day), start_time: start, end_time: end };
+  });
+}
 
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -15,7 +41,7 @@ router.get('/', authenticate, async (req, res) => {
        GROUP BY c.id
        ORDER BY c.id`
     );
-    const counselors = (rows as any[]).map((r: any) => ({
+    const counselors = (rows as CounselorRow[]).map((r) => ({
       id: r.id,
       user_id: r.user_id,
       name: r.name,
@@ -24,17 +50,11 @@ router.get('/', authenticate, async (req, res) => {
       avatar_url: r.avatar_url,
       is_active: r.is_active,
       created_at: r.created_at,
-      slots: r.slots_raw
-        ? r.slots_raw.split(';').map((s: string) => {
-            const [day, range] = s.split(':');
-            const [start, end] = range.split('-');
-            return { day_of_week: parseInt(day), start_time: start, end_time: end };
-          })
-        : [],
+      slots: parseSlots(r.slots_raw),
     }));
     res.json({ success: true, data: counselors });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 
@@ -49,7 +69,7 @@ router.get('/:id', authenticate, async (req, res) => {
        GROUP BY c.id`,
       [req.params.id]
     );
-    const list = rows as any[];
+    const list = rows as CounselorRow[];
     if (list.length === 0) {
       res.status(404).json({ success: false, error: '咨询师不存在' });
       return;
@@ -66,17 +86,11 @@ router.get('/:id', authenticate, async (req, res) => {
         avatar_url: r.avatar_url,
         is_active: r.is_active,
         created_at: r.created_at,
-        slots: r.slots_raw
-          ? r.slots_raw.split(';').map((s: string) => {
-              const [day, range] = s.split(':');
-              const [start, end] = range.split('-');
-              return { day_of_week: parseInt(day), start_time: start, end_time: end };
-            })
-          : [],
+        slots: parseSlots(r.slots_raw),
       },
     });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: (error as Error).message });
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
 });
 

@@ -84,3 +84,4 @@ coverage/
 
 # Claude plans
 .claude/plans/
+docs/superpowers/
