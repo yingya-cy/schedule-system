@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { usePsychologyStore } from '../../stores/psychologyStore';
 import type { PsychView } from './types/psychology';
+
+const CounselorManagePage = lazy(() => import('./pages/CounselorManagePage'));
 
 const PLACEHOLDER = '页面开发中...';
 
@@ -79,7 +81,7 @@ export default function PsychologyView() {
       case 'workbench':
         return <div className="empty-state"><p className="empty-state-title">工作台</p><p className="empty-state-description">{PLACEHOLDER}</p></div>;
       case 'manage':
-        return <div className="empty-state"><p className="empty-state-title">咨询师管理</p><p className="empty-state-description">{PLACEHOLDER}</p></div>;
+        return <Suspense fallback={<div className="skeleton h-64 rounded-xl" />}><CounselorManagePage /></Suspense>;
       case 'appointments-overview':
         return <div className="empty-state"><p className="empty-state-title">预约总览</p><p className="empty-state-description">{PLACEHOLDER}</p></div>;
       default:

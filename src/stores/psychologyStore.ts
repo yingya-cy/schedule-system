@@ -23,7 +23,12 @@ interface PsychologyState {
   // === Counselors ===
   counselors: Counselor[];
   counselorsLoading: boolean;
-  fetchCounselors: () => Promise<void>;
+  fetchCounselors: (all?: boolean) => Promise<void>;
+  createCounselor: (data: { user_id: number; name: string; title?: string; bio?: string; avatar_url?: string }) => Promise<number>;
+  updateCounselor: (id: number, data: { name?: string; title?: string; bio?: string; avatar_url?: string }) => Promise<void>;
+  toggleCounselor: (id: number) => Promise<void>;
+  addSlot: (counselorId: number, data: { day_of_week: number; start_time: string; end_time: string }) => Promise<void>;
+  deleteSlot: (counselorId: number, slotId: number) => Promise<void>;
 
   // === Sub-view ===
   view: PsychView;
@@ -89,14 +94,35 @@ export const usePsychologyStore = create<PsychologyState>((set, get) => ({
   counselors: [],
   counselorsLoading: false,
 
-  fetchCounselors: async () => {
+  fetchCounselors: async (all) => {
     set({ counselorsLoading: true });
     try {
-      const data = await counselorApi.list();
+      const data = await counselorApi.list(all);
       set({ counselors: data, counselorsLoading: false });
     } catch (e) {
       set({ counselorsLoading: false, error: getErrorMessage(e) });
     }
+  },
+
+  createCounselor: async (data) => {
+    const result = await counselorApi.create(data);
+    return result.id;
+  },
+
+  updateCounselor: async (id, data) => {
+    await counselorApi.update(id, data);
+  },
+
+  toggleCounselor: async (id) => {
+    await counselorApi.toggle(id);
+  },
+
+  addSlot: async (counselorId, data) => {
+    await counselorApi.addSlot(counselorId, data);
+  },
+
+  deleteSlot: async (counselorId, slotId) => {
+    await counselorApi.deleteSlot(counselorId, slotId);
   },
 
   // === Sub-view ===

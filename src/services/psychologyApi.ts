@@ -42,7 +42,10 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 // =============================================
 
 export const counselorApi = {
-  list: () => request<Counselor[]>('/counselors'),
+  list: (all?: boolean) => {
+    const query = all ? '?all=1' : '';
+    return request<Counselor[]>(`/counselors${query}`);
+  },
 
   get: (id: number) => request<Counselor>(`/counselors/${id}`),
 
