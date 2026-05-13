@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Trophy,
+  Heart,
   LogOut,
   Shield
 } from 'lucide-react';
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { id: 'files', label: '课表中心', icon: 'calendar' },
   { id: 'file-center', label: '文件中心', icon: 'folder' },
   { id: 'scoring', label: '比赛评分', icon: 'trophy' },
+  { id: 'psychology', label: '心理咨询', icon: 'heart' },
   { id: 'users', label: '用户管理', icon: 'users', adminOnly: true },
 ];
 
@@ -73,6 +75,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       case 'calendar': return <CalendarDays size={20} />;
       case 'chat': return <MessageSquare size={20} />;
       case 'trophy': return <Trophy size={20} />;
+      case 'heart': return <Heart size={20} />;
       default: return <LayoutDashboard size={20} />;
     }
   };

@@ -16,6 +16,7 @@ const ChatView = lazy(() => import('./components/views/ChatView'));
 const ScoringDashboard = lazy(() => import('./components/scoring'));
 const UserManagementView = lazy(() => import('./components/views/UserManagementView'));
 const FileCenterView = lazy(() => import('./components/views/FileCenter/FileCenterView'));
+const PsychologyView = lazy(() => import('./components/psychology'));
 
 function AppContent() {
   const refreshDepartments = useAppStore((s) => s.refreshDepartments);
@@ -56,6 +57,7 @@ function AppContent() {
             <Route path="/scoring" element={<ScoringDashboard />} />
             <Route path="/users" element={<UserManagementView />} />
             <Route path="/file-center" element={<FileCenterView />} />
+            <Route path="/psychology" element={<PsychologyView />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
