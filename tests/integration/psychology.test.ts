@@ -1,15 +1,27 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import supertest from 'supertest';
-import { createApp, loginAs } from '../helpers/testServer.ts';
+import { createApp, loginAs, createTestUser } from '../helpers/testServer.ts';
 
 let app: ReturnType<typeof createApp>;
 let adminToken: string;
+let studentToken: string;
 let counselorId: number;
 
 beforeAll(async () => {
   app = createApp();
   const result = await loginAs(app, 'admin', 'admin123');
   adminToken = result.token;
+
+  // Create a non-counselor test user for /me tests
+  const testUsername = `psych_student_${Date.now()}`;
+  await createTestUser(app, adminToken, {
+    username: testUsername,
+    name: '心理测试学生',
+    password: 'test123',
+    role: 'student',
+  });
+  const studentLogin = await loginAs(app, testUsername, 'test123');
+  studentToken = studentLogin.token;
 
   // Get first available counselor
   const res = await supertest(app)
@@ -20,6 +32,29 @@ beforeAll(async () => {
   if (counselors.length > 0) {
     counselorId = counselors[0].id;
   }
+});
+
+describe('GET /api/psychology/me', () => {
+  it('returns counselor profile for admin (who is a counselor)', async () => {
+    const res = await supertest(app)
+      .get('/api/psychology/me')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toBeTruthy();
+    expect(res.body.data.name).toBe('张老师');
+  });
+
+  it('returns null for non-counselor user', async () => {
+    const res = await supertest(app)
+      .get('/api/psychology/me')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toBeNull();
+  });
 });
 
 describe('GET /api/psychology/counselors', () => {
