@@ -118,7 +118,7 @@ export default function CompetitionList({ onSelect, onBack }: Props) {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => setShowCreate(true)}
-          className="self-end sm:self-auto px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-on-primary font-semibold rounded-xl shadow-lg shadow-primary/25 flex items-center gap-2 focus-ring touch-target"
+          className="self-end sm:self-auto px-5 py-2.5 bg-primary text-on-primary font-semibold rounded-xl shadow-md flex items-center gap-2 focus-ring touch-target hover:bg-primary/90 transition-colors"
         >
           <Plus size={18} />
           <span className="whitespace-nowrap">新建比赛</span>
@@ -170,7 +170,7 @@ export default function CompetitionList({ onSelect, onBack }: Props) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleCreate}
-              className="px-5 py-2.5 bg-gradient-to-r from-success to-success/80 text-on-primary font-semibold rounded-xl shadow-lg shadow-success/25 focus-ring"
+              className="px-5 py-2.5 bg-success text-on-success font-semibold rounded-xl shadow-md focus-ring hover:bg-success/90 transition-colors"
             >
               确认创建
             </motion.button>

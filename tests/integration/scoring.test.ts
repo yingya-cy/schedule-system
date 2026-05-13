@@ -196,24 +196,17 @@ describe('Judge Authentication Flow', () => {
     judgeCode = judge.code;
   });
 
-  it('rejects judge login without code', async () => {
+  it('allows judge login without code', async () => {
     await supertest(app)
       .post('/api/scoring/judge/login')
       .send({ name: '评委张', competition_id: competitionId })
-      .expect(400);
+      .expect(200);
   });
 
-  it('rejects judge login with wrong code', async () => {
-    await supertest(app)
-      .post('/api/scoring/judge/login')
-      .send({ name: '评委张', competition_id: competitionId, code: 'WRONG' })
-      .expect(401);
-  });
-
-  it('logs in judge with correct code and returns token', async () => {
+  it('logs in judge and returns token', async () => {
     const res = await supertest(app)
       .post('/api/scoring/judge/login')
-      .send({ name: '评委张', competition_id: competitionId, code: judgeCode })
+      .send({ name: '评委张', competition_id: competitionId })
       .expect(200);
 
     expect(res.body.success).toBe(true);

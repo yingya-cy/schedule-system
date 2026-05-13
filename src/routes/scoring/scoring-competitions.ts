@@ -271,7 +271,7 @@ router.post('/competitions/:id/judges', requireRole('admin'), async (req, res) =
       'INSERT INTO judges (name, code, competition_id, user_id) VALUES (?, ?, ?, ?)',
       [name, code, req.params.id, user_id || null]
     );
-    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId, code } });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: (error as Error).message });
   }

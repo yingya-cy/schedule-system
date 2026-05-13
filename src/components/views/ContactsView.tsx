@@ -68,6 +68,17 @@ export default function ContactsView() {
 
   return (
     <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0 transition-transform hover:scale-105 hover:rotate-3 cursor-default">
+          <Users className="text-on-primary" size={24} />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-on-surface font-headline">联系人</h1>
+          <p className="text-sm text-on-surface-variant mt-1">查看团队通讯录和部门信息</p>
+        </div>
+      </div>
+
       {/* Stats Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-primary p-6 rounded-2xl text-on-primary shadow-xl shadow-primary/10 relative overflow-hidden">

@@ -40,11 +40,15 @@ describe('Scoring Permissions', () => {
 
   // ---- Judge auth (judge endpoints now require code + token) ----
   describe('Judge authentication', () => {
-    it('should return 400 for judge login without code', async () => {
+    it('should allow judge login without code', async () => {
+      // Add a judge first
+      const auth = (req: supertest.Test) => req.set('Authorization', `Bearer ${adminToken}`);
+      await auth(supertest(app).post(`/api/scoring/competitions/${competitionId}/judges`).send({ name: '评委1' }));
       const res = await supertest(app)
         .post('/api/scoring/judge/login')
         .send({ name: '评委1', competition_id: competitionId });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(200);
+      expect(res.body.data.token).toBeTruthy();
     });
     it('should return 401 for judge contestants without judge token', async () => {
       const res = await supertest(app).get('/api/scoring/judge/contestants');

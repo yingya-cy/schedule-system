@@ -27,6 +27,10 @@ export default function UserManagementView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [filterRole, setFilterRole] = useState('');
+  const [filterDept, setFilterDept] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [showModal, setShowModal] = useState(false);
@@ -45,7 +49,11 @@ export default function UserManagementView() {
   async function fetchUsers() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/auth/users?search=${encodeURIComponent(search)}&page=${page}&limit=20`, { headers });
+      const params = new URLSearchParams({ search, page: String(page), limit: '20' });
+      if (filterRole) params.set('role', filterRole);
+      if (filterDept) params.set('department', filterDept);
+      if (filterStatus) params.set('status', filterStatus);
+      const res = await fetch(`/api/auth/users?${params}`, { headers });
       const json = await res.json();
       if (json.success) {
         setUsers(json.data);
@@ -63,7 +71,14 @@ export default function UserManagementView() {
     }
   }
 
-  useEffect(() => { fetchUsers(); }, [page, search]);
+  useEffect(() => { fetchUsers(); }, [page, search, filterRole, filterDept, filterStatus]);
+
+  useEffect(() => {
+    fetch('/api/departments')
+      .then(r => r.json())
+      .then(json => { if (json.success) setDepartments(json.data); })
+      .catch(() => {});
+  }, []);
 
   function openCreate() {
     setEditingUser(null);
@@ -135,15 +150,20 @@ export default function UserManagementView() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-extrabold text-on-surface font-headline">用户管理</h2>
-          <p className="text-sm text-on-surface-variant mt-1">管理系统用户账号和权限</p>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0 transition-transform hover:scale-105 hover:rotate-3 cursor-default">
+            <Shield className="text-on-primary" size={24} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-on-surface font-headline">用户管理</h2>
+            <p className="text-sm text-on-surface-variant mt-1">管理系统用户账号和权限</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {currentUser?.role === 'admin' && (
             <button
               onClick={() => setShowTransition(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-amber-100 text-amber-700 rounded-xl font-bold text-sm hover:bg-amber-200 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 bg-surface-container-low text-on-surface-variant rounded-xl font-medium text-sm hover:bg-surface-container-high transition-colors"
             >
               <RefreshCw size={18} />
               换届
@@ -161,15 +181,55 @@ export default function UserManagementView() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-outline size-4" />
-        <input
-          className="w-full bg-surface-container-lowest border border-surface-container-high rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-          placeholder="搜索用户名、姓名、部门..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        />
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[180px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-outline size-4" />
+          <input
+            className="w-full bg-surface-container-lowest border border-surface-container-high rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+            placeholder="搜索用户名、姓名、部门..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+        <select
+          value={filterRole}
+          onChange={(e) => { setFilterRole(e.target.value); setPage(1); }}
+          className="bg-surface-container-lowest border border-surface-container-high rounded-xl px-3 py-2 text-sm text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+        >
+          <option value="">全部角色</option>
+          <option value="admin">管理员</option>
+          <option value="teacher">教师</option>
+          <option value="student">学生</option>
+          <option value="department_head">部长</option>
+        </select>
+        <select
+          value={filterDept}
+          onChange={(e) => { setFilterDept(e.target.value); setPage(1); }}
+          className="bg-surface-container-lowest border border-surface-container-high rounded-xl px-3 py-2 text-sm text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+        >
+          <option value="">全部部门</option>
+          {departments.map(d => (
+            <option key={d.id} value={d.name}>{d.name}</option>
+          ))}
+        </select>
+        <select
+          value={filterStatus}
+          onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+          className="bg-surface-container-lowest border border-surface-container-high rounded-xl px-3 py-2 text-sm text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+        >
+          <option value="">全部状态</option>
+          <option value="active">正常</option>
+          <option value="disabled">禁用</option>
+        </select>
+        {(filterRole || filterDept || filterStatus || search) && (
+          <button
+            onClick={() => { setSearch(''); setFilterRole(''); setFilterDept(''); setFilterStatus(''); setPage(1); }}
+            className="text-xs text-primary hover:underline px-2 py-2"
+          >
+            清除筛选
+          </button>
+        )}
       </div>
 
       {/* Error */}

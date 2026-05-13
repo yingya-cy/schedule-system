@@ -245,7 +245,7 @@ export default function TemplateList({ onBack }: Props) {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => openEditor('new')}
-            className="px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-on-primary font-semibold rounded-xl shadow-lg shadow-primary/25 flex items-center gap-2 focus-ring touch-target"
+            className="px-5 py-2.5 bg-primary text-on-primary font-semibold rounded-xl shadow-md flex items-center gap-2 focus-ring touch-target hover:bg-primary/90 transition-colors"
           >
             <Plus size={18} />
             <span className="whitespace-nowrap">新建模板</span>

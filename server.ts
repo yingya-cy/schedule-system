@@ -15,6 +15,9 @@ import scoringRouter from "./src/routes/scoring/index.ts";
 import authRouter from "./src/routes/auth.ts";
 import fileCenterRouter from "./src/routes/file-center/index.ts";
 import termsRouter from "./src/routes/terms.ts";
+import psychologyRouter from "./src/routes/psychology/index.ts";
+import { WebSocketServer } from 'ws';
+import { setupWebSocket } from './src/routes/psychology/ws.ts';
 import { registerScheduleRoutes } from "./src/routes/schedule-routes.ts";
 import { sendError } from "./src/utils/errorHandler.ts";
 import pool from './src/config/database.ts';
@@ -187,6 +190,7 @@ app.get("/api/reset-departments", authenticate, requireRole('admin'), async (req
   // 文件中心 API
   app.use('/api/file-center', fileCenterRouter);
   app.use('/api/terms', termsRouter);
+  app.use('/api/psychology', psychologyRouter);
 
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
@@ -206,5 +210,9 @@ app.get("/api/reset-departments", authenticate, requireRole('admin'), async (req
   server.timeout = 300000;         // 5 分钟总超时
   server.keepAliveTimeout = 305000; // 略大于总超时，防止竞争风险
   server.headersTimeout = 310000;   // 头部超时也相应调大
+
+  const wss = new WebSocketServer({ server });
+  setupWebSocket(wss);
+  console.log(`WebSocket server running on ws://localhost:${PORT}`);
 }
 startServer();

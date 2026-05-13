@@ -127,10 +127,10 @@ export const competitionApi = {
       totalScoreMap: Record<number, Record<number, number>>;
     }>(`/competitions/${competitionId}/score-details`),
 
-  getJudgeByName: (competitionId: number, name: string, code: string) =>
+  getJudgeByName: (competitionId: number, name: string) =>
     request<Judge & { token: string }>('/judge/login', {
       method: 'POST',
-      body: JSON.stringify({ name, competition_id: competitionId, code }),
+      body: JSON.stringify({ name, competition_id: competitionId }),
     }),
 
   getJudgeContestants: () =>
@@ -212,7 +212,7 @@ export const judgeApi = {
     request<Judge[]>(`/competitions/${competitionId}/judges`),
 
   create: (competitionId: number, data: { name: string }) =>
-    request<{ id: number }>(`/competitions/${competitionId}/judges`, {
+    request<{ id: number; code: string }>(`/competitions/${competitionId}/judges`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -228,10 +228,10 @@ export const judgeApi = {
       method: 'DELETE',
     }),
 
-  login: (name: string, competitionId: number, code: string) =>
+  login: (name: string, competitionId: number) =>
     request<Judge & { token: string }>('/judge/login', {
       method: 'POST',
-      body: JSON.stringify({ name, competition_id: competitionId, code }),
+      body: JSON.stringify({ name, competition_id: competitionId }),
     }),
 
   getContestants: () =>

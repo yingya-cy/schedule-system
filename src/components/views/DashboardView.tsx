@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { RefreshCw, Calendar, Users, Clock, BookOpen, FolderOpen, Layers } from 'lucide-react';
+import { RefreshCw, Calendar, Users, Clock, BookOpen, FolderOpen, Layers, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FreeTimeResult, TIME_SLOTS, WEEKDAYS } from '@/types';
 import { api } from '@/services/api';
@@ -121,14 +121,22 @@ export default function DashboardView() {
     <div className="space-y-8 w-full">
       {/* Header */}
       <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-1">
-          <h1 className="text-4xl font-extrabold text-on-surface font-headline tracking-tight">空闲统计</h1>
-          <p className="text-on-surface-variant font-medium">查看各部门成员的空闲时间分布</p>
+        <div className="flex items-center gap-3">
+          <motion.div whileHover={{ scale: 1.05, rotate: 5 }}
+            className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0">
+            <BarChart3 className="text-on-primary" size={24} />
+          </motion.div>
+          <div>
+            <h1 className="text-2xl font-bold text-on-surface font-headline">空闲统计</h1>
+            <p className="text-sm text-on-surface-variant mt-1">查看各部门成员的空闲时间分布</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
           {availableTerms.length > 0 && (
             <select
               value={currentTermId || ''}
               onChange={e => setCurrentTermId(Number(e.target.value))}
-              className="mt-2 px-2 py-1 text-xs rounded-lg bg-surface-container-low border border-surface-container-high"
+              className="px-2 py-1 text-xs rounded-lg bg-surface-container-low border border-surface-container-high"
             >
               {availableTerms.map(t => (
                 <option key={t.id} value={t.id}>{t.name}{t.status === 'active' ? ' (当前)' : ''}</option>

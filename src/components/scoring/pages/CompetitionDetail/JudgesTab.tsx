@@ -44,6 +44,7 @@ export default function JudgesTab({
       } as Judge]);
       setShowAdd(false);
       setNewJudge({ name: '' });
+      setMessageDialog({ open: true, type: 'success', title: '添加成功', message: `评委「${newJudge.name.trim()}」的评委码：${result.code}` });
     } catch (e: unknown) {
       setMessageDialog({ open: true, type: 'error', title: '添加失败', message: (e as Error).message });
     }
@@ -118,7 +119,7 @@ export default function JudgesTab({
           </div>
           <div className="flex gap-3 pt-2">
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleAdd}
-              className="px-5 py-2.5 bg-gradient-to-r from-success to-success/80 text-on-primary font-medium rounded-xl focus-ring touch-target">
+              className="px-5 py-2.5 bg-success text-on-success font-semibold rounded-xl shadow-md focus-ring touch-target hover:bg-success/90 transition-colors">
               添加
             </motion.button>
             <button onClick={() => setShowAdd(false)}
@@ -146,7 +147,7 @@ export default function JudgesTab({
             placeholder={"张三\n李四\n王五"} rows={4} />
           <div className="flex gap-3 pt-2">
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleBatchImport} disabled={loadingAction}
-              className="px-5 py-2.5 bg-gradient-to-r from-success to-success/80 text-on-primary font-medium rounded-xl disabled:opacity-50 focus-ring touch-target">
+              className="px-5 py-2.5 bg-success text-on-success font-semibold rounded-xl shadow-md disabled:opacity-50 focus-ring touch-target hover:bg-success/90 transition-colors">
               导入
             </motion.button>
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}

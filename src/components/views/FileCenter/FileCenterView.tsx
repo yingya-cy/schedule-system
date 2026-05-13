@@ -522,7 +522,15 @@ export default function FileCenterView() {
         /* Activity Selection Grid */
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-on-surface font-headline">文件中心</h2>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0 transition-transform hover:scale-105 hover:rotate-3 cursor-default">
+                <FolderOpen className="text-on-primary" size={24} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-on-surface font-headline">文件中心</h1>
+                <p className="text-sm text-on-surface-variant mt-1">管理活动和文件资源</p>
+              </div>
+            </div>
             <button
               onClick={openCreateActivity}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-on-primary hover:bg-primary/90 transition-colors"

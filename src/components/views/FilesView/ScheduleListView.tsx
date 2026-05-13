@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { FileText, FileSpreadsheet, Search, X, Plus, Upload } from 'lucide-react';
+import { FileText, FileSpreadsheet, Search, X, Plus, Upload, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScheduleData, Department } from '@/types';
 import { filterSchedules } from './utils';
@@ -16,6 +16,10 @@ interface ScheduleListViewProps {
   onManualEntryClick: () => void;
   onViewSchedule: (schedule: ScheduleData) => void;
   onDeleteSchedule: (id: number) => void;
+  onExportReverse: () => void;
+  terms?: { id: number; name: string; status: string }[];
+  currentTermId?: number;
+  onTermChange?: (id: number) => void;
 }
 
 function EmptyState({
@@ -122,7 +126,11 @@ export default function ScheduleListView({
   onUploadClick,
   onManualEntryClick,
   onViewSchedule,
-  onDeleteSchedule
+  onDeleteSchedule,
+  onExportReverse,
+  terms,
+  currentTermId,
+  onTermChange,
 }: ScheduleListViewProps) {
   const [filterDepartment, setFilterDepartment] = useState('');
   const [searchName, setSearchName] = useState('');
@@ -164,6 +172,17 @@ export default function ScheduleListView({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {terms && terms.length > 0 && (
+            <select
+              value={currentTermId || ''}
+              onChange={e => onTermChange?.(Number(e.target.value))}
+              className="px-3 py-2.5 text-sm rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+            >
+              {terms.map(t => (
+                <option key={t.id} value={t.id}>{t.name}{t.status === 'active' ? ' (当前)' : ''}</option>
+              ))}
+            </select>
+          )}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -173,6 +192,13 @@ export default function ScheduleListView({
             <Plus size={18} />
             <span className="hidden sm:inline">手动录入</span>
           </motion.button>
+          <button
+            onClick={onExportReverse}
+            className="focus-ring flex items-center gap-2 px-5 py-2.5 bg-surface-container-low text-on-surface font-medium rounded-xl hover:bg-surface-container-high transition-all"
+          >
+            <Download size={18} />
+            <span className="hidden sm:inline">导出反课表</span>
+          </button>
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}

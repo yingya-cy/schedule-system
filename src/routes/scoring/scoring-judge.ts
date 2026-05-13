@@ -9,29 +9,25 @@ import jwt from 'jsonwebtoken';
 const router = Router();
 
 // =============================================
-// 评委登录（公开，用名字 + 比赛ID + 评委码）
+// 评委登录（公开，用名字 + 比赛ID）
 // =============================================
 
 router.post('/judge/login', async (req, res) => {
   try {
-    const { name, competition_id, code } = req.body;
+    const { name, competition_id } = req.body;
     if (!name || !competition_id) {
       res.status(400).json({ success: false, error: '请输入评委姓名和比赛' });
-      return;
-    }
-    if (!code) {
-      res.status(400).json({ success: false, error: '请输入评委码' });
       return;
     }
     const [rows] = await pool.query(
       `SELECT j.id, j.name, j.code, j.competition_id, c.name as competition_name, c.status as competition_status
        FROM judges j
        LEFT JOIN competitions c ON j.competition_id = c.id
-       WHERE j.name = ? AND j.competition_id = ? AND j.code = ?`,
-      [name, competition_id, code]
+       WHERE j.name = ? AND j.competition_id = ?`,
+      [name, competition_id]
     );
     if ((rows as RowDataPacket[]).length === 0) {
-      res.status(401).json({ success: false, error: '评委姓名或评委码错误' });
+      res.status(401).json({ success: false, error: '评委姓名错误或未分配到该比赛' });
       return;
     }
     const judge = (rows as RowDataPacket[])[0];

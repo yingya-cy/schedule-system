@@ -6,35 +6,35 @@
   --font-headline: "Ma Shan Zheng", "Noto Serif SC", serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* ── Watercolor warm palette ── */
+  /* ── Watercolor palette (refined) ── */
 
-  /* Primary — misty watercolor blue */
-  --color-primary: #5590b2;
+  /* Primary — watercolor blue */
+  --color-primary: #5092b0;
   --color-primary-container: #a8c8db;
-  --color-on-primary: #fefcf7;
+  --color-on-primary: #fefcf9;
 
-  /* Background — warm paper tones (coldest→warmest gradient) */
-  --color-background: #f5f1ea;
-  --color-surface: #f5f1ea;
-  --color-surface-container: #ede6d8;
-  --color-surface-container-low: #f2ece0;
-  --color-surface-container-high: #e8dfce;
-  --color-surface-container-highest: #e0d5c0;
-  --color-surface-container-lowest: #fdf6ed;
+  /* Background — cool paper with depth */
+  --color-background: #f0f0f2;
+  --color-surface: #fafaf8;
+  --color-surface-container: #f3f1ee;
+  --color-surface-container-low: #f7f5f2;
+  --color-surface-container-high: #ebe7e1;
+  --color-surface-container-highest: #e2ddd5;
+  --color-surface-container-lowest: #ffffff;
 
-  /* Text — warm brown, never cold black */
-  --color-on-surface: #3a3028;
-  --color-on-surface-variant: #8a7a68;
+  /* Text — warm but crisp */
+  --color-on-surface: #302b26;
+  --color-on-surface-variant: #736d65;
 
-  /* Borders — warm beige */
-  --color-outline: #c4b8a8;
-  --color-outline-variant: #ddd2c4;
+  /* Borders — defined but soft */
+  --color-outline: #cec7bd;
+  --color-outline-variant: #e2dbd1;
 
-  /* Semantic — desaturated watercolor pastels */
-  --color-success: #7aab8c;
-  --color-secondary: #b8a8d0;
-  --color-warning: #d4b88a;
-  --color-error: #c89088;
+  /* Semantic — bold & crisp, matching blue primary weight */
+  --color-success: #4d8b65;
+  --color-secondary: #9b8cb8;
+  --color-warning: #b8854a;
+  --color-error: #b46058;
 
   --color-on-secondary: #ffffff;
   --color-on-warning: #ffffff;
@@ -59,7 +59,7 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background: #f5f1ea;
+    background: #f0f0f2;
   }
 
   /* Paper fiber grain — CSS radial-gradient micro-dots, no SVG filter */
@@ -69,13 +69,13 @@
     inset: 0;
     pointer-events: none;
     z-index: 9998;
-    opacity: 0.40;
+    opacity: 0.25;
     background-image:
-      radial-gradient(circle at 15% 25%, rgba(139, 119, 90, 0.08) 0.4px, transparent 0.4px),
-      radial-gradient(circle at 55% 65%, rgba(139, 119, 90, 0.06) 0.3px, transparent 0.3px),
-      radial-gradient(circle at 80% 15%, rgba(139, 119, 90, 0.05) 0.5px, transparent 0.5px),
-      radial-gradient(circle at 35% 80%, rgba(139, 119, 90, 0.06) 0.3px, transparent 0.3px),
-      radial-gradient(circle at 70% 45%, rgba(139, 119, 90, 0.05) 0.4px, transparent 0.4px);
+      radial-gradient(circle at 15% 25%, rgba(120, 110, 100, 0.07) 0.4px, transparent 0.4px),
+      radial-gradient(circle at 55% 65%, rgba(120, 110, 100, 0.05) 0.3px, transparent 0.3px),
+      radial-gradient(circle at 80% 15%, rgba(120, 110, 100, 0.04) 0.5px, transparent 0.5px),
+      radial-gradient(circle at 35% 80%, rgba(120, 110, 100, 0.05) 0.3px, transparent 0.3px),
+      radial-gradient(circle at 70% 45%, rgba(120, 110, 100, 0.04) 0.4px, transparent 0.4px);
     background-size: 8px 8px, 6px 6px, 10px 10px, 7px 7px, 9px 9px;
   }
 
@@ -117,38 +117,38 @@
 @layer components {
   /* ── Paper card — semi-transparent, warm ── */
   .paper-card {
-    @apply bg-surface-container-lowest/85 backdrop-blur-sm rounded-3xl p-6
-           border border-outline-variant/50
-           shadow-[0_4px_20px_rgba(139,119,90,0.06)]
+    @apply bg-surface rounded-2xl p-6
+           border border-outline-variant/60
+           shadow-[0_1px_6px_rgba(0,0,0,0.06),0_2px_16px_rgba(0,0,0,0.04)]
            transition-all duration-300 ease-out;
   }
   .paper-card:hover {
     @apply -translate-y-0.5
-           shadow-[0_8px_30px_rgba(139,119,90,0.10)]
-           border-outline-variant/80;
+           shadow-[0_4px_16px_rgba(0,0,0,0.08),0_8px_32px_rgba(0,0,0,0.06)]
+           border-outline/40;
   }
 
   /* ── Glass panel — frosted paper ── */
   .paper-panel {
-    @apply bg-surface-container-lowest/70 backdrop-blur-md
-           border border-outline-variant/30;
+    @apply bg-surface/80 backdrop-blur-md
+           border border-outline-variant/40;
   }
 
   /* ── Legacy aliases (mirror paper-card/paper-panel) ── */
   .bento-card {
-    @apply bg-surface-container-lowest/85 backdrop-blur-sm rounded-3xl p-6
-           border border-outline-variant/50
-           shadow-[0_4px_20px_rgba(139,119,90,0.06)]
+    @apply bg-surface rounded-2xl p-6
+           border border-outline-variant/60
+           shadow-[0_1px_6px_rgba(0,0,0,0.06),0_2px_16px_rgba(0,0,0,0.04)]
            transition-all duration-300 ease-out;
   }
   .bento-card:hover {
     @apply -translate-y-0.5
-           shadow-[0_8px_30px_rgba(139,119,90,0.10)]
-           border-outline-variant/80;
+           shadow-[0_4px_16px_rgba(0,0,0,0.08),0_8px_32px_rgba(0,0,0,0.06)]
+           border-outline/40;
   }
   .glass-panel {
-    @apply bg-surface-container-lowest/70 backdrop-blur-md
-           border border-outline-variant/30;
+    @apply bg-surface/80 backdrop-blur-md
+           border border-outline-variant/40;
   }
 
   /* ── Focus ring ── */
@@ -182,14 +182,15 @@
     @apply transition-all duration-300 ease-out;
   }
   .card-hover:hover {
-    @apply -translate-y-0.5 shadow-[0_6px_24px_rgba(139,119,90,0.08)];
+    @apply -translate-y-0.5 shadow-[0_6px_24px_rgba(0,0,0,0.05)];
   }
 
   /* ── Primary button ── */
   .btn-primary {
     @apply bg-primary text-on-primary font-semibold rounded-2xl
-           shadow-[0_4px_16px_rgba(85,144,178,0.22)]
-           hover:shadow-[0_6px_22px_rgba(85,144,178,0.30)]
+           border border-primary/20
+           shadow-[0_4px_14px_rgba(80,146,176,0.25)]
+           hover:shadow-[0_6px_20px_rgba(80,146,176,0.35)]
            hover:brightness-105
            active:brightness-95
            transition-all duration-200 ease-out;

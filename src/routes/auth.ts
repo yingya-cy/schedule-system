@@ -266,7 +266,7 @@ router.get('/users', authenticate, async (req, res) => {
       return;
     }
 
-    const { search, role, page = '1', limit = '20' } = req.query;
+    const { search, role, department, status, page = '1', limit = '20' } = req.query;
     let sql = 'SELECT id, username, name, email, role, department, is_active, last_login, created_at FROM users WHERE 1=1';
     const params: (string | number)[] = [];
 
@@ -283,6 +283,15 @@ router.get('/users', authenticate, async (req, res) => {
     if (role) {
       sql += ' AND role = ?';
       params.push(String(role));
+    }
+    if (department) {
+      sql += ' AND department = ?';
+      params.push(String(department));
+    }
+    if (status === 'active') {
+      sql += ' AND is_active = 1';
+    } else if (status === 'disabled') {
+      sql += ' AND is_active = 0';
     }
 
     const offset = (parseInt(page as string) - 1) * parseInt(limit as string);

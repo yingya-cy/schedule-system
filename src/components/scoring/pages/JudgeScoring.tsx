@@ -4,9 +4,9 @@ import type { Contestant, ScoringDimension } from '../types/scoring.ts';
 import MessageDialog from '../../MessageDialog.tsx';
 import ConfirmDialog from '../../ConfirmDialog.tsx';
 import { useSimpleToast } from '../../Toast.tsx';
+import ContestantStepper from './JudgeScoring/ContestantStepper.tsx';
 import ScoringForm from './JudgeScoring/ScoringForm.tsx';
-import { motion } from 'motion/react';
-import { ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, HelpCircle } from 'lucide-react';
 
 interface JudgeScoringProps {
   competitionId: number;
@@ -27,19 +27,16 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   const [competitionName, setCompetitionName] = useState('');
 
   const [dimensions, setDimensions] = useState<ScoringDimension[]>([]);
-  const [expandedDims, setExpandedDims] = useState<Record<number, boolean>>({});
 
   const [messageDialog, setMessageDialog] = useState<{ open: boolean; type: 'success' | 'error' | 'info'; title: string; message?: string }>({ open: false, type: 'info', title: '' });
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
   const [switchingContestant, setSwitchingContestant] = useState(false);
   const [loadScoreError, setLoadScoreError] = useState('');
+  const [showHelp, setShowHelp] = useState(false);
   const toast = useSimpleToast();
-  const scoringAreaRef = useRef<HTMLDivElement>(null);
   const submitBtnRef = useRef<HTMLButtonElement>(null);
   const submitAllBtnRef = useRef<HTMLButtonElement>(null);
-  const prevBtnRef = useRef<HTMLButtonElement>(null);
-  const nextBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => { loadData(); }, [competitionId, judgeId]);
 
@@ -47,26 +44,14 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.ctrlKey && e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        submitBtnRef.current?.click();
-      }
-      if (e.ctrlKey && e.shiftKey && e.key === 'Enter') {
-        e.preventDefault();
-        submitAllBtnRef.current?.click();
-      }
-      if (e.ctrlKey && e.key === 'ArrowLeft') {
-        e.preventDefault();
-        prevBtnRef.current?.click();
-      }
-      if (e.ctrlKey && e.key === 'ArrowRight') {
-        e.preventDefault();
-        nextBtnRef.current?.click();
-      }
+      if (e.ctrlKey && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitBtnRef.current?.click(); }
+      if (e.ctrlKey && e.shiftKey && e.key === 'Enter') { e.preventDefault(); submitAllBtnRef.current?.click(); }
+      if (e.ctrlKey && e.key === 'ArrowLeft') { e.preventDefault(); goToPrevContestant(); }
+      if (e.ctrlKey && e.key === 'ArrowRight') { e.preventDefault(); goToNextContestant(); }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [activeContestant, contestants]);
 
   async function loadData() {
     try {
@@ -74,11 +59,6 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
       setCompetitionName(comp.name);
       if (comp.template?.dimensions?.length) {
         setDimensions(comp.template.dimensions);
-        const initialExpanded: Record<number, boolean> = {};
-        comp.template.dimensions.forEach((d: ScoringDimension) => {
-          initialExpanded[d.id] = true;
-        });
-        setExpandedDims(initialExpanded);
       }
       const data = await competitionApi.getJudgeContestants();
       setContestants(data);
@@ -88,9 +68,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
         setCurrentScores(loaded);
         setContestantScores({ [data[0].id]: loaded });
       }
-    } catch (e: unknown) {
-      setError((e as Error).message);
-    }
+    } catch (e: unknown) { setError((e as Error).message); }
   }
 
   async function loadContestantScores(contestantId: number) {
@@ -99,17 +77,11 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
       setLoadScoreError('');
       const loaded: Record<number, number> = {};
       for (const row of rows) {
-        if (row.subdimension_id) {
-          loaded[Number(row.subdimension_id)] = parseFloat(String(row.score));
-        } else if (row.dimension_id) {
-          loaded[Number(row.dimension_id)] = parseFloat(String(row.score));
-        }
+        if (row.subdimension_id) loaded[Number(row.subdimension_id)] = parseFloat(String(row.score));
+        else if (row.dimension_id) loaded[Number(row.dimension_id)] = parseFloat(String(row.score));
       }
       return loaded;
-    } catch (e: unknown) {
-      setLoadScoreError('加载已有评分失败，请检查网络连接');
-      return {};
-    }
+    } catch (e: unknown) { setLoadScoreError('加载已有评分失败'); return {}; }
   }
 
   async function saveCurrentScores(silent = false): Promise<boolean> {
@@ -118,27 +90,19 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
     const scoreList: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
     for (const dim of dimensions) {
       if (dim.subdimensions.length > 0) {
-        for (const sub of dim.subdimensions) {
-          const scoreVal = currentScores[sub.id];
-          scoreList.push({ subdimension_id: sub.id, score: scoreVal !== undefined ? scoreVal : 0 });
-        }
+        for (const sub of dim.subdimensions) scoreList.push({ subdimension_id: sub.id, score: currentScores[sub.id] ?? 0 });
       } else {
-        const scoreVal = currentScores[dim.id];
-        scoreList.push({ dimension_id: dim.id, score: scoreVal !== undefined ? scoreVal : 0 });
+        scoreList.push({ dimension_id: dim.id, score: currentScores[dim.id] ?? 0 });
       }
     }
     try {
       await judgeApi.submitScore({ contestant_id: activeContestant.id, scores: scoreList });
       setContestantScores((prev) => ({ ...prev, [activeContestant.id]: { ...currentScores } }));
-      setContestants((prev) =>
-        prev.map((c) => (c.id === activeContestant.id ? { ...c, scored: true } : c))
-      );
+      setContestants((prev) => prev.map((c) => (c.id === activeContestant.id ? { ...c, scored: true } : c)));
       toast.success('评分已保存', undefined, 1500);
       return true;
     } catch (e: unknown) {
-      if (!silent) {
-        setMessageDialog({ open: true, type: 'error', title: '保存失败', message: (e as Error).message });
-      }
+      if (!silent) setMessageDialog({ open: true, type: 'error', title: '保存失败', message: (e as Error).message });
       return false;
     }
   }
@@ -156,10 +120,6 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
     setSwitchingContestant(false);
   }
 
-  function clamp(value: number, min: number, max: number): number {
-    return Math.min(Math.max(value, min), max);
-  }
-
   function handleScoreChange(subId: number, maxScore: number, rawValue: string) {
     if (rawValue === '') {
       setCurrentScores((prev) => { const next = { ...prev }; delete next[subId]; return next; });
@@ -167,12 +127,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
     }
     const num = parseFloat(rawValue);
     if (isNaN(num)) return;
-    const clamped = clamp(num, 0, maxScore);
-    setCurrentScores((prev) => ({ ...prev, [subId]: clamped }));
-  }
-
-  function toggleDimension(dimId: number) {
-    setExpandedDims((prev) => ({ ...prev, [dimId]: !prev[dimId] }));
+    setCurrentScores((prev) => ({ ...prev, [subId]: Math.min(Math.max(num, 0), maxScore) }));
   }
 
   function goToPrevContestant() {
@@ -190,47 +145,19 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   function handleSubmit() {
     if (!activeContestant) return;
     const scoreList: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
+    const templateTotal = dimensions.reduce((sum, d) => sum + (parseFloat(String(d.max_score)) || 0), 0);
     for (const dim of dimensions) {
       if (dim.subdimensions.length > 0) {
-        for (const sub of dim.subdimensions) {
-          const scoreVal = currentScores[sub.id];
-          scoreList.push({ subdimension_id: sub.id, score: scoreVal !== undefined ? scoreVal : 0 });
-        }
+        for (const sub of dim.subdimensions) scoreList.push({ subdimension_id: sub.id, score: currentScores[sub.id] ?? 0 });
       } else {
-        const scoreVal = currentScores[dim.id];
-        scoreList.push({ dimension_id: dim.id, score: scoreVal !== undefined ? scoreVal : 0 });
+        scoreList.push({ dimension_id: dim.id, score: currentScores[dim.id] ?? 0 });
       }
     }
-
-    const overMax = scoreList.filter((s) => {
-      let maxScore = 0;
-      for (const dim of dimensions) {
-        if (dim.subdimensions.length > 0) {
-          if (s.subdimension_id) {
-            const sub = dim.subdimensions.find((sub) => sub.id === s.subdimension_id);
-            if (sub) { maxScore = sub.max_score; break; }
-          }
-        } else if (s.dimension_id && dim.id === s.dimension_id) {
-          maxScore = dim.max_score; break;
-        }
-      }
-      return s.score > maxScore;
-    });
-
     const totalInput = scoreList.reduce((sum, s) => sum + s.score, 0);
-    const templateTotal = dimensions.reduce((sum, d) => sum + (parseFloat(String(d.max_score)) || 0), 0);
-
-    if (overMax.length > 0) {
-      setMessageDialog({ open: true, type: 'error', title: '分数超出范围',
-        message: `有 ${overMax.length} 个评分项分数超过了满分，请修正后再提交。` });
-      return;
-    }
     if (totalInput > templateTotal) {
-      setMessageDialog({ open: true, type: 'error', title: '总分超出限制',
-        message: `当前总分 ${totalInput} 超过了模板满分 ${templateTotal}，请修正后再提交。` });
+      setMessageDialog({ open: true, type: 'error', title: '总分超出限制', message: `当前总分 ${totalInput} 超过了模板满分 ${templateTotal}` });
       return;
     }
-
     setSubmitting(true);
     judgeApi.submitScore({ contestant_id: activeContestant.id, scores: scoreList })
       .then(() => {
@@ -268,9 +195,7 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
   async function submitAllContestants(toSubmit: Contestant[]) {
     setSubmittingAll(true);
     const templateTotal = dimensions.reduce((sum, d) => sum + (parseFloat(String(d.max_score)) || 0), 0);
-    let submitted = 0;
-    let skipped = 0;
-    let unchanged = 0;
+    let submitted = 0, skipped = 0, unchanged = 0;
     for (const c of toSubmit) {
       const isCurrent = activeContestant?.id === c.id;
       const rawScores: Record<number, number> | undefined = isCurrent
@@ -281,30 +206,23 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
       const scoreList: { subdimension_id?: number; dimension_id?: number; score: number }[] = [];
       for (const dim of dimensions) {
         if (dim.subdimensions.length > 0) {
-          for (const sub of dim.subdimensions) {
-            const scoreVal = saved[sub.id];
-            scoreList.push({ subdimension_id: sub.id, score: scoreVal !== undefined ? scoreVal : 0 });
-          }
+          for (const sub of dim.subdimensions) scoreList.push({ subdimension_id: sub.id, score: saved[sub.id] ?? 0 });
         } else {
-          const scoreVal = saved[dim.id];
-          scoreList.push({ dimension_id: dim.id, score: scoreVal !== undefined ? scoreVal : 0 });
+          scoreList.push({ dimension_id: dim.id, score: saved[dim.id] ?? 0 });
         }
       }
-      const totalInput = scoreList.reduce((sum, s) => sum + s.score, 0);
-      if (totalInput > templateTotal) { skipped++; continue; }
+      if (scoreList.reduce((sum, s) => sum + s.score, 0) > templateTotal) { skipped++; continue; }
       try {
         await judgeApi.submitScore({ contestant_id: c.id, scores: scoreList });
         setContestants((prev) => prev.map((cc) => (cc.id === c.id ? { ...cc, scored: true } : cc)));
         setSubmittedIds((prev) => new Set([...prev, c.id]));
         setContestantScores((prev) => ({ ...prev, [c.id]: { ...saved } }));
         submitted++;
-      } catch (e: unknown) {
-        // skip failed ones
-      }
+      } catch (e: unknown) { /* skip */ }
     }
     setSubmittingAll(false);
     const parts: string[] = [`已提交 ${submitted} 个选手的评分`];
-    if (unchanged > 0) parts.push(`${unchanged} 个选手已有评分且未修改，已保持`);
+    if (unchanged > 0) parts.push(`${unchanged} 个选手已有评分，已保持`);
     if (skipped > 0) parts.push(`${skipped} 个选手因总分超出满分已跳过`);
     setMessageDialog({ open: true, type: 'success', title: '提交完成', message: parts.join('，') });
   }
@@ -321,74 +239,55 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
     );
   }
 
-  const unscoredCount = contestants.filter((c) => !c.scored && !submittedIds.has(c.id)).length;
-
   return (
-    <div className="min-h-screen bg-background flex flex-col overflow-hidden">
-      {/* Top Bar */}
-      <header className="bg-gradient-to-r from-primary to-primary/80 text-on-primary px-6 py-4 flex justify-between items-center shadow-lg shadow-primary/20 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors focus-ring">
-            <ArrowLeft size={20} className="text-on-primary/80" />
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-gradient-to-b from-primary to-primary/90 shadow-lg shadow-primary/25 rounded-b-2xl">
+        <div className="flex items-center justify-between px-3 py-2">
+          <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors focus-ring touch-target flex items-center justify-center">
+            <ArrowLeft size={18} className="text-on-primary/80" />
           </button>
-          <div>
-            <div className="text-lg font-bold font-headline truncate max-w-[50vw]">{competitionName}</div>
-            <div className="text-sm text-on-primary/80 mt-0.5">评委：{judgeName}</div>
+          <div className="text-center min-w-0 mx-2">
+            <div className="text-sm font-bold text-on-primary truncate">{competitionName}</div>
+            <div className="text-xs text-on-primary/60">{judgeName}</div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setShowHelp(!showHelp)}
+              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors focus-ring touch-target flex items-center justify-center">
+              <HelpCircle size={16} className="text-on-primary/80" />
+            </button>
           </div>
         </div>
-        <div className="hidden md:flex items-center gap-4">
-          <div className="flex gap-2 text-[10px] text-on-primary/60">
-            <span><kbd className="px-1 py-0.5 bg-white/10 rounded text-[10px] font-mono">Ctrl+Enter</kbd> 提交</span>
-            <span><kbd className="px-1 py-0.5 bg-white/10 rounded text-[10px] font-mono">Ctrl+←/→</kbd> 切换</span>
-          </div>
-        </div>
-        <div className="text-right flex-shrink-0">
-          <div className="text-3xl font-bold font-headline">{unscoredCount}</div>
-          <div className="text-xs text-on-primary/80">待评分</div>
-        </div>
-      </header>
 
-      {/* Contestant Tabs */}
-      {contestants.length > 0 && (
-        <div className="bg-surface border-b border-surface-container-high px-2 py-2 flex gap-2 items-center flex-shrink-0 overflow-hidden">
-          <button ref={prevBtnRef} onClick={goToPrevContestant}
-            disabled={!activeContestant || contestants.findIndex((c) => c.id === activeContestant.id) === 0}
-            className="p-1 rounded bg-surface-container-low hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-ring flex-shrink-0 touch-target flex items-center justify-center">
-            <ChevronLeft size={14} className="text-on-surface-variant" />
-          </button>
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide flex-1 min-w-0 h-7 max-w-[calc(100vw-140px)]">
-            {contestants.map((c) => (
-              <button key={c.id} onClick={() => switchToContestant(c)}
-                className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 h-full flex items-center justify-center ${
-                  activeContestant?.id === c.id
-                    ? 'bg-primary text-on-primary shadow-md'
-                    : c.scored
-                    ? 'bg-success/10 text-success'
-                    : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
-                }`}>
-                {c.number || c.name}
-                {c.scored && <span className="ml-0.5">✓</span>}
-              </button>
-            ))}
+        {/* Help tooltip */}
+        {showHelp && (
+          <div className="px-4 pb-3 text-xs text-on-primary/70 flex flex-wrap gap-x-4 gap-y-1">
+            <span><kbd className="px-1 py-0.5 bg-white/10 rounded text-xs font-mono">Ctrl+Enter</kbd> 提交</span>
+            <span><kbd className="px-1 py-0.5 bg-white/10 rounded text-xs font-mono">Ctrl+←→</kbd> 切换</span>
+            <span><kbd className="px-1 py-0.5 bg-white/10 rounded text-xs font-mono">Ctrl+Shift+Enter</kbd> 全部提交</span>
           </div>
-          <button ref={nextBtnRef} onClick={goToNextContestant}
-            disabled={!activeContestant || contestants.findIndex((c) => c.id === activeContestant.id) >= contestants.length - 1}
-            className="p-1 rounded bg-surface-container-low hover:bg-surface-container-high disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-ring flex-shrink-0 touch-target flex items-center justify-center">
-            <ChevronRight size={14} className="text-on-surface-variant" />
-          </button>
+        )}
+
+        {/* Stepper */}
+        <div className="px-3 pb-2">
+          <ContestantStepper
+            contestants={contestants}
+            activeContestant={activeContestant}
+            onSelect={switchToContestant}
+            onPrev={goToPrevContestant}
+            onNext={goToNextContestant}
+          />
         </div>
-      )}
+      </div>
 
       {/* Scoring Area */}
-      <div ref={scoringAreaRef} className="flex-1 p-4 md:p-6 flex flex-col gap-4 md:gap-6 overflow-y-auto">
+      <div className="flex-1 p-3 md:p-6">
         <ScoringForm
           contestant={activeContestant}
           contestants={contestants}
           dimensions={dimensions}
           scores={currentScores}
           onScoreChange={handleScoreChange}
-          expandedDims={expandedDims}
-          onToggleDim={toggleDimension}
           onSubmit={handleSubmit}
           submitting={submitting}
           onSubmitAll={handleSubmitAll}
@@ -397,14 +296,12 @@ export default function JudgeScoring({ competitionId, judgeId, judgeName, onBack
         />
       </div>
 
-      {/* Message Dialog */}
+      {/* Dialogs */}
       <MessageDialog
         isOpen={messageDialog.open}
         type={messageDialog.type} title={messageDialog.title} message={messageDialog.message}
         onClose={() => setMessageDialog((p) => ({ ...p, open: false }))}
       />
-
-      {/* Confirm Dialog */}
       <ConfirmDialog
         isOpen={confirmDialog.open}
         title={confirmDialog.title} message={confirmDialog.message}

@@ -12,6 +12,7 @@ import {
   FileText,
   School,
   Users,
+  MessageCircle,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -74,7 +75,17 @@ export default function ChatView() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-128px)] gap-6">
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0 transition-transform hover:scale-105 hover:rotate-3 cursor-default">
+          <MessageCircle className="text-on-primary" size={24} />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-on-surface font-headline">群聊</h1>
+          <p className="text-sm text-on-surface-variant mt-1">团队内部即时通讯</p>
+        </div>
+      </div>
+      <div className="flex h-[calc(100vh-210px)] gap-6">
       {/* Left Sidebar: Conversations */}
       <div className="w-80 flex flex-col gap-4">
         <div className="bg-surface-container-low rounded-xl p-2 flex gap-1">
@@ -268,6 +279,7 @@ export default function ChatView() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

@@ -22,7 +22,6 @@ export default function ScoringDashboard() {
   const [nav, setNav] = useState<NavState>({ view: 'home' });
   const [showJudgeDialog, setShowJudgeDialog] = useState(false);
   const [judgeNameInput, setJudgeNameInput] = useState('');
-  const [judgeCodeInput, setJudgeCodeInput] = useState('');
   const [judgeNameError, setJudgeNameError] = useState('');
   const [competitionList, setCompetitionList] = useState<Competition[]>([]);
   const [selectedCompetitionId, setSelectedCompetitionId] = useState<number>(0);
@@ -34,8 +33,7 @@ export default function ScoringDashboard() {
 
   async function handleJudgeNameSubmit() {
     const name = judgeNameInput.trim();
-    const code = judgeCodeInput.trim();
-    if (!name || !code) return;
+    if (!name) return;
     if (!selectedCompetitionId) {
       setJudgeNameError('请先选择一个比赛');
       return;
@@ -43,11 +41,10 @@ export default function ScoringDashboard() {
     setJudgingLoading(true);
     setJudgeNameError('');
     try {
-      const judge = await competitionApi.getJudgeByName(selectedCompetitionId, name, code);
+      const judge = await competitionApi.getJudgeByName(selectedCompetitionId, name);
       localStorage.setItem('judge_token', judge.token);
       setShowJudgeDialog(false);
       setJudgeNameInput('');
-      setJudgeCodeInput('');
       setSelectedCompetitionId(0);
       navigate('judge', selectedCompetitionId, judge.id, judge.name);
     } catch (e: unknown) {
@@ -60,7 +57,6 @@ export default function ScoringDashboard() {
   function handleJudgeNameCancel() {
     setShowJudgeDialog(false);
     setJudgeNameInput('');
-    setJudgeCodeInput('');
     setJudgeNameError('');
     setSelectedCompetitionId(0);
   }
@@ -84,9 +80,14 @@ export default function ScoringDashboard() {
       {nav.view === 'home' && (
         <div className="p-6 lg:p-8">
           {/* 页面标题 */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-primary font-headline tracking-tight">比赛评分系统</h1>
-            <p className="text-sm text-outline mt-1">多维度评分模板 · 多人离线评分</p>
+          <div className="mb-8 flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0 transition-transform hover:scale-105 hover:rotate-3 cursor-default">
+              <Trophy className="text-on-primary" size={24} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-primary font-headline tracking-tight">比赛评分系统</h1>
+              <p className="text-sm text-outline mt-1">多维度评分模板 · 多人离线评分</p>
+            </div>
           </div>
 
           {/* 功能卡片 */}
@@ -169,20 +170,10 @@ export default function ScoringDashboard() {
                   type="text"
                   value={judgeNameInput}
                   onChange={(e) => setJudgeNameInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleJudgeNameSubmit()}
                   placeholder="请输入您的姓名"
                   className="w-full px-4 py-3 bg-surface-container-low border border-surface-container-high rounded-xl text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 text-base"
                   autoFocus
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-on-surface-variant">评委码</label>
-                <input
-                  type="text"
-                  value={judgeCodeInput}
-                  onChange={(e) => setJudgeCodeInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleJudgeNameSubmit()}
-                  placeholder="请输入评委码（由管理员提供）"
-                  className="w-full px-4 py-3 bg-surface-container-low border border-surface-container-high rounded-xl text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/30 text-base"
                 />
               </div>
               {judgeNameError && (
@@ -199,7 +190,7 @@ export default function ScoringDashboard() {
               <button
                 onClick={handleJudgeNameSubmit}
                 disabled={judgingLoading}
-                className="focus-ring px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-on-primary font-semibold rounded-xl shadow-lg shadow-primary/25 disabled:opacity-50"
+                className="focus-ring px-5 py-2.5 bg-primary text-on-primary font-semibold rounded-xl shadow-md disabled:opacity-50 hover:bg-primary/90 transition-colors"
               >
                 {judgingLoading ? '验证中...' : '进入'}
               </button>

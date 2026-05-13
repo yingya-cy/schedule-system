@@ -361,7 +361,7 @@ function TemplateEditor({ template, onClose, onSaved, onError }: TemplateEditorP
           whileTap={{ scale: 0.98 }}
           onClick={handleSave}
           disabled={saving}
-          className="px-6 py-3 bg-gradient-to-r from-primary to-primary/80 text-on-primary font-semibold rounded-xl shadow-lg shadow-primary/25 disabled:opacity-50 flex items-center gap-2 focus-ring"
+          className="px-6 py-3 bg-primary text-on-primary font-semibold rounded-xl shadow-md disabled:opacity-50 flex items-center gap-2 focus-ring hover:bg-primary/90 transition-colors"
         >
           {saving ? '保存中...' : '保存模板'}
         </motion.button>

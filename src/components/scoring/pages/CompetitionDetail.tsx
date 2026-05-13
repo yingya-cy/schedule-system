@@ -227,14 +227,14 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
           {competition.status === 'preparing' && (
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={handleStartScoring} disabled={loadingAction}
-              className="px-5 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-on-primary font-medium rounded-xl shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50 focus-ring touch-target">
+              className="px-5 py-2.5 bg-primary text-on-primary font-semibold rounded-xl shadow-md flex items-center gap-2 disabled:opacity-50 focus-ring touch-target transition-colors hover:bg-primary/90">
               开始评分
             </motion.button>
           )}
           {competition.status === 'scoring' && (
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={handleCalculate} disabled={loadingAction}
-              className="px-5 py-2.5 bg-gradient-to-r from-success to-success/80 text-on-primary font-medium rounded-xl shadow-lg shadow-success/20 flex items-center gap-2 disabled:opacity-50 focus-ring touch-target">
+              className="px-5 py-2.5 bg-success text-on-success font-semibold rounded-xl shadow-md flex items-center gap-2 disabled:opacity-50 focus-ring touch-target transition-colors hover:bg-success/90">
               <Calculator size={16} /> 计算结果
             </motion.button>
           )}
@@ -242,12 +242,12 @@ export default function CompetitionDetail({ competitionId, onBack }: Props) {
             <>
               <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={handleClearResults} disabled={loadingAction}
-                className="px-4 py-2.5 bg-gradient-to-r from-error to-error/80 text-on-error font-medium rounded-xl shadow-lg shadow-error/20 flex items-center gap-2 disabled:opacity-50 focus-ring touch-target">
+                className="px-4 py-2.5 bg-error text-on-error font-semibold rounded-xl shadow-md flex items-center gap-2 disabled:opacity-50 focus-ring touch-target transition-colors hover:bg-error/90">
                 <Trash size={16} /> 清除结果
               </motion.button>
               <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={handleReopenScoring} disabled={loadingAction}
-                className="px-4 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-on-primary font-medium rounded-xl shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50 focus-ring touch-target">
+                className="px-4 py-2.5 bg-primary text-on-primary font-semibold rounded-xl shadow-md flex items-center gap-2 disabled:opacity-50 focus-ring touch-target transition-colors hover:bg-primary/90">
                 <RotateCcw size={16} /> 重新开放评分
               </motion.button>
             </>

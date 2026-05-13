@@ -7,6 +7,7 @@ import {
   MapPin,
   Clock,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -63,6 +64,17 @@ export default function CoursesView() {
 
   return (
     <section className="max-w-7xl mx-auto space-y-8">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0 transition-transform hover:scale-105 hover:rotate-3 cursor-default">
+          <BookOpen className="text-on-primary" size={24} />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-on-surface font-headline">课程目录</h1>
+          <p className="text-sm text-on-surface-variant mt-1">浏览各学期、各部门的课程安排</p>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2">
