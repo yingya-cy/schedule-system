@@ -7,6 +7,7 @@ const CounselorManagePage = lazy(() => import('./pages/CounselorManagePage'));
 const CounselorListPage = lazy(() => import('./pages/CounselorListPage'));
 const CounselorDetailPage = lazy(() => import('./pages/CounselorDetailPage'));
 const MyAppointmentsPage = lazy(() => import('./pages/MyAppointmentsPage'));
+const ChatPage = lazy(() => import('./pages/ChatPage'));
 
 function SubNav({ view, onView }: { view: PsychView; onView: (v: PsychView) => void }) {
   const user = useAuthStore((s) => s.user);
@@ -76,7 +77,7 @@ export default function PsychologyView() {
       case 'counselor-detail':
         return <Suspense fallback={<div className="skeleton h-64 rounded-xl" />}><CounselorDetailPage /></Suspense>;
       case 'chat':
-        return <div className="empty-state"><p className="empty-state-title">聊天</p><p className="empty-state-description">页面开发中...</p></div>;
+        return <Suspense fallback={<div className="skeleton h-96 rounded-xl" />}><ChatPage /></Suspense>;
       case 'my-appointments':
         return <Suspense fallback={<div className="skeleton h-64 rounded-xl" />}><MyAppointmentsPage /></Suspense>;
       case 'workbench':
