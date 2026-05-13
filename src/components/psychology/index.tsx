@@ -4,8 +4,9 @@ import { usePsychologyStore } from '../../stores/psychologyStore';
 import type { PsychView } from './types/psychology';
 
 const CounselorManagePage = lazy(() => import('./pages/CounselorManagePage'));
-
-const PLACEHOLDER = '页面开发中...';
+const CounselorListPage = lazy(() => import('./pages/CounselorListPage'));
+const CounselorDetailPage = lazy(() => import('./pages/CounselorDetailPage'));
+const MyAppointmentsPage = lazy(() => import('./pages/MyAppointmentsPage'));
 
 function SubNav({ view, onView }: { view: PsychView; onView: (v: PsychView) => void }) {
   const user = useAuthStore((s) => s.user);
@@ -71,19 +72,19 @@ export default function PsychologyView() {
   const renderPage = () => {
     switch (view) {
       case 'counselors':
-        return <div className="empty-state"><p className="empty-state-title">咨询师列表</p><p className="empty-state-description">{PLACEHOLDER}</p></div>;
+        return <Suspense fallback={<div className="skeleton h-64 rounded-xl" />}><CounselorListPage /></Suspense>;
       case 'counselor-detail':
-        return <div className="empty-state"><p className="empty-state-title">咨询师详情</p><p className="empty-state-description">{PLACEHOLDER}</p></div>;
+        return <Suspense fallback={<div className="skeleton h-64 rounded-xl" />}><CounselorDetailPage /></Suspense>;
       case 'chat':
-        return <div className="empty-state"><p className="empty-state-title">聊天</p><p className="empty-state-description">{PLACEHOLDER}</p></div>;
+        return <div className="empty-state"><p className="empty-state-title">聊天</p><p className="empty-state-description">页面开发中...</p></div>;
       case 'my-appointments':
-        return <div className="empty-state"><p className="empty-state-title">我的预约</p><p className="empty-state-description">{PLACEHOLDER}</p></div>;
+        return <Suspense fallback={<div className="skeleton h-64 rounded-xl" />}><MyAppointmentsPage /></Suspense>;
       case 'workbench':
-        return <div className="empty-state"><p className="empty-state-title">工作台</p><p className="empty-state-description">{PLACEHOLDER}</p></div>;
+        return <div className="empty-state"><p className="empty-state-title">工作台</p><p className="empty-state-description">页面开发中...</p></div>;
       case 'manage':
         return <Suspense fallback={<div className="skeleton h-64 rounded-xl" />}><CounselorManagePage /></Suspense>;
       case 'appointments-overview':
-        return <div className="empty-state"><p className="empty-state-title">预约总览</p><p className="empty-state-description">{PLACEHOLDER}</p></div>;
+        return <div className="empty-state"><p className="empty-state-title">预约总览</p><p className="empty-state-description">页面开发中...</p></div>;
       default:
         return <div className="empty-state"><p className="empty-state-title">未知页面</p></div>;
     }
