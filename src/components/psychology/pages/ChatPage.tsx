@@ -128,7 +128,7 @@ export default function ChatPage() {
   const isMobile = showMobileList || !activeConversationId;
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-1 min-h-0">
       {/* 会话列表侧边栏：桌面始终显示，移动端在选会话前全屏显示 */}
       <div className={`${isMobile ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-72 border-r border-outline-variant/40 shrink-0`}>
         <div className="px-4 py-3 border-b border-outline-variant/40">
