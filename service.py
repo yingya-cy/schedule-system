@@ -23,6 +23,7 @@ from utils.excel_parser import parse_excel_for_template, parse_excel_for_contest
 
 from ai_endpoints import register_ai_routes
 from ai_schedule import register_schedule_routes
+from ai_counsel import register_counsel_routes
 
 app = Flask(__name__)
 CORS(app)
@@ -30,6 +31,7 @@ CORS(app)
 # 注册 AI 端点
 register_ai_routes(app)
 register_schedule_routes(app)
+register_counsel_routes(app)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
