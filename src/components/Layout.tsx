@@ -81,7 +81,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen overflow-x-hidden">
+    <div className="flex h-screen overflow-hidden">
       {/* Mobile Overlay */}
       <motion.div
         initial={{ opacity: 0 }}
