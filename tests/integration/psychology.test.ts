@@ -147,7 +147,8 @@ describe('POST /api/psychology/appointments', () => {
   it('creates an appointment and rejects duplicate', async () => {
     if (!counselorId) return;
     // 使用唯一日期避免跨运行数据污染
-    const slotDate = `2026-12-${String(Date.now() % 28 + 1).padStart(2, '0')}`;
+    const day = ((Date.now() * 7) % 25) + 1;
+    const slotDate = `2027-03-${String(Math.floor(day)).padStart(2, '0')}`;
 
     // 第一次创建应成功
     const res1 = await supertest(app)
@@ -194,7 +195,8 @@ describe('GET /api/psychology/appointments', () => {
 describe('PUT /api/psychology/appointments/:id/cancel', () => {
   it('cancels an appointment', async () => {
     if (!counselorId) return;
-    const slotDate = `2026-11-${String((Date.now() % 28) + 1).padStart(2, '0')}`;
+    const day = ((Date.now() * 13) % 25) + 1;
+    const slotDate = `2027-02-${String(Math.floor(day)).padStart(2, '0')}`;
     const create = await supertest(app)
       .post('/api/psychology/appointments')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -221,5 +223,121 @@ describe('PUT /api/psychology/appointments/:id/cancel', () => {
       .expect(404);
 
     expect(res.body.error).toContain('不存在');
+  });
+});
+
+// =============================================
+// Admin counselor CRUD
+// =============================================
+
+describe('POST /api/psychology/counselors (admin)', () => {
+  it('admin creates a counselor', async () => {
+    const res = await supertest(app)
+      .post('/api/psychology/counselors')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ user_id: 94, name: '测试咨询师', title: '实习咨询师', bio: '测试用' })
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.id).toBeTruthy();
+  });
+
+  it('returns 403 for non-admin', async () => {
+    const res = await supertest(app)
+      .post('/api/psychology/counselors')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ user_id: 94, name: '非法创建' })
+      .expect(403);
+
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe('PUT /api/psychology/counselors/:id (admin)', () => {
+  it('admin updates counselor info', async () => {
+    if (!counselorId) return;
+    const res = await supertest(app)
+      .put(`/api/psychology/counselors/${counselorId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ title: '更新后的职称' })
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('PUT /api/psychology/counselors/:id/toggle (admin)', () => {
+  it('toggles counselor active status', async () => {
+    if (!counselorId) return;
+    const res = await supertest(app)
+      .put(`/api/psychology/counselors/${counselorId}/toggle`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('POST / DELETE counselor slots (admin)', () => {
+  let slotId: number;
+
+  it('adds a slot', async () => {
+    if (!counselorId) return;
+    const res = await supertest(app)
+      .post(`/api/psychology/counselors/${counselorId}/slots`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ day_of_week: 6, start_time: '10:00:00', end_time: '11:00:00' })
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.id).toBeTruthy();
+    slotId = res.body.data.id;
+  });
+
+  it('deletes the slot', async () => {
+    if (!counselorId || !slotId) return;
+    const res = await supertest(app)
+      .delete(`/api/psychology/counselors/${counselorId}/slots/${slotId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+  });
+});
+
+// =============================================
+// Admin appointments overview
+// =============================================
+
+describe('GET /api/psychology/appointments/all (admin)', () => {
+  it('admin sees all appointments', async () => {
+    const res = await supertest(app)
+      .get('/api/psychology/appointments/all')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('admin filters by status', async () => {
+    const res = await supertest(app)
+      .get('/api/psychology/appointments/all?status=pending')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(res.body.success).toBe(true);
+    res.body.data.forEach((a: { status: string }) => {
+      expect(a.status).toBe('pending');
+    });
+  });
+
+  it('returns 403 for non-admin', async () => {
+    const res = await supertest(app)
+      .get('/api/psychology/appointments/all')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(403);
+
+    expect(res.body.success).toBe(false);
   });
 });
