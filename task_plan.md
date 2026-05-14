@@ -269,12 +269,12 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - 聊天消息 WS 广播含回声（发送方也收到），前端通过 `sender_id === userId` 区分
 
 ### Phase 17: AI 日程安排 + AI 心理咨询（计划阶段）
-- [ ] 17.1 用户画像扩展 — `users` 表加 `grade`、`major` 字段
-- [ ] 17.2 Flask AI 核心端点 — `ai_text()` + `ai_stream()`（SSE），错误处理 + 断连清理
-- [ ] 17.3 AI 日程安排 — 选课表 + 输入事项 → MiniMax 生成结构化学习计划 → JSON 时间表渲染
-- [ ] 17.4 AI 心理咨询 — 独立 AI 咨询页面，SSE 流式对话，system prompt 限定场景 + 危机识别
-- [ ] 17.5 导航集成 + 安全护栏 + E2E 测试
-- **Status:** planned — 详见 `docs/superpowers/plans/2026-05-14-ai-features.md`
+- [ ] 17.1 Step 1: 用户画像扩展 — `users` 表加 `grade`、`major` 字段，UserInfo 类型 + auth 路由同步
+- [ ] 17.2 Step 2: Flask AI 核心端点 — `ai_text()` 非流式 + `ai_stream()` SSE 流式，异常处理 + 断连清理
+- [ ] 17.3 Step 3: AI 日程安排 — 选课表 + 事项输入 → MiniMax 生成 → JSON 时间表渲染（7 files）
+- [ ] 17.4 Step 4: AI 心理咨询 — SSE 流式对话 + 会话管理 + 危机识别 system prompt（6 files）
+- [ ] 17.5 Step 5: 导航集成 + rate limit 安全护栏 + Playwright E2E（6 flows）
+- **Status:** planned — 详见 `docs/superpowers/plans/2026-05-14-ai-features.md`（完整 prompt 模板 + ASCII 布局 + API 合约表）
 
 **技术栈：** MiniMax-M2.7（OpenAI 兼容 API）→ Flask `ai_endpoints.py` → Express 代理 → React 前端
 - 排课：非流式 JSON 输出，前端时间表渲染
