@@ -25,6 +25,7 @@ export default function ChatPage() {
   const [showMobileList, setShowMobileList] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [wsError, setWsError] = useState('');
+  const sendingRef = useRef(false);
 
   const { sendMessage: wsSend, isConnected } = useWebSocket(token, {
     onMessage: (msg) => {
@@ -57,12 +58,13 @@ export default function ChatPage() {
   };
 
   const handleSend = async () => {
+    if (sendingRef.current) return;
     const text = inputText.trim();
     if (!text || !activeConversationId) return;
+    sendingRef.current = true;
     setInputText('');
 
     try {
-      // Try WS first, fallback to REST
       const sent = wsSend(activeConversationId, text);
       if (!sent) {
         await sendMessage(activeConversationId, text);
@@ -70,6 +72,8 @@ export default function ChatPage() {
       }
     } catch {
       // message will be retried
+    } finally {
+      sendingRef.current = false;
     }
   };
 

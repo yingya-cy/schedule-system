@@ -33,6 +33,7 @@ export default function AiCounselPage() {
   const [showCrisis, setShowCrisis] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     fetchSessions();
@@ -56,8 +57,10 @@ export default function AiCounselPage() {
   };
 
   const handleSend = async () => {
+    if (sendingRef.current) return;
     const text = inputText.trim();
     if (!text || streaming) return;
+    sendingRef.current = true;
     setInputText('');
     setStreamError(null);
 
@@ -133,6 +136,7 @@ export default function AiCounselPage() {
     } finally {
       setStreaming(false);
       controllerRef.current = null;
+      sendingRef.current = false;
     }
   };
 
