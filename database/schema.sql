@@ -125,3 +125,43 @@ CREATE TABLE IF NOT EXISTS action_logs (
   details JSON,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- ============================================
+-- AI 功能支持
+-- ============================================
+
+-- 用户画像扩展（AI 排课需要年级/专业信息）
+ALTER TABLE users ADD COLUMN IF NOT EXISTS grade VARCHAR(20) COMMENT '年级，如 2024级';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS major VARCHAR(100) COMMENT '专业';
+
+-- AI 排课计划存储
+CREATE TABLE IF NOT EXISTS ai_schedule_plans (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  term_id INT,
+  input_data JSON COMMENT '课表+事项原始输入',
+  plan_data JSON COMMENT 'AI 生成的完整计划 JSON',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AI 咨询会话
+CREATE TABLE IF NOT EXISTS ai_counsel_sessions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  title VARCHAR(200) DEFAULT '新对话',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AI 咨询消息
+CREATE TABLE IF NOT EXISTS ai_counsel_messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  session_id INT NOT NULL,
+  role ENUM('user','assistant') NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (session_id) REFERENCES ai_counsel_sessions(id) ON DELETE CASCADE,
+  INDEX idx_session_time (session_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;

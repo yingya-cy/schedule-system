@@ -195,7 +195,7 @@ router.post('/verify-email/resend', async (req, res) => {
 router.get('/me', authenticate, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, username, name, email, role, department, avatar_url, last_login, created_at FROM users WHERE id = ?',
+      'SELECT id, username, name, email, role, department, grade, major, avatar_url, last_login, created_at FROM users WHERE id = ?',
       [req.user!.userId]
     );
     const users = rows as RowDataPacket[];
@@ -212,10 +212,10 @@ router.get('/me', authenticate, async (req, res) => {
 // PUT /api/auth/me
 router.put('/me', authenticate, async (req, res) => {
   try {
-    const { name, email, department } = req.body;
+    const { name, email, department, grade, major } = req.body;
     const [result] = await pool.query(
-      'UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), department = COALESCE(?, department) WHERE id = ?',
-      [name, email, department, req.user!.userId]
+      'UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), department = COALESCE(?, department), grade = COALESCE(?, grade), major = COALESCE(?, major) WHERE id = ?',
+      [name, email, department, grade, major, req.user!.userId]
     );
     res.json({ success: true, data: { updated: (result as ResultSetHeader).affectedRows > 0 } });
   } catch (error: unknown) {
@@ -267,7 +267,7 @@ router.get('/users', authenticate, async (req, res) => {
     }
 
     const { search, role, department, status, page = '1', limit = '20' } = req.query;
-    let sql = 'SELECT id, username, name, email, role, department, is_active, last_login, created_at FROM users WHERE 1=1';
+    let sql = 'SELECT id, username, name, email, role, department, grade, major, is_active, last_login, created_at FROM users WHERE 1=1';
     const params: (string | number)[] = [];
 
     // Department head can only see their department
@@ -340,10 +340,11 @@ router.post('/users', authenticate, requireRole('admin'), async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const { grade, major } = req.body;
     // Admin-created users are auto-verified (no email verification needed)
     const [result] = await pool.query(
-      'INSERT INTO users (username, name, email, role, department, password_hash, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-      [username, name, email || null, role, department || null, passwordHash]
+      'INSERT INTO users (username, name, email, role, department, grade, major, password_hash, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+      [username, name, email || null, role, department || null, grade || null, major || null, passwordHash]
     );
     res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
@@ -380,16 +381,16 @@ router.put('/users/:id', authenticate, async (req, res) => {
         return;
       }
       // Department head can only edit name, email, department
-      const { name, email, department } = req.body;
+      const { name, email, department, grade, major } = req.body;
       await pool.query(
-        'UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), department = COALESCE(?, department) WHERE id = ?',
-        [name, email, department, req.params.id]
+        'UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email), department = COALESCE(?, department), grade = COALESCE(?, grade), major = COALESCE(?, major) WHERE id = ?',
+        [name, email, department, grade, major, req.params.id]
       );
     } else {
-      const { name, role, department, email, is_active } = req.body;
+      const { name, role, department, email, is_active, grade, major } = req.body;
       await pool.query(
-        'UPDATE users SET name = COALESCE(?, name), role = COALESCE(?, role), department = COALESCE(?, department), email = COALESCE(?, email), is_active = COALESCE(?, is_active) WHERE id = ?',
-        [name, role, department, email, is_active, req.params.id]
+        'UPDATE users SET name = COALESCE(?, name), role = COALESCE(?, role), department = COALESCE(?, department), email = COALESCE(?, email), is_active = COALESCE(?, is_active), grade = COALESCE(?, grade), major = COALESCE(?, major) WHERE id = ?',
+        [name, role, department, email, is_active, grade, major, req.params.id]
       );
     }
     res.json({ success: true });
