@@ -94,15 +94,15 @@ export default function PsychologyView() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-1 flex-col overflow-hidden">
       <SubNav view={view} onView={setView} />
       {error && (
-        <div className="mx-4 mt-3 px-4 py-2 bg-error/10 text-error rounded-lg text-sm flex items-center justify-between">
+        <div className="mx-4 mt-3 px-4 py-2 bg-error/10 text-error rounded-lg text-sm flex items-center justify-between shrink-0">
           <span>{error}</span>
           <button onClick={clearError} className="ml-2 font-bold text-lg leading-none">&times;</button>
         </div>
       )}
-      <div className="flex-1 p-4 min-h-0 flex flex-col">
+      <div className="flex-1 p-4 min-h-0 overflow-y-auto">
         {renderPage()}
       </div>
     </div>
