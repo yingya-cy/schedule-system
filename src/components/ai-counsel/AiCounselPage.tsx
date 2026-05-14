@@ -39,7 +39,10 @@ export default function AiCounselPage() {
   }, []);
 
   useEffect(() => {
-    if (activeSessionId) fetchMessages(activeSessionId);
+    // Don't fetch if we already have messages for this session (prevents race with handleSend)
+    if (activeSessionId && !useAiCounselStore.getState().messages.some((m) => m.session_id === activeSessionId)) {
+      fetchMessages(activeSessionId);
+    }
   }, [activeSessionId]);
 
   useEffect(() => {
@@ -64,10 +67,10 @@ export default function AiCounselPage() {
     let sessionId = activeSessionId;
     if (!sessionId) {
       sessionId = await createSession();
-      setActiveSession(sessionId);
     }
 
-    // Add user message
+    // Build history BEFORE setting active session (avoids fetchMessages race)
+    const currentMsgs = [...useAiCounselStore.getState().messages];
     const userMsg: CounselMessage = {
       id: Date.now(),
       session_id: sessionId,
@@ -75,14 +78,14 @@ export default function AiCounselPage() {
       content: text,
       created_at: new Date().toISOString(),
     };
+    const history = [...currentMsgs, userMsg].map((m) => ({ role: m.role, content: m.content }));
+
+    // Now update store & activate session
     useAiCounselStore.setState((s) => ({ messages: [...s.messages, userMsg] }));
+    setActiveSession(sessionId);
 
     // Save user message
     try { await saveMessage(sessionId, 'user', text); } catch { /* continue */ }
-
-    // Build message history
-    const allMsgs = [...useAiCounselStore.getState().messages];
-    const history = allMsgs.map((m) => ({ role: m.role, content: m.content }));
 
     // Start streaming
     setStreaming(true);

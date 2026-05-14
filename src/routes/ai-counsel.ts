@@ -10,7 +10,7 @@ const FLASK_URL = process.env.FLASK_URL || 'http://localhost:5002';
 router.post('/counsel/stream', authenticate, async (req, res) => {
   const { messages, session_id } = req.body;
 
-  if (!messages || !Array.isArray(messages)) {
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
     res.status(400).json({ success: false, error: '缺少 messages' });
     return;
   }
