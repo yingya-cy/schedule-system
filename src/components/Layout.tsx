@@ -16,6 +16,8 @@ import {
   X,
   Trophy,
   Heart,
+  Bot,
+  Smile,
   LogOut,
   Shield
 } from 'lucide-react';
@@ -30,6 +32,8 @@ const navItems: NavItem[] = [
   { id: 'file-center', label: '文件中心', icon: 'folder' },
   { id: 'scoring', label: '比赛评分', icon: 'trophy' },
   { id: 'psychology', label: '心理咨询', icon: 'heart' },
+  { id: 'ai-schedule', label: 'AI 排课', icon: 'bot' },
+  { id: 'ai-counsel', label: 'AI 咨询', icon: 'smile' },
   { id: 'users', label: '用户管理', icon: 'users', adminOnly: true },
 ];
 
@@ -76,6 +80,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       case 'chat': return <MessageSquare size={20} />;
       case 'trophy': return <Trophy size={20} />;
       case 'heart': return <Heart size={20} />;
+      case 'bot': return <Bot size={20} />;
+      case 'smile': return <Smile size={20} />;
       default: return <LayoutDashboard size={20} />;
     }
   };

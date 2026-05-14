@@ -1,5 +1,5 @@
 // Route paths
-export type RoutePath = '/dashboard' | '/files' | '/courses' | '/contacts' | '/schedule' | '/chat' | '/scoring' | '/login' | '/users' | '/file-center' | '/psychology';
+export type RoutePath = '/dashboard' | '/files' | '/courses' | '/contacts' | '/schedule' | '/chat' | '/scoring' | '/login' | '/users' | '/file-center' | '/psychology' | '/ai-schedule' | '/ai-counsel';
 
 export const ROUTE_LABELS: Record<RoutePath, string> = {
   '/dashboard': '仪表盘',
@@ -13,6 +13,8 @@ export const ROUTE_LABELS: Record<RoutePath, string> = {
   '/users': '用户管理',
   '/file-center': '文件中心',
   '/psychology': '心理咨询',
+  '/ai-schedule': 'AI 排课',
+  '/ai-counsel': 'AI 咨询',
 };
 
 export interface NavItem {

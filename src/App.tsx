@@ -17,6 +17,8 @@ const ScoringDashboard = lazy(() => import('./components/scoring'));
 const UserManagementView = lazy(() => import('./components/views/UserManagementView'));
 const FileCenterView = lazy(() => import('./components/views/FileCenter/FileCenterView'));
 const PsychologyView = lazy(() => import('./components/psychology'));
+const AiSchedulePage = lazy(() => import('./components/ai-schedule/AiSchedulePage'));
+const AiCounselPage = lazy(() => import('./components/ai-counsel/AiCounselPage'));
 
 function AppContent() {
   const refreshDepartments = useAppStore((s) => s.refreshDepartments);
@@ -58,6 +60,8 @@ function AppContent() {
             <Route path="/users" element={<UserManagementView />} />
             <Route path="/file-center" element={<FileCenterView />} />
             <Route path="/psychology" element={<PsychologyView />} />
+            <Route path="/ai-schedule" element={<AiSchedulePage />} />
+            <Route path="/ai-counsel" element={<AiCounselPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
