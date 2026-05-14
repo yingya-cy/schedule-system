@@ -22,12 +22,14 @@ from utils.ai_client import create_ark_client, AI_MODEL, strip_thinking
 from utils.excel_parser import parse_excel_for_template, parse_excel_for_contestants, fill_template_with_results
 
 from ai_endpoints import register_ai_routes
+from ai_schedule import register_schedule_routes
 
 app = Flask(__name__)
 CORS(app)
 
-# 注册 AI 端点（非流式文本 + SSE 流式）
+# 注册 AI 端点
 register_ai_routes(app)
+register_schedule_routes(app)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

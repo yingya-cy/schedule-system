@@ -16,6 +16,7 @@ import authRouter from "./src/routes/auth.ts";
 import fileCenterRouter from "./src/routes/file-center/index.ts";
 import termsRouter from "./src/routes/terms.ts";
 import psychologyRouter from "./src/routes/psychology/index.ts";
+import aiScheduleRouter from "./src/routes/ai-schedule.ts";
 import { WebSocketServer } from 'ws';
 import { setupWebSocket } from './src/routes/psychology/ws.ts';
 import { registerScheduleRoutes } from "./src/routes/schedule-routes.ts";
@@ -191,6 +192,7 @@ app.get("/api/reset-departments", authenticate, requireRole('admin'), async (req
   app.use('/api/file-center', fileCenterRouter);
   app.use('/api/terms', termsRouter);
   app.use('/api/psychology', psychologyRouter);
+  app.use('/api/ai', aiScheduleRouter);
 
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
