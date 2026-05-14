@@ -270,7 +270,7 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 
 ### Phase 17: AI 日程安排 + AI 心理咨询（计划阶段）
 - [x] 17.1 Step 1: 用户画像扩展 — `users` 表加 `grade`、`major` 字段，UserInfo 类型 + auth 路由同步
-- [ ] 17.2 Step 2: Flask AI 核心端点 — `ai_text()` 非流式 + `ai_stream()` SSE 流式，异常处理 + 断连清理
+- [x] 17.2 Step 2: Flask AI 核心端点 — `ai_text()` 非流式 + `ai_stream()` SSE 流式，异常处理 + 断连清理
 - [ ] 17.3 Step 3: AI 日程安排 — 选课表 + 事项输入 → MiniMax 生成 → JSON 时间表渲染（7 files）
 - [ ] 17.4 Step 4: AI 心理咨询 — SSE 流式对话 + 会话管理 + 危机识别 system prompt（6 files）
 - [ ] 17.5 Step 5: 导航集成 + rate limit 安全护栏 + Playwright E2E（6 flows）
