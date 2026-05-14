@@ -123,11 +123,9 @@ export default function AiCounselPage() {
         }
       }
 
-      // Save AI response
+      // Save AI response (no fetchMessages — would duplicate user msg from DB)
       if (fullResponse) {
         await saveMessage(sessionId, 'assistant', fullResponse);
-        // Replace placeholder with real message
-        await fetchMessages(sessionId);
       }
     } catch (err: unknown) {
       if (!controller.signal.aborted) {
