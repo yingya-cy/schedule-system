@@ -138,7 +138,7 @@ export default function ChatPage() {
       </div>
 
       {/* 消息区：桌面始终显示，移动端在选会话后全屏显示 */}
-      <div className={`${isMobile ? 'hidden' : 'flex'} lg:flex flex-1 flex-col min-w-0`}>
+      <div className={`${isMobile ? 'hidden' : 'flex'} lg:flex flex-1 flex-col min-w-0 min-h-0`}>
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-outline-variant/40">
           <button

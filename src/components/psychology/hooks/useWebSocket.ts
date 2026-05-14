@@ -10,13 +10,14 @@ export function useWebSocket(token: string | null, callbacks: WsCallbacks) {
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intentionalRef = useRef(false); // 防止 StrictMode 重连死循环
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
 
   const [isConnected, setIsConnected] = useState(false);
 
   const connect = useCallback(() => {
-    if (!token) return;
+    if (!token || intentionalRef.current) return;
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${location.host}/?token=${token}`);
     wsRef.current = ws;
@@ -41,6 +42,7 @@ export function useWebSocket(token: string | null, callbacks: WsCallbacks) {
 
     ws.onclose = () => {
       setIsConnected(false);
+      if (intentionalRef.current) return; // 主动关闭时不重连
       const delay = Math.min(1000 * Math.pow(2, retriesRef.current), 30000);
       retriesRef.current++;
       timerRef.current = setTimeout(connect, delay);
@@ -61,6 +63,7 @@ export function useWebSocket(token: string | null, callbacks: WsCallbacks) {
   }, []);
 
   const disconnect = useCallback(() => {
+    intentionalRef.current = true;
     if (timerRef.current) clearTimeout(timerRef.current);
     wsRef.current?.close();
     wsRef.current = null;
@@ -68,8 +71,10 @@ export function useWebSocket(token: string | null, callbacks: WsCallbacks) {
   }, []);
 
   useEffect(() => {
+    intentionalRef.current = false;
     connect();
     return () => {
+      intentionalRef.current = true;
       if (timerRef.current) clearTimeout(timerRef.current);
       wsRef.current?.close();
       wsRef.current = null;

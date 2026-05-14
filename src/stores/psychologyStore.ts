@@ -174,7 +174,10 @@ export const usePsychologyStore = create<PsychologyState>((set, get) => ({
   },
 
   appendMessage: (msg) =>
-    set((state) => ({ messages: [...state.messages, msg] })),
+    set((state) => {
+      if (state.messages.some((m) => m.id === msg.id)) return state; // 去重
+      return { messages: [...state.messages, msg] };
+    }),
 
   // === Appointments ===
   myAppointments: [],
