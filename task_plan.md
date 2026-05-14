@@ -4,7 +4,7 @@
 构建完整的学术管理平台，包含课表管理、比赛评分、登录认证、网盘系统、即时通讯等功能模块。
 
 ## Current Phase
-Phase 15: 权限重构 + 换届系统 + 部长角色 — 实施中
+Phase 17: AI 日程安排 + AI 心理咨询 — 计划已就绪，待实施
 
 ## Phases
 
@@ -236,6 +236,51 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - [x] 15.21 过渡测试清理 — afterAll 恢复 DB，不再污染数据
 - [x] 15.22 allFree 单双周标注 — formatFreeTimeForPeriod 补 detectParity
 - **Status:** completed
+
+### Phase 16: 心理咨询预约系统
+- [x] 16.1 数据库 — 6 张新表（counselors, counselor_slots, appointments, chat_conversations, chat_messages, action_logs）
+- [x] 16.2 后端 API — 12 个 REST 端点 + WebSocket 实时聊天
+  - `GET/POST/PUT /api/psychology/counselors` — 咨询师 CRUD + 时段管理
+  - `GET/POST /api/psychology/chat/conversations` + `/messages` — 会话 + 消息
+  - `GET/POST/PUT /api/psychology/appointments` — 预约 + 确认/完成/取消 + 事务锁
+  - `GET /api/psychology/me` — 当前用户咨询师身份
+  - `GET /api/psychology/appointments/all` — admin 查看全局预约
+  - WebSocket `ws://host/?token=` — 实时双向聊天，指数退避重连
+- [x] 16.3 前端 Web 管理 — 心理咨询模块入口 + 10 个页面组件
+  - 咨询师管理页（admin）：列表、新增/编辑、启用/停用、时段编辑
+  - 学生端：咨询师列表 → 详情+时段 → 预约弹窗 → 我的预约（tab 筛选）
+  - 聊天页面（WebSocket + REST fallback）：会话列表 + 消息气泡 + mobile/desktop 响应式
+  - 咨询师工作台：tab 切换、确认/完成（写备注）/取消
+  - Admin 预约总览：表格 + 状态筛选 + mobile 卡片
+- [x] 16.4 `as any` 清零 — 4 个路由文件 19→0，统一用 RowDataPacket/ResultSetHeader/getErrorMessage
+- [x] 16.5 前端导航集成 — `App.tsx` lazy route, `Layout.tsx` Heart 图标, `types.ts` RoutePath
+- [x] 16.6 时段解析 bug 修复 — `split(':')` 误拆 TIME 字段，改 `parseSlots()` 工具函数
+- [x] 16.7 聊天布局修复 — 桌面端白屏（`lg:hidden` 提前返回）、消息重复（StrictMode 双 WS）、滚动条（flex 高度链）
+- [x] 16.8 视口锁定 — PsychologyView `calc(100vh - 4rem)`，页面不溢出
+- [x] 16.9 测试 — 集成 22 tests + E2E 6 flows + WebSocket 双向测试脚本
+- **Status:** completed — 全量 492 tests 零失败
+
+**架构：** Express 路由模块 `routes/psychology/` + Zustand store + 自包含 `components/psychology/`（仿 scoring 模式）
+
+**关键决策：**
+- 预约用 `SELECT ... FOR UPDATE` 事务锁防并发冲突
+- 聊天双通道：WebSocket 主（实时）+ REST fallback（离线/重连）
+- 咨询师身份通过 `GET /api/psychology/me` 检测（查 counselors 表）
+- 聊天消息 WS 广播含回声（发送方也收到），前端通过 `sender_id === userId` 区分
+
+### Phase 17: AI 日程安排 + AI 心理咨询（计划阶段）
+- [ ] 17.1 用户画像扩展 — `users` 表加 `grade`、`major` 字段
+- [ ] 17.2 Flask AI 核心端点 — `ai_text()` + `ai_stream()`（SSE），错误处理 + 断连清理
+- [ ] 17.3 AI 日程安排 — 选课表 + 输入事项 → MiniMax 生成结构化学习计划 → JSON 时间表渲染
+- [ ] 17.4 AI 心理咨询 — 独立 AI 咨询页面，SSE 流式对话，system prompt 限定场景 + 危机识别
+- [ ] 17.5 导航集成 + 安全护栏 + E2E 测试
+- **Status:** planned — 详见 `docs/superpowers/plans/2026-05-14-ai-features.md`
+
+**技术栈：** MiniMax-M2.7（OpenAI 兼容 API）→ Flask `ai_endpoints.py` → Express 代理 → React 前端
+- 排课：非流式 JSON 输出，前端时间表渲染
+- 咨询：SSE 流式输出，前端逐字渲染
+
+**依赖图：** Step 1 → Step 2 → Step 3 & 4 (并行) → Step 5
 
 ## Key Questions
 1. 登录系统是独立用户体系还是对接学校 SSO/LDAP？→ **独立用户体系（用户名+密码+JWT），不开放注册，管理员后台创建**
