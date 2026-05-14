@@ -63,7 +63,7 @@ export default function WorkbenchPage() {
   };
 
   return (
-    <div>
+    <div className="h-full overflow-y-auto">
       <h2 className="text-xl font-bold text-on-surface font-headline mb-4">工作台</h2>
 
       <div className="flex gap-1 mb-4 overflow-x-auto">

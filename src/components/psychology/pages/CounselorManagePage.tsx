@@ -61,7 +61,7 @@ export default function CounselorManagePage() {
   }
 
   return (
-    <div>
+    <div className="h-full overflow-y-auto">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-on-surface font-headline">咨询师管理</h2>
         <button

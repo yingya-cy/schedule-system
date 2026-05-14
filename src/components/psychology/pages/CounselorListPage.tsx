@@ -40,7 +40,7 @@ export default function CounselorListPage() {
   }
 
   return (
-    <div>
+    <div className="h-full overflow-y-auto">
       <h2 className="text-xl font-bold text-on-surface font-headline mb-4">咨询师列表</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {counselors.map((c) => (

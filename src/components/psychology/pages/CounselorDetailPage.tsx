@@ -42,7 +42,7 @@ export default function CounselorDetailPage() {
   if (!counselor) return <div className="empty-state"><p className="empty-state-title">咨询师不存在</p></div>;
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl h-full overflow-y-auto">
       <button
         onClick={() => setView('counselors')}
         className="text-sm text-primary hover:underline mb-4 inline-block"

@@ -102,7 +102,7 @@ export default function PsychologyView() {
           <button onClick={clearError} className="ml-2 font-bold text-lg leading-none">&times;</button>
         </div>
       )}
-      <div className="flex flex-col flex-1 p-4 min-h-0 overflow-y-auto">
+      <div className="flex flex-col flex-1 p-4 min-h-0">
         {renderPage()}
       </div>
     </div>
