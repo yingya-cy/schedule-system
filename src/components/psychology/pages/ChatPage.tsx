@@ -82,84 +82,63 @@ export default function ChatPage() {
 
   const activeConv = conversations.find((c) => c.id === activeConversationId);
 
-  // Mobile: show conversation list
-  if (showMobileList || !activeConversationId) {
-    return (
-      <div className="flex flex-col h-full lg:hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant/40">
-          <h2 className="font-bold text-on-surface font-headline">我的聊天</h2>
-        </div>
-        {conversationsLoading ? (
-          <div className="p-4 space-y-3">{[1, 2].map((i) => <div key={i} className="skeleton h-16 rounded-lg" />)}</div>
-        ) : conversations.length === 0 ? (
-          <div className="empty-state flex-1">
-            <p className="empty-state-title">暂无会话</p>
-            <p className="empty-state-description">去咨询师列表发起聊天</p>
-            <button onClick={() => setView('counselors')} className="btn-primary text-sm mt-3 px-4 py-2">浏览咨询师</button>
+  // 共享的会话列表渲染
+  const conversationList = (
+    <div className="flex-1 overflow-y-auto">
+      {conversations.map((c) => (
+        <button
+          key={c.id}
+          onClick={() => handleSelectConversation(c.id)}
+          className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors text-left border-b border-outline-variant/20 ${
+            c.id === activeConversationId ? 'bg-primary/5' : ''
+          }`}
+        >
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
+            {c.counselor_name?.[0] || '?'}
           </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto">
-            {conversations.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => handleSelectConversation(c.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors text-left border-b border-outline-variant/20"
-              >
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
-                  {c.counselor_name?.[0] || '?'}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm text-on-surface truncate">{c.counselor_name}</span>
-                  </div>
-                  <p className="text-xs text-on-surface-variant truncate">点击查看消息</p>
-                </div>
-                {Number(c.unread_count) > 0 && (
-                  <span className="badge badge-error text-xs shrink-0">{c.unread_count}</span>
-                )}
-              </button>
-            ))}
+          <div className="min-w-0 flex-1">
+            <span className="font-medium text-sm text-on-surface truncate block">{c.counselor_name}</span>
+            <span className="text-xs text-on-surface-variant truncate block">
+              {Number(c.unread_count) > 0 ? `${c.unread_count} 条未读` : '点击查看消息'}
+            </span>
           </div>
-        )}
-        {/* Desktop: full layout rendered via the outer div's lg:flex sibling */}
-      </div>
-    );
+          {Number(c.unread_count) > 0 && (
+            <span className="badge badge-error text-xs shrink-0">{c.unread_count}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+
+  // 空态
+  const emptyState = (
+    <div className="empty-state flex-1">
+      <p className="empty-state-title">暂无会话</p>
+      <p className="empty-state-description">去咨询师列表发起聊天</p>
+      <button onClick={() => setView('counselors')} className="btn-primary text-sm mt-3 px-4 py-2">浏览咨询师</button>
+    </div>
+  );
+
+  // 加载态
+  if (conversationsLoading) {
+    return <div className="p-4 space-y-3">{[1, 2, 3].map((i) => <div key={i} className="skeleton h-16 rounded-lg" />)}</div>;
   }
+
+  // 移动端：会话列表全屏 → 点选后消息区全屏
+  const isMobile = showMobileList || !activeConversationId;
 
   return (
     <div className="flex h-full">
-      {/* Conversation list (desktop) */}
-      <div className="hidden lg:flex flex-col w-72 border-r border-outline-variant/40 shrink-0">
+      {/* 会话列表侧边栏：桌面始终显示，移动端在选会话前全屏显示 */}
+      <div className={`${isMobile ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-72 border-r border-outline-variant/40 shrink-0`}>
         <div className="px-4 py-3 border-b border-outline-variant/40">
           <h2 className="font-bold text-on-surface font-headline text-sm">会话</h2>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {conversations.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setActiveConversation(c.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors text-left border-b border-outline-variant/20 ${
-                c.id === activeConversationId ? 'bg-primary/5' : ''
-              }`}
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
-                {c.counselor_name?.[0] || '?'}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm text-on-surface truncate">{c.counselor_name}</span>
-                </div>
-                <p className="text-xs text-on-surface-variant truncate">
-                  {Number(c.unread_count) > 0 ? `${c.unread_count} 条未读` : '暂无新消息'}
-                </p>
-              </div>
-            </button>
-          ))}
-        </div>
+        {conversations.length === 0 ? emptyState : conversationList}
       </div>
 
-      {/* Message area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* 消息区：桌面始终显示，移动端在选会话后全屏显示 */}
+      <div className={`${isMobile ? 'hidden' : 'flex'} lg:flex flex-1 flex-col min-w-0`}>
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-outline-variant/40">
           <button
