@@ -94,7 +94,7 @@ export default function PsychologyView() {
   };
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 4rem)' }}>
       <SubNav view={view} onView={setView} />
       {error && (
         <div className="mx-4 mt-3 px-4 py-2 bg-error/10 text-error rounded-lg text-sm flex items-center justify-between shrink-0">
