@@ -35,21 +35,34 @@ router.post('/schedule-plan', authenticate, async (req, res) => {
     }
 
     const plan = flaskJson.data;
+    const inputJson = JSON.stringify({ courses, commitments, grade, major });
+    const planJson = JSON.stringify(plan);
 
-    // 存储到 DB
-    const [result] = await pool.query(
-      'INSERT INTO ai_schedule_plans (user_id, term_id, input_data, plan_data) VALUES (?, ?, ?, ?)',
-      [
-        req.user!.userId,
-        req.body.term_id || null,
-        JSON.stringify({ courses, commitments, grade, major }),
-        JSON.stringify(plan),
-      ]
+    // Upsert: update the latest pending plan (no plan_data), or insert new
+    const [existing] = await pool.query(
+      'SELECT id FROM ai_schedule_plans WHERE user_id = ? AND plan_data IS NULL ORDER BY created_at DESC LIMIT 1',
+      [req.user!.userId]
     );
+    const existingRow = (existing as RowDataPacket[])[0];
+
+    let planId: number;
+    if (existingRow) {
+      await pool.query(
+        'UPDATE ai_schedule_plans SET input_data = ?, plan_data = ? WHERE id = ?',
+        [inputJson, planJson, existingRow.id]
+      );
+      planId = existingRow.id;
+    } else {
+      const [result] = await pool.query(
+        'INSERT INTO ai_schedule_plans (user_id, input_data, plan_data) VALUES (?, ?, ?)',
+        [req.user!.userId, inputJson, planJson]
+      );
+      planId = (result as ResultSetHeader).insertId;
+    }
 
     res.json({
       success: true,
-      data: { id: (result as ResultSetHeader).insertId, plan },
+      data: { id: planId, plan },
     });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: getErrorMessage(error) });
@@ -189,6 +202,58 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
         diagnostic: data.diagnostics || {},
       },
     });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
+  }
+});
+
+// GET /api/ai/latest-schedule — 加载用户最近的课表和计划
+router.get('/latest-schedule', authenticate, async (req, res) => {
+  try {
+    const [plans] = await pool.query(
+      'SELECT id, input_data, plan_data, created_at FROM ai_schedule_plans WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
+      [req.user!.userId]
+    );
+    const latestPlan = (plans as RowDataPacket[])[0];
+    const parseJson = (v: unknown): Record<string, unknown> => {
+      if (!v) return {};
+      if (typeof v === 'string') return JSON.parse(v);
+      return v as Record<string, unknown>;
+    };
+
+    const input = latestPlan ? parseJson(latestPlan.input_data) : {};
+    const plan = latestPlan?.plan_data ? parseJson(latestPlan.plan_data) : null;
+
+    res.json({
+      success: true,
+      data: {
+        courses: (input as Record<string, unknown>).courses || [],
+        commitments: (input as Record<string, unknown>).commitments || [],
+        plan,
+        planId: latestPlan?.id || null,
+        createdAt: latestPlan?.created_at || null,
+      },
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
+  }
+});
+
+// POST /api/ai/save-schedule — 保存课表（生成计划前持久化）
+router.post('/save-schedule', authenticate, async (req, res) => {
+  try {
+    const { courses, commitments } = req.body;
+    if (!courses || courses.length === 0) {
+      res.status(400).json({ success: false, error: '课表为空' });
+      return;
+    }
+
+    const [result] = await pool.query(
+      'INSERT INTO ai_schedule_plans (user_id, input_data) VALUES (?, ?)',
+      [req.user!.userId, JSON.stringify({ courses, commitments: commitments || [] })]
+    );
+
+    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: getErrorMessage(error) });
   }
