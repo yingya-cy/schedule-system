@@ -172,23 +172,31 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
         }
       }
 
-      // Normalize sections: OCR returns 'section' (array), we need 'sections'
+      // Normalize sections: OCR returns 'section' (could be array, string, or number)
       let sections: number[] = [];
-      const sectionVal = (c as Record<string, unknown>).section;
-      if (Array.isArray(sectionVal)) {
-        sections = sectionVal as number[];
-      } else if (Array.isArray(c.sections)) {
-        sections = c.sections as number[];
+      const rawSection = (c as Record<string, unknown>).section ?? c.sections;
+      if (Array.isArray(rawSection)) {
+        sections = rawSection.map((s: unknown) => typeof s === 'number' ? s : parseInt(String(s), 10)).filter((n: number) => !isNaN(n));
+      } else if (typeof rawSection === 'string') {
+        sections = rawSection.split(/[,，、]/).map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !isNaN(n));
+      } else if (typeof rawSection === 'number') {
+        sections = [rawSection];
       }
+
+      // Normalize weekday: could be number or array from OCR
+      let weekday = 1;
+      const rawWeekday = c.weekday;
+      if (typeof rawWeekday === 'number') weekday = rawWeekday;
+      else if (Array.isArray(rawWeekday) && rawWeekday.length > 0) weekday = Number(rawWeekday[0]) || 1;
 
       return {
         id: `ocr_${i}_${Date.now()}`,
-        course_name: (c.course_name as string) || '未识别课程',
-        weekday: (c.weekday as number) || 1,
+        course_name: String(c.course_name || c.name || c.title || c.courseName || '未识别课程'),
+        weekday,
         sections,
         weeks,
-        teacher: (c.teacher as string) || '',
-        location: (c.location as string) || '',
+        teacher: String(c.teacher || ''),
+        location: String(c.location || ''),
         remark: '',
       };
     });
