@@ -1,7 +1,12 @@
 import { Router } from 'express';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — multer 2.x has no bundled types, handled by src/types/multer.d.ts
+import multer from 'multer';
 import { authenticate } from '../middleware/auth';
 import pool from '../config/database';
 import { RowDataPacket, ResultSetHeader, getErrorMessage } from '../utils/db-types';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 const router = Router();
 const FLASK_URL = process.env.FLASK_URL || 'http://localhost:5002';
@@ -90,6 +95,55 @@ router.delete('/schedule-plans/:id', authenticate, async (req, res) => {
       [req.params.id, req.user!.userId]
     );
     res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: getErrorMessage(error) });
+  }
+});
+
+// POST /api/ai/upload — OCR 课表上传（AI 排课专用，不存 schedules 表）
+router.post('/upload', authenticate, upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ success: false, error: '请选择文件' });
+      return;
+    }
+
+    const formData = new FormData();
+    const f = new File([file.buffer], file.originalname, { type: file.mimetype });
+    formData.append('file', f);
+
+    // Detect if it's an image or PDF
+    const isPdf = file.mimetype === 'application/pdf'
+      || file.originalname.toLowerCase().endsWith('.pdf');
+    const ocrEndpoint = isPdf ? '/api/ocr/pdf' : '/api/ocr/image';
+
+    const flaskRes = await fetch(`${FLASK_URL}${ocrEndpoint}`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!flaskRes.ok) {
+      const errText = await flaskRes.text();
+      res.status(502).json({ success: false, error: `OCR 失败: ${errText.slice(0, 200)}` });
+      return;
+    }
+
+    const data = await flaskRes.json();
+    if (!data.success) {
+      res.status(422).json({ success: false, error: '未能识别课程数据，请检查图片清晰度' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        courses: data.schedule_data || [],
+        raw: data.raw_data || [],
+        diagnostic: data.diagnostics || {},
+        schedule_type: data.schedule_type || 'unknown',
+      },
+    });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: getErrorMessage(error) });
   }

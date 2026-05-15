@@ -63,3 +63,14 @@ declare module 'multer' {
   const multer: Multer;
   export default multer;
 }
+
+export {};
+
+declare global {
+  namespace Express {
+    interface Request {
+      file?: import('multer').File;
+      files?: import('multer').File[];
+    }
+  }
+}
