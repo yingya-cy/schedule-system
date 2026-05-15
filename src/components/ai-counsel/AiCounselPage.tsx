@@ -141,6 +141,13 @@ export default function AiCounselPage() {
   };
 
   return (
+    <>
+      <style>{`
+        .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(var(--outline-variant)/.3); border-radius: 2px; }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgb(var(--outline)/.4); }
+      `}</style>
     <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 4rem)' }}>
       <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
@@ -148,7 +155,7 @@ export default function AiCounselPage() {
         <div className="px-4 py-3 border-b border-outline-variant/40">
           <button onClick={handleNewSession} className="btn-primary text-sm px-4 py-2 w-full">新对话</button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scrollbar-thin">
           {sessionsLoading ? (
             <div className="p-4 space-y-2">{[1, 2].map((i) => <div key={i} className="skeleton h-10 rounded-lg" />)}</div>
           ) : sessions.length === 0 ? (
@@ -186,7 +193,7 @@ export default function AiCounselPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-surface-container-low/30">
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-3 bg-surface-container-low/30">
           {messagesLoading ? (
             <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="skeleton h-12 rounded-lg w-3/4" />)}</div>
           ) : messages.length === 0 ? (
@@ -251,5 +258,6 @@ export default function AiCounselPage() {
         </div>
       )}
     </div>
+    </>
   );
 }
