@@ -143,7 +143,7 @@ export default function AiCounselPage() {
   };
 
   return (
-    <div className="flex flex-1 min-h-0">
+    <div className="flex flex-col flex-1 overflow-hidden" style={{ height: 'calc(100vh - 4rem)' }}>
       {/* Desktop sidebar */}
       <div className={`${showSidebar ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-64 border-r border-outline-variant/40 shrink-0`}>
         <div className="px-4 py-3 border-b border-outline-variant/40">
