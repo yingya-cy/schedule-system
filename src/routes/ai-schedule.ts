@@ -17,7 +17,7 @@ router.post('/schedule-plan', authenticate, async (req, res) => {
     const { courses, commitments, grade, major, next_monday } = req.body;
 
     if (!courses || courses.length === 0) {
-      res.status(400).json({ success: false, error: '课表为空，请先选择有课表的学期' });
+      res.status(400).json({ success: false, error: '课表为空，请先上传课表' });
       return;
     }
 
@@ -135,13 +135,58 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
       return;
     }
 
+    // Normalize OCR output to EditableCourse format
+    const courses = (data.schedule_data || []).map((c: Record<string, unknown>, i: number) => {
+      // Normalize weeks: handle complex week objects from OCR
+      let weeks: number[] = [];
+      const weekVal = c.week;
+      if (Array.isArray(weekVal)) {
+        weeks = weekVal as number[];
+      } else if (typeof weekVal === 'object' && weekVal !== null) {
+        const w = weekVal as Record<string, unknown>;
+        if (w.type === 'range' && typeof w.start === 'number' && typeof w.end === 'number') {
+          for (let n = w.start; n <= w.end; n++) {
+            if (w.rule === 'odd' && n % 2 === 0) continue;
+            if (w.rule === 'even' && n % 2 === 1) continue;
+            weeks.push(n);
+          }
+        } else if (w.type === 'list' && Array.isArray(w.weeks)) {
+          weeks = w.weeks as number[];
+        } else if (w.type === 'multi_range' && Array.isArray(w.ranges)) {
+          (w.ranges as Array<{ start: number; end: number }>).forEach((r) => {
+            for (let n = r.start; n <= r.end; n++) weeks.push(n);
+          });
+        }
+      }
+
+      // Normalize sections: OCR returns 'section' (array), we need 'sections'
+      let sections: number[] = [];
+      const sectionVal = (c as Record<string, unknown>).section;
+      if (Array.isArray(sectionVal)) {
+        sections = sectionVal as number[];
+      } else if (Array.isArray(c.sections)) {
+        sections = c.sections as number[];
+      }
+
+      return {
+        id: `ocr_${i}_${Date.now()}`,
+        course_name: (c.course_name as string) || '未识别课程',
+        weekday: (c.weekday as number) || 1,
+        sections,
+        weeks,
+        teacher: (c.teacher as string) || '',
+        location: (c.location as string) || '',
+        remark: '',
+      };
+    });
+
     res.json({
       success: true,
       data: {
-        courses: data.schedule_data || [],
+        courses,
+        course_count: courses.length,
         raw: data.raw_data || [],
         diagnostic: data.diagnostics || {},
-        schedule_type: data.schedule_type || 'unknown',
       },
     });
   } catch (error: unknown) {
