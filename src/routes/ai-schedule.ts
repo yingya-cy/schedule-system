@@ -149,7 +149,9 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
     }
 
     // Normalize OCR output to EditableCourse format
-    const courses = (data.schedule_data || []).map((c: Record<string, unknown>, i: number) => {
+    // Try schedule_data first, fallback to raw_data (some schedule types put results there)
+    const rawList = (data.schedule_data?.length > 0 ? data.schedule_data : data.raw_data) || [];
+    const courses = rawList.map((c: Record<string, unknown>, i: number) => {
       // Normalize weeks: handle complex week objects from OCR
       let weeks: number[] = [];
       const weekVal = c.week;
