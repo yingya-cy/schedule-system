@@ -84,11 +84,9 @@ export default function AiCounselPage() {
     const history = [...currentMsgs, userMsg].map((m) => ({ role: m.role, content: m.content }));
 
     // Now update store & activate session
+    // (user message saved to DB by Express /api/ai/counsel/stream — don't double-save)
     useAiCounselStore.setState((s) => ({ messages: [...s.messages, userMsg] }));
     setActiveSession(sessionId);
-
-    // Save user message
-    try { await saveMessage(sessionId, 'user', text); } catch { /* continue */ }
 
     // Start streaming
     setStreaming(true);
