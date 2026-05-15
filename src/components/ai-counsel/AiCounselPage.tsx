@@ -143,7 +143,7 @@ export default function AiCounselPage() {
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
       <div className={`${showSidebar ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-64 border-r border-outline-variant/40 shrink-0`}>
         <div className="px-4 py-3 border-b border-outline-variant/40">
@@ -156,11 +156,17 @@ export default function AiCounselPage() {
             <div className="p-4 text-xs text-on-surface-variant text-center">还没有对话记录</div>
           ) : (
             sessions.map((s) => (
-              <button key={s.id} onClick={() => { setActiveSession(s.id); setShowSidebar(false); }}
-                className={`w-full text-left px-4 py-3 hover:bg-surface-container-low transition-colors border-b border-outline-variant/20 ${s.id === activeSessionId ? 'bg-primary/5' : ''}`}>
-                <span className="text-sm text-on-surface truncate block">{s.title}</span>
-                <span className="text-xs text-on-surface-variant">{new Date(s.updated_at).toLocaleDateString('zh-CN')}</span>
-              </button>
+              <div key={s.id} className="relative group border-b border-outline-variant/20">
+                <button onClick={() => { setActiveSession(s.id); setShowSidebar(false); }}
+                  className={`w-full text-left px-4 py-3 hover:bg-surface-container-low transition-colors ${s.id === activeSessionId ? 'bg-primary/5' : ''}`}>
+                  <span className="text-sm text-on-surface truncate block pr-6">{s.title}</span>
+                  <span className="text-xs text-on-surface-variant">{new Date(s.updated_at).toLocaleDateString('zh-CN')}</span>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-outline hover:text-error hover:bg-error/10 opacity-0 group-hover:opacity-100 transition-opacity text-xs">
+                  &times;
+                </button>
+              </div>
             ))
           )}
         </div>
