@@ -234,10 +234,23 @@ router.get('/latest-schedule', authenticate, async (req, res) => {
     const input = latestPlan ? parseJson(latestPlan.input_data) : {};
     const plan = latestPlan?.plan_data ? parseJson(latestPlan.plan_data) : null;
 
+    // Normalize stored courses to EditableCourse format (handle both name and course_name)
+    const rawCourses = ((input as Record<string, unknown>).courses || []) as Record<string, unknown>[];
+    const courses = rawCourses.map((c: Record<string, unknown>, i: number) => ({
+      id: (c.id as string) || `saved_${i}`,
+      course_name: String(c.course_name || c.name || '未识别课程'),
+      weekday: Number(c.weekday) || 1,
+      sections: Array.isArray(c.sections) ? c.sections : [],
+      weeks: Array.isArray(c.weeks) ? c.weeks : [],
+      teacher: String(c.teacher || ''),
+      location: String(c.location || ''),
+      remark: String(c.remark || ''),
+    }));
+
     res.json({
       success: true,
       data: {
-        courses: (input as Record<string, unknown>).courses || [],
+        courses,
         commitments: (input as Record<string, unknown>).commitments || [],
         plan,
         planId: latestPlan?.id || null,
