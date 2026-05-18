@@ -157,7 +157,7 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
       case 'image':
         return <img src={displayUrl} alt={file?.original_filename} className="max-w-full max-h-[70vh] object-contain rounded-lg" />;
       case 'video':
-        return <video src={displayUrl} controls className="max-w-full max-h-[70vh] rounded-lg" />;
+        return <video src={displayUrl} controls preload="metadata" playsInline crossOrigin="anonymous" className="max-w-full max-h-[70vh] rounded-lg bg-black" />;
       case 'pdf':
         if (pdfPages.length > 0) {
           return (

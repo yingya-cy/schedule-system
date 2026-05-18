@@ -806,7 +806,7 @@ export default function FileCenterView() {
                             </div>
                             <div className="absolute bottom-2 right-2 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-surface/80 backdrop-blur rounded-lg p-0.5">
                               <button
-                                onClick={e => { e.stopPropagation(); setEditingFolder(sf); setFolderForm({ name: sf.name, parent_id: String(sf.parent_id || '') }); setFolderError(''); }}
+                                onClick={e => { e.stopPropagation(); setEditingFolder(sf); setFolderForm({ name: sf.name, parent_id: String(sf.parent_id || '') }); setFolderError(''); setShowFolderModal(true); }}
                                 className="p-1 hover:bg-primary/10 rounded text-primary"
                               >
                                 <Edit3 size={12} />
@@ -850,7 +850,7 @@ export default function FileCenterView() {
                             </div>
                             <div className="absolute bottom-2 right-2 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-surface/80 backdrop-blur rounded-lg p-0.5">
                               <button
-                                onClick={e => { e.stopPropagation(); setEditingFolder(sf); setFolderForm({ name: sf.name, parent_id: String(sf.parent_id || '') }); setFolderError(''); }}
+                                onClick={e => { e.stopPropagation(); setEditingFolder(sf); setFolderForm({ name: sf.name, parent_id: String(sf.parent_id || '') }); setFolderError(''); setShowFolderModal(true); }}
                                 className="p-1 hover:bg-primary/10 rounded text-primary"
                                 title="编辑"
                               >
@@ -1193,21 +1193,21 @@ export default function FileCenterView() {
                     </div>
                   )}
 
-                  {!editingItem && (
                   <div className="border-t border-surface-container-high pt-4">
-                  <p className="text-xs text-outline mb-3">或者从外部链接添加文件</p>
+                    <p className="text-xs text-outline mb-3">{editingItem ? '修改文件信息' : '或者从外部链接添加文件'}</p>
                     <div className="space-y-3">
                       <div>
                         <label className="block text-xs font-semibold text-on-surface mb-1">文件名</label>
-                        <input type="text" value={itemForm.original_filename} onChange={e => setItemForm({ ...itemForm, original_filename: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-surface-container-high text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" disabled={uploading} />
+                        <input type="text" value={itemForm.original_filename} onChange={e => setItemForm({ ...itemForm, original_filename: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-surface-container-high text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" disabled={!!uploading} />
                       </div>
+                      {!editingItem && (
                       <div>
                         <label className="block text-xs font-semibold text-on-surface mb-1">URL</label>
                         <input type="text" value={itemForm.oss_url} onChange={e => setItemForm({ ...itemForm, oss_url: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-surface-container-high text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" placeholder="已有文件的 OSS URL（不填则使用上传的文件）" disabled={uploading} />
                       </div>
+                      )}
                     </div>
                   </div>
-                  )}
                   <div>
                     <label className="block text-xs font-semibold text-on-surface mb-1">描述</label>
                     <textarea value={itemForm.description} onChange={e => setItemForm({ ...itemForm, description: e.target.value })} rows={2} className="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-surface-container-high text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none" disabled={uploading} />
