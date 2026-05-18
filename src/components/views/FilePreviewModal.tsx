@@ -19,7 +19,8 @@ function getPreviewType(mime: string | null, filename?: string): 'image' | 'vide
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   if (mime === 'application/pdf') return 'pdf';
-  if (mime.includes('wordprocessingml') || mime === 'application/msword') return 'docx';
+  if (mime.includes('wordprocessingml')) return 'docx';
+  // .doc (binary format) not supported for preview — only .docx
   if (mime.startsWith('text/') || mime === 'application/json' || mime.includes('javascript')) return 'text';
   return 'unsupported';
 }

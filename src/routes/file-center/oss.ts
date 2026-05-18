@@ -149,16 +149,25 @@ router.get('/oss/preview', async (req, res) => {
       return;
     }
     const { body, contentType } = await getObjectContent(key);
-    const isDocx = contentType.includes('wordprocessingml') || key.toLowerCase().endsWith('.docx');
+    // Only convert .docx (Office Open XML), not .doc (binary format)
+    const isDocx = contentType.includes('wordprocessingml')
+      || (key.toLowerCase().endsWith('.docx') && !key.toLowerCase().endsWith('.doc'));
 
     if (isDocx) {
-      // Convert .docx to HTML for inline preview
-      const mammoth = await import('mammoth');
-      const result = await mammoth.convertToHtml({ buffer: body });
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('Content-Disposition', 'inline');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;max-width:800px;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#333}</style></head><body>${result.value}</body></html>`);
+      try {
+        const mammoth = await import('mammoth');
+        const result = await mammoth.convertToHtml({ buffer: body });
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Content-Disposition', 'inline');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;max-width:800px;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#333}</style></head><body>${result.value}</body></html>`);
+      } catch {
+        // mammoth failed — fall through to raw download
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', 'attachment');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.end(body);
+      }
     } else {
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Disposition', 'inline');
