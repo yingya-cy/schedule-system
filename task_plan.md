@@ -4,7 +4,7 @@
 构建完整的学术管理平台，包含课表管理、比赛评分、登录认证、网盘系统、即时通讯等功能模块。
 
 ## Current Phase
-Phase 17: AI 日程安排 + AI 心理咨询 — 计划已就绪，待实施
+Phase 19: 迭代优化 — 文件预览、移动端适配、Bug 修复（进行中）
 
 ## Phases
 
@@ -271,16 +271,37 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 ### Phase 17: AI 日程安排 + AI 心理咨询（计划阶段）
 - [x] 17.1 Step 1: 用户画像扩展 — `users` 表加 `grade`、`major` 字段，UserInfo 类型 + auth 路由同步
 - [x] 17.2 Step 2: Flask AI 核心端点 — `ai_text()` 非流式 + `ai_stream()` SSE 流式，异常处理 + 断连清理
-- [ ] 17.3 Step 3: AI 日程安排 — 选课表 + 事项输入 → MiniMax 生成 → JSON 时间表渲染（7 files）
-- [ ] 17.4 Step 4: AI 心理咨询 — SSE 流式对话 + 会话管理 + 危机识别 system prompt（6 files）
-- [ ] 17.5 Step 5: 导航集成 + rate limit 安全护栏 + Playwright E2E（6 flows）
-- **Status:** planned — 详见 `docs/superpowers/plans/2026-05-14-ai-features.md`（完整 prompt 模板 + ASCII 布局 + API 合约表）
+- [x] 17.3 Step 3: AI 日程安排 — 上传课表 OCR → ScheduleEditor → 事项 → AI 生成周计划 → 持久化 Dashboard
+- [x] 17.4 Step 4: AI 心理咨询 — SSE 流式对话 + "小暖" system prompt + 会话管理 + 危机关键词检测
+- [x] 17.5 Step 5: 导航集成 + 13 集成测试
+- **Status:** completed — 但三个入口已隐藏（功能待完善），505 tests
+- **已部署:** 47.120.29.188（后端 + 前端）
 
 **技术栈：** MiniMax-M2.7（OpenAI 兼容 API）→ Flask `ai_endpoints.py` → Express 代理 → React 前端
 - 排课：非流式 JSON 输出，前端时间表渲染
 - 咨询：SSE 流式输出，前端逐字渲染
 
 **依赖图：** Step 1 → Step 2 → Step 3 & 4 (并行) → Step 5
+
+### Phase 18: 文件预览系统
+- [x] 18.1 PDF 预览 — pdf.js v3 UMD → canvas 渲染 + 翻页（兼容微信/手机）
+- [x] 18.2 .docx 预览 — mammoth → HTML + 完整表格 CSS
+- [x] 18.3 .doc 预览 — antiword → 纯文本 HTML（200KB，无需 LibreOffice）
+- [x] 18.4 预览弹窗 — FilePreviewModal 统一入口，blob URL + iframe/object
+- [x] 18.5 跨浏览器兼容 — 微信浏览器、Safari、Firefox 全部覆盖
+- **Status:** completed
+
+### Phase 19: 迭代优化 & Bug 修复
+- [x] 19.1 文件中心移动端适配 — 侧边栏滑入悬浮层、汉堡菜单、2 列网格
+- [x] 19.2 schedules API 79MB → 10KB — 排除 file_data LONGBLOB + 大小写文件名
+- [x] 19.3 MySQL 字符集 — 数据库文件夹名乱码修复
+- [x] 19.4 OSS 环境变量配置 — docker-compose 注入
+- [x] 19.5 文件夹树修复 — allFolders 递归透传、新建后刷新
+- [x] 19.6 聊天页面布局修复 — 高度约束三件套、防竞态、防重复
+- [x] 19.7 隐藏未完成入口 — 心理咨询、AI 排课、AI 咨询
+- [ ] 19.8 服务器内存优化（115MB free）
+- [ ] 19.9 覆盖率提升
+- **Status:** in-progress
 
 ## Key Questions
 1. 登录系统是独立用户体系还是对接学校 SSO/LDAP？→ **独立用户体系（用户名+密码+JWT），不开放注册，管理员后台创建**
