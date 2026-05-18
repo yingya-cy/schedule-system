@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus, Trash2, Edit3, X, FolderPlus, FileText, Image, Video, ExternalLink,
-  ChevronRight, ChevronDown, FolderOpen, Upload, Search, Eye, Download
+  ChevronRight, ChevronDown, FolderOpen, Upload, Search, Eye, Download, Menu
 } from 'lucide-react';
 import FilePreviewModal from '../FilePreviewModal';
 import { useAuthStore } from '@/stores/authStore';
@@ -56,6 +56,7 @@ export default function FileCenterView() {
   const [selectedFileIds, setSelectedFileIds] = useState<Set<number>>(new Set());
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [previewFile, setPreviewFile] = useState<FileCenterFileItem | null>(null);
@@ -546,7 +547,7 @@ export default function FileCenterView() {
               <p className="text-sm mt-1">文件中心按活动组织资料</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {activities.map(a => (
                 <div key={a.id} className="group relative bg-surface rounded-2xl border border-surface-container-high p-5 hover:border-primary/30 hover:shadow-md transition-all">
                   <button
@@ -596,8 +597,52 @@ export default function FileCenterView() {
           )}
         </div>
       ) : (
-        <div className="flex gap-4">
-          <div className="w-56 shrink-0">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Mobile sidebar overlay */}
+          {showMobileSidebar && (
+            <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setShowMobileSidebar(false)}>
+              <div className="absolute inset-0 bg-black/40" />
+              <motion.div initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="absolute left-0 top-0 bottom-0 w-64 bg-surface shadow-2xl border-r border-outline-variant/40 p-4 overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-bold text-on-surface">目录</span>
+                  <button onClick={() => setShowMobileSidebar(false)} className="p-1 hover:bg-surface-container-low rounded-lg"><X size={18} /></button>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedActivity(null);
+                    setSelectedFolderId(null);
+                    setItems({ files: [], tweets: [], subfolders: [] });
+                    setExpandedFolders(new Set());
+                    setShowMobileSidebar(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 mb-2 rounded-xl text-sm text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors"
+                >
+                  <ChevronRight size={14} className="rotate-180" />
+                  <span className="truncate">{selectedActivity.name}</span>
+                </button>
+                <div>
+                  <div className="flex items-center justify-between mb-2 px-2">
+                    <span className="text-xs text-outline">{folders.length} 个文件夹</span>
+                    <button onClick={() => { openCreateFolder(selectedFolderId); setShowMobileSidebar(false); }}
+                      className="p-1 hover:bg-surface-container-low rounded-lg text-outline hover:text-primary transition-colors">
+                      <FolderPlus size={14} />
+                    </button>
+                  </div>
+                  <div className="space-y-0.5" onClick={() => setShowMobileSidebar(false)}>
+                    {buildTree(folders).length === 0 ? (
+                      <p className="text-xs text-on-surface-variant py-2 px-2">暂无文件夹</p>
+                    ) : (
+                      renderFolderTree(buildTree(folders), 0, folders)
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {/* Desktop sidebar */}
+          <div className="hidden lg:block w-56 shrink-0">
             <button
               onClick={() => {
                 setSelectedActivity(null);
@@ -622,7 +667,7 @@ export default function FileCenterView() {
                   <FolderPlus size={14} />
                 </button>
               </div>
-              <div className="space-y-0.5 max-h-[65vh] overflow-y-auto">
+              <div className="space-y-0.5 max-h-[65vh] overflow-y-auto scrollbar-thin">
                 {buildTree(folders).length === 0 ? (
                   <p className="text-xs text-on-surface-variant py-2 px-2">暂无文件夹</p>
                 ) : (
@@ -645,6 +690,10 @@ export default function FileCenterView() {
             <div className="bg-surface rounded-2xl border border-surface-container-high p-4">
               <div className="flex items-center justify-between mb-3 pb-3 border-b border-surface-container-high">
                 <div className="flex items-center gap-2 min-w-0">
+                  <button onClick={() => setShowMobileSidebar(true)}
+                    className="lg:hidden p-1.5 hover:bg-surface-container-low rounded-lg text-outline hover:text-primary transition-colors shrink-0">
+                    <Menu size={18} />
+                  </button>
                   <button
                     onClick={() => {
                       setSelectedActivity(null);
@@ -691,14 +740,13 @@ export default function FileCenterView() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
                 <div className="flex items-center gap-3">
                   <h3 className="text-sm font-bold text-on-surface font-headline">
                     {selectedFolderId
                       ? folders.find(f => f.id === selectedFolderId)?.name || '文件夹'
                       : '全部文件'}
                   </h3>
-                  {/* Sort controls */}
                   {items.files.length > 1 && (
                     <div className="flex items-center gap-1 text-[10px]">
                       <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
@@ -717,17 +765,17 @@ export default function FileCenterView() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => { setShowItemModal(true); setEditingItem(null); setItemForm({ original_filename: '', file_category: 'document', description: '', oss_url: '' }); setItemError(''); setSelectedFiles([]); setUploadProgress(0); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-on-primary hover:bg-primary/90 transition-colors"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-primary text-on-primary hover:bg-primary/90 transition-colors"
                     disabled={!selectedFolderId}
                   >
-                    <Upload size={13} /> 上传文件
+                    <Upload size={13} /> <span className="hidden sm:inline">上传文件</span>
                   </button>
                   <button
                     onClick={() => { setShowTweetModal(true); setEditingTweet(null); setTweetForm({ title: '', content: '', summary: '', cover_image: '', link_url: '', author: '' }); setItemError(''); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-container-high/80 transition-colors"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-container-high/80 transition-colors"
                     disabled={!selectedFolderId}
                   >
-                    <Plus size={13} /> 添加推文
+                    <Plus size={13} /> <span className="hidden sm:inline">添加推文</span>
                   </button>
                 </div>
               </div>
@@ -742,7 +790,7 @@ export default function FileCenterView() {
                   return rootFolders.length > 0 ? (
                     <div>
                       <p className="text-xs font-bold text-outline uppercase tracking-wider mb-2">文件夹</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                         {rootFolders.map(sf => (
                           <div key={sf.id} className="group relative bg-surface-container-lowest rounded-xl border border-surface-container-high p-3 hover:border-primary/30 transition-all cursor-pointer"
                             onClick={() => setSelectedFolderId(sf.id)}
@@ -786,7 +834,7 @@ export default function FileCenterView() {
                   {items.subfolders.length > 0 && (
                     <div className="mb-4">
                       <p className="text-xs font-bold text-outline uppercase tracking-wider mb-2">文件夹</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                         {items.subfolders.map(sf => (
                           <div key={sf.id} className="group relative bg-surface-container-lowest rounded-xl border border-surface-container-high p-3 hover:border-primary/30 transition-all cursor-pointer"
                             onClick={() => setSelectedFolderId(sf.id)}
@@ -836,7 +884,7 @@ export default function FileCenterView() {
                           {selectedFileIds.size === items.files.length ? '取消全选' : '全选'}
                         </button>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                         {sortedFiles(items.files, sortBy, sortOrder).map(f => (
                           <div key={f.id} className={`group relative bg-surface-container-lowest rounded-xl border p-3 hover:border-primary/30 transition-all cursor-pointer ${selectedFileIds.has(f.id) ? 'border-primary/50 bg-primary/5' : 'border-surface-container-high'}`}
                             onClick={() => setPreviewFile(f)}
