@@ -17,6 +17,7 @@ export default defineConfig(({mode}) => {
             'vendor-react': ['react', 'react-dom', 'react-router-dom'],
             'vendor-motion': ['motion/react'],
             'vendor-icons': ['lucide-react'],
+            'pdfjs': ['pdfjs-dist'],
           },
         },
       },
@@ -25,6 +26,9 @@ export default defineConfig(({mode}) => {
       alias: {
         '@': path.resolve(__dirname, 'src'),
       },
+    },
+    optimizeDeps: {
+      exclude: ['pdfjs-dist'],
     },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
