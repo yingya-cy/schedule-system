@@ -36,8 +36,10 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const renderPdf = useCallback(async (url: string) => {
-    const pdfjs = await import('pdfjs-dist');
-    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284/build/pdf.worker.min.mjs';
+    // Load pdf.js entirely from CDN (avoids Vite bundling issues)
+    const CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/';
+    const pdfjs = await import(/* @vite-ignore */ CDN + 'build/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = CDN + 'build/pdf.worker.min.mjs';
     const pdf = await pdfjs.getDocument(url).promise;
     const pages: string[] = [];
     for (let i = 1; i <= pdf.numPages; i++) {
@@ -46,7 +48,7 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
       const c = document.createElement('canvas');
       c.width = vp.width; c.height = vp.height;
       const ctx = c.getContext('2d')!;
-      await page.render({ canvasContext: ctx, viewport: vp } as Parameters<typeof page.render>[0]).promise;
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
       pages.push(c.toDataURL());
     }
     setPdfPages(pages);
