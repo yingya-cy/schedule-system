@@ -9,7 +9,7 @@ import {
   Department
 } from '../types/database';
 import { fileStorageService, FileMetadata } from './fileStorageService';
-import { scheduleRepository } from '../repositories/ScheduleRepository';
+import { scheduleRepository } from '../repositories/scheduleRepository';
 
 export class ScheduleService {
   // ==================== Department Operations ====================

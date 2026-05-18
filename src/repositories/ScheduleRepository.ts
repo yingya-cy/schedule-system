@@ -8,7 +8,7 @@ export class ScheduleRepository {
   // ==================== Schedule Operations ====================
 
   async findAll(filters?: { department?: string; name?: string; term_id?: number; created_by?: string }): Promise<Schedule[]> {
-    let query = 'SELECT * FROM schedules';
+    let query = 'SELECT id, name, department, term_id, filename, file_type, created_by, created_at, updated_at FROM schedules';
     const params: (string | number)[] = [];
     const conditions: string[] = [];
 
@@ -39,29 +39,7 @@ export class ScheduleRepository {
     query += ' ORDER BY created_at DESC';
 
     const [rows] = await pool.execute(query, params);
-    const schedules = rows as Schedule[];
-
-    // Batch load courses for all schedules
-    const scheduleIds = schedules.map((s) => s.id);
-    if (scheduleIds.length > 0) {
-      const [courseRows] = await pool.execute(
-        `SELECT * FROM courses WHERE schedule_id IN (${scheduleIds.map(() => '?').join(',')}) ORDER BY weekday ASC, sections ASC`,
-        scheduleIds
-      );
-      const coursesMap = new Map<number, Course[]>();
-      (courseRows as Course[]).forEach((c) => {
-        const list = coursesMap.get(c.schedule_id) || [];
-        list.push(c);
-        coursesMap.set(c.schedule_id, list);
-      });
-      schedules.forEach((s) => {
-        s.courses = coursesMap.get(s.id) || [];
-      });
-    } else {
-      schedules.forEach((s) => { s.courses = []; });
-    }
-
-    return schedules;
+    return rows as Schedule[];
   }
 
   async findById(id: number): Promise<Schedule | null> {
