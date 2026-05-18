@@ -16,6 +16,7 @@ COPY package*.json ./
 
 RUN npm install --production
 
+
 COPY server.ts ./
 COPY src/ ./src/
 COPY dist/ ./dist/

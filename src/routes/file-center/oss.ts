@@ -149,7 +149,6 @@ router.get('/oss/preview', async (req, res) => {
       return;
     }
     const { body, contentType } = await getObjectContent(key);
-    // Only convert .docx (Office Open XML), not .doc (binary format)
     const isDocx = contentType.includes('wordprocessingml')
       || (key.toLowerCase().endsWith('.docx') && !key.toLowerCase().endsWith('.doc'));
 
@@ -157,12 +156,20 @@ router.get('/oss/preview', async (req, res) => {
       try {
         const mammoth = await import('mammoth');
         const result = await mammoth.convertToHtml({ buffer: body });
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+body{font-family:'Noto Sans SC',system-ui,sans-serif;max-width:800px;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#333}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:14px}
+td,th{border:1px solid #999;padding:6px 10px;vertical-align:top;text-align:left}
+th{background:#f0f0f0;font-weight:600}
+p{margin:.5em 0}
+h1,h2,h3,h4,h5,h6{margin:.8em 0 .4em}
+img{max-width:100%}
+</style></head><body>${result.value}</body></html>`;
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.setHeader('Content-Disposition', 'inline');
         res.setHeader('Cache-Control', 'public, max-age=3600');
-        res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;max-width:800px;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#333}</style></head><body>${result.value}</body></html>`);
+        res.end(html);
       } catch {
-        // mammoth failed — fall through to raw download
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', 'attachment');
         res.setHeader('Cache-Control', 'public, max-age=3600');

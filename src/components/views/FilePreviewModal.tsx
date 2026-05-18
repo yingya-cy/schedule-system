@@ -12,15 +12,14 @@ interface Props {
 
 function getPreviewType(mime: string | null, filename?: string): 'image' | 'video' | 'pdf' | 'docx' | 'text' | 'unsupported' {
   if (!mime) {
-    // Guess from extension
-    if (filename?.toLowerCase().endsWith('.docx')) return 'docx';
+    const ext = filename?.toLowerCase() || '';
+    if (ext.endsWith('.docx')) return 'docx';
     return 'unsupported';
   }
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   if (mime === 'application/pdf') return 'pdf';
   if (mime.includes('wordprocessingml')) return 'docx';
-  // .doc (binary format) not supported for preview — only .docx
   if (mime.startsWith('text/') || mime === 'application/json' || mime.includes('javascript')) return 'text';
   return 'unsupported';
 }
@@ -47,13 +46,11 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
         }
 
         if (previewType === 'docx') {
-          // Use server-side mammoth conversion
           const res = await fetch(`/api/file-center/oss/preview?key=${encodeURIComponent(file.oss_object_key!)}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (!res.ok) throw new Error('文档加载失败');
-          const html = await res.text();
-          setTextContent(html);
+          setTextContent(await res.text());
         } else if (previewType === 'text') {
           const res = await fetch('/api/file-center/oss/download-url', {
             method: 'POST',
@@ -121,12 +118,15 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
         return <video src={displayUrl} controls className="max-w-full max-h-[70vh] rounded-lg" />;
       case 'pdf':
         return (
-          <object data={displayUrl} type="application/pdf" className="w-full h-[75vh] rounded-lg">
-            <div className="text-center py-16 text-on-surface-variant text-sm">
-              <p className="mb-3">PDF 无法直接预览</p>
-              <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm">在新标签页中打开</a>
+          <>
+            <iframe src={displayUrl} className="w-full h-[65vh] sm:h-[75vh] rounded-lg border border-surface-container-high" />
+            <div className="flex items-center justify-center gap-3 mt-3">
+              <a href={displayUrl} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline">新窗口打开</a>
+              <a href={downloadUrl} download={file?.original_filename}
+                className="text-xs text-primary hover:underline">下载</a>
             </div>
-          </object>
+          </>
         );
       case 'docx':
         return <iframe srcDoc={textContent} className="w-full h-[75vh] rounded-lg border border-surface-container-high" />;
