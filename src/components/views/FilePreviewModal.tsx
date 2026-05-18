@@ -37,7 +37,7 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
 
   const renderPdf = useCallback(async (url: string) => {
     const pdfjs = await import('pdfjs-dist');
-    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.7.284/pdf.worker.min.mjs';
+    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284/build/pdf.worker.min.mjs';
     const pdf = await pdfjs.getDocument(url).promise;
     const pages: string[] = [];
     for (let i = 1; i <= pdf.numPages; i++) {
