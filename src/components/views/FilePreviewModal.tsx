@@ -15,13 +15,13 @@ interface Props {
 function getPreviewType(mime: string | null, filename?: string): 'image' | 'video' | 'pdf' | 'docx' | 'text' | 'unsupported' {
   if (!mime) {
     const ext = filename?.toLowerCase() || '';
-    if (ext.endsWith('.docx')) return 'docx';
+    if (ext.endsWith('.docx') || ext.endsWith('.doc')) return 'docx'; // antiword handles .doc server-side
     return 'unsupported';
   }
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   if (mime === 'application/pdf') return 'pdf';
-  if (mime.includes('wordprocessingml')) return 'docx';
+  if (mime.includes('wordprocessingml') || mime === 'application/msword') return 'docx'; // .doc via antiword
   if (mime.startsWith('text/') || mime === 'application/json' || mime.includes('javascript')) return 'text';
   return 'unsupported';
 }

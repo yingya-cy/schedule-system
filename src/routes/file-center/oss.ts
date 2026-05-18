@@ -14,6 +14,10 @@ import { RowDataPacket, ResultSetHeader } from '../../utils/db-types';
 const router = Router();
 router.use(authenticate);
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // =============================================
 // Permissions CRUD
 // =============================================
@@ -151,8 +155,28 @@ router.get('/oss/preview', async (req, res) => {
     const { body, contentType } = await getObjectContent(key);
     const isDocx = contentType.includes('wordprocessingml')
       || (key.toLowerCase().endsWith('.docx') && !key.toLowerCase().endsWith('.doc'));
+    const isDoc = contentType === 'application/msword'
+      || (key.toLowerCase().endsWith('.doc') && !key.toLowerCase().endsWith('.docx'));
 
-    if (isDocx) {
+    if (isDoc) {
+      try {
+        const { execSync } = await import('child_process');
+        const text = execSync('antiword -m UTF-8.txt -', {
+          input: body as Buffer,
+          timeout: 10000,
+          maxBuffer: 10 * 1024 * 1024,
+          encoding: 'utf-8',
+        });
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;max-width:800px;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#333;white-space:pre-wrap}</style></head><body>${escapeHtml(text)}</body></html>`;
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Content-Disposition', 'inline');
+        res.end(html);
+      } catch {
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', 'attachment');
+        res.end(body);
+      }
+    } else if (isDocx) {
       try {
         const mammoth = await import('mammoth');
         const result = await mammoth.convertToHtml({ buffer: body });

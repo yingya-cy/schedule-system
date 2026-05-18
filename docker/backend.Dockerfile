@@ -16,6 +16,8 @@ COPY package*.json ./
 
 RUN npm install --production
 
+# antiword: lightweight .doc to text converter (~200KB)
+RUN apk add --no-cache antiword
 
 COPY server.ts ./
 COPY src/ ./src/
