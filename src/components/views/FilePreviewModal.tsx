@@ -10,11 +10,16 @@ interface Props {
   onClose: () => void;
 }
 
-function getPreviewType(mime: string | null): 'image' | 'video' | 'pdf' | 'text' | 'unsupported' {
-  if (!mime) return 'unsupported';
+function getPreviewType(mime: string | null, filename?: string): 'image' | 'video' | 'pdf' | 'docx' | 'text' | 'unsupported' {
+  if (!mime) {
+    // Guess from extension
+    if (filename?.toLowerCase().endsWith('.docx')) return 'docx';
+    return 'unsupported';
+  }
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   if (mime === 'application/pdf') return 'pdf';
+  if (mime.includes('wordprocessingml') || mime === 'application/msword') return 'docx';
   if (mime.startsWith('text/') || mime === 'application/json' || mime.includes('javascript')) return 'text';
   return 'unsupported';
 }
@@ -29,7 +34,7 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
 
   useEffect(() => {
     if (!isOpen || !file) return;
-    const previewType = getPreviewType(file.mime_type);
+    const previewType = getPreviewType(file.mime_type, file.original_filename);
 
     async function loadUrl() {
       setLoading(true);
@@ -40,7 +45,15 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
           return;
         }
 
-        if (previewType === 'text') {
+        if (previewType === 'docx') {
+          // Use server-side mammoth conversion
+          const res = await fetch(`/api/file-center/oss/preview?key=${encodeURIComponent(file.oss_object_key!)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error('文档加载失败');
+          const html = await res.text();
+          setTextContent(html);
+        } else if (previewType === 'text') {
           const res = await fetch('/api/file-center/oss/download-url', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -94,7 +107,7 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
   }, [isOpen, file?.id]);
 
   if (!file) return null;
-  const previewType = getPreviewType(file.mime_type);
+  const previewType = getPreviewType(file.mime_type, file.original_filename);
 
   function renderContent() {
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 size={32} className="animate-spin text-primary" /></div>;
@@ -114,6 +127,8 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
             </div>
           </object>
         );
+      case 'docx':
+        return <iframe srcDoc={textContent} className="w-full h-[75vh] rounded-lg border border-surface-container-high" sandbox="allow-same-origin" />;
       case 'text':
         return <pre className="max-h-[70vh] overflow-auto bg-surface-container-lowest rounded-lg p-4 text-xs text-on-surface whitespace-pre-wrap font-mono">{textContent}</pre>;
       default:

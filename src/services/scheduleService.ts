@@ -23,7 +23,7 @@ export class ScheduleService {
 
   // ==================== Schedule Operations (delegated to Repository) ====================
 
-  async getAllSchedules(filters?: { department?: string; name?: string; term_id?: number }): Promise<Schedule[]> {
+  async getAllSchedules(filters?: { department?: string; name?: string; term_id?: number; created_by?: string }): Promise<Schedule[]> {
     return scheduleRepository.findAll(filters);
   }
 

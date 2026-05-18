@@ -29,11 +29,11 @@ export const dbConfig = {
 // 创建连接池
 const pool = mysql.createPool(dbConfig);
 
-// ✅ 每次获取连接时强制设置 utf8mb4
+// ✅ 每次获取连接时强制设置 utf8mb4，防止中文乱码
 pool.on('connection', (connection) => {
-  // connection.promise() returns a promisified connection wrapper (mysql2)
-  // @ts-expect-error mysql2 types missing promise() on PoolConnection
-  connection.promise().query('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci').catch(() => {});
+  connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci', (err) => {
+    if (err) console.error('Failed to set charset:', err.message);
+  });
 });
 
 /**

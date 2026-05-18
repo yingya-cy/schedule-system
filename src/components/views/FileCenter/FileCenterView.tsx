@@ -671,7 +671,7 @@ export default function FileCenterView() {
                 {buildTree(folders).length === 0 ? (
                   <p className="text-xs text-on-surface-variant py-2 px-2">暂无文件夹</p>
                 ) : (
-                  renderFolderTree(buildTree(folders))
+                  renderFolderTree(buildTree(folders), 0, folders)
                 )}
               </div>
             </div>

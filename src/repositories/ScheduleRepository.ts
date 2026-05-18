@@ -7,7 +7,7 @@ import { RowDataPacket } from '../utils/db-types';
 export class ScheduleRepository {
   // ==================== Schedule Operations ====================
 
-  async findAll(filters?: { department?: string; name?: string; term_id?: number }): Promise<Schedule[]> {
+  async findAll(filters?: { department?: string; name?: string; term_id?: number; created_by?: string }): Promise<Schedule[]> {
     let query = 'SELECT * FROM schedules';
     const params: (string | number)[] = [];
     const conditions: string[] = [];
@@ -25,6 +25,11 @@ export class ScheduleRepository {
     if (filters?.name) {
       conditions.push('name LIKE ?');
       params.push(`%${filters.name}%`);
+    }
+
+    if (filters?.created_by) {
+      conditions.push('created_by = ?');
+      params.push(filters.created_by);
     }
 
     if (conditions.length > 0) {

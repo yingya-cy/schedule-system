@@ -149,10 +149,22 @@ router.get('/oss/preview', async (req, res) => {
       return;
     }
     const { body, contentType } = await getObjectContent(key);
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', 'inline');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.end(body);
+    const isDocx = contentType.includes('wordprocessingml') || key.toLowerCase().endsWith('.docx');
+
+    if (isDocx) {
+      // Convert .docx to HTML for inline preview
+      const mammoth = await import('mammoth');
+      const result = await mammoth.convertToHtml({ buffer: body });
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,sans-serif;max-width:800px;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#333}</style></head><body>${result.value}</body></html>`);
+    } else {
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.end(body);
+    }
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
