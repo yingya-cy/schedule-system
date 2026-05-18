@@ -4,6 +4,8 @@ import { X, Download, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { FileCenterFileItem } from './FileCenter/FileCenterTypes';
 
+declare global { interface Window { pdfjsLib?: any; } }
+
 interface Props {
   isOpen: boolean;
   file: FileCenterFileItem | null;
@@ -35,11 +37,26 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
   const [pdfPage, setPdfPage] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const pdfjsLoaded = useRef(false);
+
+  const loadPdfJs = useCallback((): Promise<typeof window.pdfjsLib> => {
+    return new Promise((resolve, reject) => {
+      if (window.pdfjsLib) { resolve(window.pdfjsLib); return; }
+      // v3 UMD build for max compatibility (WeChat old Chrome, iOS WKWebView)
+      const CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
+      const script = document.createElement('script');
+      script.src = CDN + 'build/pdf.min.js';
+      script.onload = () => {
+        window.pdfjsLib!.GlobalWorkerOptions.workerSrc = CDN + 'build/pdf.worker.min.js';
+        resolve(window.pdfjsLib!);
+      };
+      script.onerror = () => reject(new Error('PDF.js 加载失败'));
+      document.head.appendChild(script);
+    });
+  }, []);
+
   const renderPdf = useCallback(async (url: string) => {
-    // Load pdf.js entirely from CDN (avoids Vite bundling issues)
-    const CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/';
-    const pdfjs = await import(/* @vite-ignore */ CDN + 'build/pdf.min.mjs');
-    pdfjs.GlobalWorkerOptions.workerSrc = CDN + 'build/pdf.worker.min.mjs';
+    const pdfjs = await loadPdfJs();
     const pdf = await pdfjs.getDocument(url).promise;
     const pages: string[] = [];
     for (let i = 1; i <= pdf.numPages; i++) {
