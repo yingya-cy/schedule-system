@@ -129,11 +129,21 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
           </object>
         );
       case 'docx':
-        return <iframe srcDoc={textContent} className="w-full h-[75vh] rounded-lg border border-surface-container-high" sandbox="allow-same-origin" />;
+        return <iframe srcDoc={textContent} className="w-full h-[75vh] rounded-lg border border-surface-container-high" />;
       case 'text':
         return <pre className="max-h-[70vh] overflow-auto bg-surface-container-lowest rounded-lg p-4 text-xs text-on-surface whitespace-pre-wrap font-mono">{textContent}</pre>;
       default:
-        return <div className="text-center py-16 text-on-surface-variant text-sm">暂不支持在线预览此文件格式</div>;
+        return (
+          <div className="text-center py-16 text-on-surface-variant text-sm space-y-3">
+            <p>暂不支持在线预览此文件格式</p>
+            {downloadUrl && (
+              <a href={downloadUrl} download={file?.original_filename}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-medium hover:bg-primary/90 transition-colors">
+                <Download size={14} /> 下载文件
+              </a>
+            )}
+          </div>
+        );
     }
   }
 
