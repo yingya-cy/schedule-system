@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Download, Loader2 } from 'lucide-react';
+import { X, Download, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { FileCenterFileItem } from './FileCenter/FileCenterTypes';
 
@@ -31,6 +31,27 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
   const [textContent, setTextContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [pdfPages, setPdfPages] = useState<string[]>([]);
+  const [pdfPage, setPdfPage] = useState(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const renderPdf = useCallback(async (url: string) => {
+    const pdfjs = await import('pdfjs-dist');
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs`;
+    const pdf = await pdfjs.getDocument(url).promise;
+    const pages: string[] = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const vp = page.getViewport({ scale: 1.5 });
+      const c = document.createElement('canvas');
+      c.width = vp.width; c.height = vp.height;
+      const ctx = c.getContext('2d')!;
+      await page.render({ canvasContext: ctx, viewport: vp } as Parameters<typeof page.render>[0]).promise;
+      pages.push(c.toDataURL());
+    }
+    setPdfPages(pages);
+    setPdfPage(0);
+  }, []);
 
   useEffect(() => {
     if (!isOpen || !file) return;
@@ -77,8 +98,10 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
           if (!dlJson.success) throw new Error(dlJson.error);
           if (!proxyRes.ok) throw new Error('PDF 加载失败');
           const blob = await proxyRes.blob();
-          setDisplayUrl(URL.createObjectURL(blob));
+          const url = URL.createObjectURL(blob);
+          setDisplayUrl(url);
           setDownloadUrl(dlJson.data.downloadUrl);
+          await renderPdf(url);
         } else {
           const res = await fetch('/api/file-center/oss/download-url', {
             method: 'POST',
@@ -100,7 +123,7 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
     loadUrl();
     return () => {
       if (displayUrl) URL.revokeObjectURL(displayUrl);
-      setDisplayUrl(''); setDownloadUrl(''); setTextContent(''); setError('');
+      setDisplayUrl(''); setDownloadUrl(''); setTextContent(''); setError(''); setPdfPages([]); setPdfPage(0);
     };
   }, [isOpen, file?.id]);
 
@@ -117,17 +140,24 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
       case 'video':
         return <video src={displayUrl} controls className="max-w-full max-h-[70vh] rounded-lg" />;
       case 'pdf':
-        return (
-          <>
-            <iframe src={displayUrl} className="w-full h-[65vh] sm:h-[75vh] rounded-lg border border-surface-container-high" />
-            <div className="flex items-center justify-center gap-3 mt-3">
-              <a href={displayUrl} target="_blank" rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline">新窗口打开</a>
-              <a href={downloadUrl} download={file?.original_filename}
-                className="text-xs text-primary hover:underline">下载</a>
+        if (pdfPages.length > 0) {
+          return (
+            <div className="flex flex-col items-center">
+              <img src={pdfPages[pdfPage]} alt={`第${pdfPage + 1}页`} className="max-w-full max-h-[65vh] object-contain rounded-lg shadow-lg" />
+              {pdfPages.length > 1 && (
+                <div className="flex items-center gap-3 mt-3">
+                  <button onClick={() => setPdfPage(p => Math.max(0, p - 1))} disabled={pdfPage === 0}
+                    className="p-1.5 rounded-lg hover:bg-surface-container-low disabled:opacity-30"><ChevronLeft size={18} /></button>
+                  <span className="text-xs text-on-surface-variant">{pdfPage + 1} / {pdfPages.length}</span>
+                  <button onClick={() => setPdfPage(p => Math.min(pdfPages.length - 1, p + 1))} disabled={pdfPage >= pdfPages.length - 1}
+                    className="p-1.5 rounded-lg hover:bg-surface-container-low disabled:opacity-30"><ChevronRight size={18} /></button>
+                </div>
+              )}
+              <a href={downloadUrl} download={file?.original_filename} className="text-xs text-primary hover:underline mt-2">下载</a>
             </div>
-          </>
-        );
+          );
+        }
+        return <div className="flex items-center justify-center h-64"><Loader2 size={32} className="animate-spin text-primary" /></div>;
       case 'docx':
         return <iframe srcDoc={textContent} className="w-full h-[75vh] rounded-lg border border-surface-container-high" />;
       case 'text':
