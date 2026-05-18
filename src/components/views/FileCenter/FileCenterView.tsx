@@ -165,6 +165,7 @@ export default function FileCenterView() {
       }
       setShowFolderModal(false);
       if (selectedActivity) fetchFolders(selectedActivity.id);
+      if (selectedFolderId) fetchItems(selectedFolderId);
     } catch (e: unknown) {
       setFolderError(e instanceof Error ? e.message : '未知错误');
     }
