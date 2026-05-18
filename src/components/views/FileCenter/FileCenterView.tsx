@@ -475,9 +475,9 @@ export default function FileCenterView() {
     });
   }
 
-  function renderFolderTree(folders: FileCenterFolder[], depth = 0) {
-    return folders.map(f => {
-      const children = buildTree(folders, f.id);
+  function renderFolderTree(folderList: FileCenterFolder[], depth = 0, allFolders: FileCenterFolder[] = folderList) {
+    return folderList.map(f => {
+      const children = buildTree(allFolders, f.id);
       const isExpanded = expandedFolders.has(f.id);
       const isSelected = selectedFolderId === f.id;
       return (
@@ -511,7 +511,7 @@ export default function FileCenterView() {
               </button>
             </span>
           </button>
-          {isExpanded && children.length > 0 && renderFolderTree(children, depth + 1)}
+          {isExpanded && children.length > 0 && renderFolderTree(children, depth + 1, allFolders)}
         </div>
       );
     });
