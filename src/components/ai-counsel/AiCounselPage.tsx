@@ -94,7 +94,8 @@ export default function AiCounselPage() {
     controllerRef.current = controller;
 
     try {
-      const response = await aiCounselApi.streamChat(history, sessionId, controller.signal);
+      const model = localStorage.getItem('ai_text_model') || undefined;
+      const response = await aiCounselApi.streamChat(history, sessionId, controller.signal, model);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       if (!response.body) throw new Error('No response body');
 
@@ -152,8 +153,17 @@ export default function AiCounselPage() {
       <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
       <div className={`${showSidebar ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-64 border-r border-outline-variant/40 shrink-0`}>
-        <div className="px-4 py-3 border-b border-outline-variant/40">
+        <div className="px-4 py-2.5 border-b border-outline-variant/40 space-y-2">
           <button onClick={handleNewSession} className="btn-primary text-sm px-4 py-2 w-full">新对话</button>
+          <select
+            defaultValue={localStorage.getItem('ai_text_model') || 'deepseek-v4-pro'}
+            onChange={(e) => localStorage.setItem('ai_text_model', e.target.value)}
+            className="w-full px-2 py-1 rounded border border-outline-variant bg-surface-container-low text-[10px] text-on-surface-variant focus-ring"
+            title="文本生成模型"
+          >
+            <option value="deepseek-v4-pro">DeepSeek-V4-Pro</option>
+            <option value="minimax-m2.7">MiniMax-M2.7</option>
+          </select>
         </div>
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           {sessionsLoading ? (

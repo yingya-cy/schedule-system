@@ -15,7 +15,7 @@ import WeekSelector from '../WeekSelector';
 import ScheduleGrid from './ScheduleGrid';
 import CourseListSidebar from './CourseListSidebar';
 import CourseEditModal from './CourseEditModal';
-import { CURRENT_WEEK_KEY, CELL_HEIGHT } from './constants';
+import { CELL_HEIGHT } from './constants';
 import { parseSectionInput } from './utils';
 
 interface ScheduleEditorProps {
@@ -36,7 +36,6 @@ export default function ScheduleEditor({
   readOnly,
 }: ScheduleEditorProps) {
   const [currentWeek, setCurrentWeek] = useState(1);
-  const [actualCurrentWeek, setActualCurrentWeek] = useState<number | null>(null);
   const [editingCourse, setEditingCourse] = useState<EditableCourse | null>(null);
   const [draggedCourse, setDraggedCourse] = useState<EditableCourse | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ weekday: number; section: number } | null>(null);
@@ -52,29 +51,11 @@ export default function ScheduleEditor({
     remark: ''
   });
 
-  useEffect(() => {
-    const saved = localStorage.getItem(CURRENT_WEEK_KEY);
-    if (saved) {
-      setActualCurrentWeek(parseInt(saved));
-    }
-  }, []);
-
   const filteredCourses = courses.filter(c => c.weeks.includes(currentWeek));
 
   const getCourseAtCell = useCallback((weekday: number, section: number): EditableCourse | undefined => {
     return filteredCourses.find(c => c.weekday === weekday && c.sections.includes(section));
   }, [filteredCourses]);
-
-  const handleSetCurrentWeek = (week: number) => {
-    setActualCurrentWeek(week);
-    localStorage.setItem(CURRENT_WEEK_KEY, String(week));
-  };
-
-  const jumpToCurrentWeek = () => {
-    if (actualCurrentWeek) {
-      setCurrentWeek(actualCurrentWeek);
-    }
-  };
 
   const handleDragStart = (e: React.DragEvent, course: EditableCourse) => {
     setDraggedCourse(course);
@@ -215,23 +196,9 @@ export default function ScheduleEditor({
         </div>
 
         {/* Week Selector */}
-        <WeekSelector
-          currentWeek={currentWeek}
-          actualCurrentWeek={actualCurrentWeek}
-          onWeekChange={setCurrentWeek}
-          onSetActualWeek={handleSetCurrentWeek}
-        />
+        <WeekSelector currentWeek={currentWeek} onWeekChange={setCurrentWeek} />
 
-        {/* Tips */}
-        <div className="flex items-center gap-4 text-xs text-on-surface-variant">
-          <span>点击选择周次</span>
-          <span>右键设为当前周</span>
-          <span className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded bg-green-500"></div>
-            当前周
-          </span>
-          <span>本周共 {filteredCourses.length} 门课程</span>
-        </div>
+        <div className="text-xs text-on-surface-variant">本周共 {filteredCourses.length} 门课程</div>
       </div>
 
       {/* Grid + Sidebar */}

@@ -8,7 +8,7 @@ const FLASK_URL = process.env.FLASK_URL || 'http://localhost:5002';
 
 // POST /api/ai/counsel/stream — SSE 代理
 router.post('/counsel/stream', authenticate, async (req, res) => {
-  const { messages, session_id } = req.body;
+  const { messages, session_id, model } = req.body;
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     res.status(400).json({ success: false, error: '缺少 messages' });
@@ -56,7 +56,7 @@ router.post('/counsel/stream', authenticate, async (req, res) => {
     const flaskRes = await fetch(`${FLASK_URL}/api/ai/counsel/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, model }),
       signal: controller.signal,
     });
 

@@ -60,6 +60,7 @@ export const aiScheduleApi = {
     major?: string;
     next_monday: string;
     term_id?: number;
+    model?: string;
   }) =>
     request<{ id: number; plan: PlanData }>('/schedule-plan', {
       method: 'POST',

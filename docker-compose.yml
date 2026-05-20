@@ -13,6 +13,11 @@ services:
       - backend
       - ai-service
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   backend:
     build:
@@ -20,6 +25,11 @@ services:
       dockerfile: docker/backend.Dockerfile
     container_name: schedule-backend
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       - "3000:3001"
     environment:
@@ -39,10 +49,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1.5G
+          memory: 512M
           cpus: '1.0'
         reservations:
-          memory: 512M
+          memory: 256M
           cpus: '0.5'
 
   ai-service:
@@ -51,6 +61,11 @@ services:
       dockerfile: docker/ai-service.Dockerfile
     container_name: schedule-ai-service
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       - "5002:5002"
     environment:
@@ -61,16 +76,21 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1.5G
+          memory: 512M
           cpus: '1.0'
         reservations:
-          memory: 512M
+          memory: 256M
           cpus: '0.5'
 
   db:
     image: mysql:8.0
     container_name: schedule-mysql
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       TZ: Asia/Shanghai
       MYSQL_CHARSET: utf8mb4
@@ -81,8 +101,8 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --default-authentication-plugin=mysql_native_password
-      - --innodb-buffer-pool-size=256M
-      - --max-connections=100
+      - --innodb-buffer-pool-size=128M
+      - --max-connections=50
     ports:
       - "3307:3306"
     volumes:
@@ -91,7 +111,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 512M
           cpus: '1.0'
         reservations:
           memory: 256M

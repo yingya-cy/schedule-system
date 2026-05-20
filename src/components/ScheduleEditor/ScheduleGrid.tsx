@@ -35,16 +35,16 @@ export default function ScheduleGrid({
 
   return (
     <div className="flex-1 overflow-x-auto overflow-y-auto momentum-scroll" id="schedule-table-container" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-      <div className="min-w-[700px] md:min-w-[800px]">
+      <div className="min-w-[600px]">
         <div className="grid grid-cols-[60px_repeat(7,1fr)] gap-px bg-surface-container-high">
           {/* Header row */}
-          <div className="bg-surface-container-low p-2 text-center text-xs font-bold text-outline sticky left-0 top-0 z-20">
-            节次
+          <div className="bg-surface-container-low p-2 text-center text-xs font-bold text-outline sticky left-0 top-0 z-30">
+  节次
           </div>
           {WEEKDAYS.map((day) => (
             <div
               key={day}
-              className="bg-surface-container-low p-2 text-center text-sm font-bold text-on-surface sticky top-0 z-10"
+              className="bg-surface-container-low p-2 text-center text-sm font-bold text-on-surface sticky top-0 z-30"
             >
               {day}
             </div>
@@ -53,7 +53,7 @@ export default function ScheduleGrid({
           {/* Time slots */}
           {SECTION_TIMES.map((sectionInfo, sectionIndex) => (
             <React.Fragment key={sectionInfo.section}>
-              <div className="bg-surface-container-lowest p-2 text-center sticky left-0 z-10">
+              <div className="bg-surface-container-lowest p-2 text-center sticky left-0 z-25">
                 <div className="text-xs font-bold text-on-surface">第{sectionInfo.section}节</div>
                 <div className="text-[10px] text-outline">{sectionInfo.time}</div>
               </div>

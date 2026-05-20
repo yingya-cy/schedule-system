@@ -52,7 +52,7 @@ export const aiCounselApi = {
   deleteSession: (id: number) => request<void>(`/counsel/sessions/${id}`, { method: 'DELETE' }),
 
   /** SSE 流式请求 — 返回 ReadableStream */
-  streamChat: (messages: { role: string; content: string }[], sessionId: number, signal?: AbortSignal) => {
+  streamChat: (messages: { role: string; content: string }[], sessionId: number, signal?: AbortSignal, model?: string) => {
     const token = localStorage.getItem('auth_token');
     return fetch('/api/ai/counsel/stream', {
       method: 'POST',
@@ -60,7 +60,7 @@ export const aiCounselApi = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ messages, session_id: sessionId }),
+      body: JSON.stringify({ messages, session_id: sessionId, model }),
       signal,
     });
   },

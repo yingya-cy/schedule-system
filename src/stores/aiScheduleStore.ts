@@ -19,6 +19,9 @@ interface AiScheduleState {
     major?: string;
     next_monday: string;
     term_id?: number;
+    model?: string;
+    current_week?: number | null;
+    custom_prompt?: string;
   }) => Promise<number | null>;
 
   // Selected plan (for viewing history)

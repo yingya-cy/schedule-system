@@ -11,8 +11,6 @@ import DaySelector from '@/components/DaySelector';
 import TimeSlotSelector from '@/components/TimeSlotSelector';
 import FreeTimeGrid from '@/components/FreeTimeGrid';
 
-const CURRENT_WEEK_KEY = 'schedule_current_week';
-
 interface DashboardStats {
   schedules: number;
   courses: number;
@@ -26,7 +24,6 @@ export default function DashboardView() {
   const token = useAuthStore((s) => s.token);
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [currentWeek, setCurrentWeek] = useState(1);
-  const [actualCurrentWeek, setActualCurrentWeek] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState(1);
   const [selectedTimeSlotIndex, setSelectedTimeSlotIndex] = useState(0);
   const [freeTimeData, setFreeTimeData] = useState<FreeTimeResult[]>([]);
@@ -35,13 +32,6 @@ export default function DashboardView() {
   const [useCustomRange, setUseCustomRange] = useState(false);
   const [customStartSection, setCustomStartSection] = useState(1);
   const [customEndSection, setCustomEndSection] = useState(2);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(CURRENT_WEEK_KEY);
-    if (saved) {
-      setActualCurrentWeek(parseInt(saved));
-    }
-  }, []);
 
   const currentTermId = useAppStore((s) => s.currentTermId);
   const availableTerms = useAppStore((s) => s.availableTerms);
@@ -75,11 +65,6 @@ export default function DashboardView() {
   useEffect(() => {
     loadFreeTimeData();
   }, [currentWeek, selectedDepartment, currentTermId]);
-
-  const handleSetCurrentWeek = (week: number) => {
-    setActualCurrentWeek(week);
-    localStorage.setItem(CURRENT_WEEK_KEY, String(week));
-  };
 
   const getCurrentTimeSlot = useMemo(() => {
     if (useCustomRange) {
@@ -196,12 +181,7 @@ export default function DashboardView() {
             <h3 className="font-bold text-on-surface font-headline">选择周次</h3>
             <span className="text-sm text-on-surface-variant">共18周</span>
           </div>
-          <WeekSelector
-            currentWeek={currentWeek}
-            actualCurrentWeek={actualCurrentWeek}
-            onWeekChange={setCurrentWeek}
-            onSetActualWeek={handleSetCurrentWeek}
-          />
+          <WeekSelector currentWeek={currentWeek} onWeekChange={setCurrentWeek} />
         </div>
 
         {/* Time slot selector */}

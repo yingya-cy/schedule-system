@@ -11,10 +11,83 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 const router = Router();
 const FLASK_URL = process.env.FLASK_URL || 'http://localhost:5002';
 
+function parseSectionString(raw: string): number[] {
+  // Handle "1-2节", "1-2", "3-4节" range format
+  const rangeMatch = raw.match(/^(\d+)\s*-\s*(\d+)/);
+  if (rangeMatch) {
+    const start = parseInt(rangeMatch[1], 10);
+    const end = parseInt(rangeMatch[2], 10);
+    if (!isNaN(start) && !isNaN(end) && end >= start) {
+      return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    }
+  }
+  // Handle comma/Chinese comma separated: "1,3,5" or "1，3，5"
+  return raw.split(/[,，、]/).map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
+}
+
+function parseWeekdayString(raw: string): number {
+  // "星期一"→1, "星期二"→2, ..., "星期日"→7
+  // "周一"→1, "Monday"→1, plain "1"→1
+  const map: Record<string, number> = {
+    '一': 1, '1': 1, 'mon': 1, 'monday': 1,
+    '二': 2, '2': 2, 'tue': 2, 'tuesday': 2,
+    '三': 3, '3': 3, 'wed': 3, 'wednesday': 3,
+    '四': 4, '4': 4, 'thu': 4, 'thursday': 4,
+    '五': 5, '5': 5, 'fri': 5, 'friday': 5,
+    '六': 6, '6': 6, 'sat': 6, 'saturday': 6,
+    '日': 7, '天': 7, '7': 7, 'sun': 7, 'sunday': 7,
+  };
+  for (const [key, val] of Object.entries(map)) {
+    if (raw.includes(key)) return val;
+  }
+  const num = parseInt(raw, 10);
+  return isNaN(num) ? 1 : num;
+}
+
+function parseWeekString(raw: string): number[] {
+  const text = raw.replace(/\s/g, '');
+  const weeks = new Set<number>();
+
+  // Split by comma (English or Chinese)
+  const parts = text.split(/[,，]/);
+  for (const part of parts) {
+    if (!part) continue;
+
+    // Detect parity: (单) or (双)
+    let parity: 'odd' | 'even' | null = null;
+    if (part.includes('(单)') || part.includes('（单）')) parity = 'odd';
+    else if (part.includes('(双)') || part.includes('（双）')) parity = 'even';
+
+    // Range: "1-16周"
+    const rangeMatch = part.match(/(\d+)\s*-\s*(\d+)/);
+    if (rangeMatch) {
+      const start = parseInt(rangeMatch[1], 10);
+      const end = parseInt(rangeMatch[2], 10);
+      if (!isNaN(start) && !isNaN(end)) {
+        for (let n = start; n <= end; n++) {
+          if (parity === 'odd' && n % 2 === 0) continue;
+          if (parity === 'even' && n % 2 === 1) continue;
+          weeks.add(n);
+        }
+      }
+      continue;
+    }
+
+    // Single: "3周" or just "3"
+    const singleMatch = part.match(/(\d+)/);
+    if (singleMatch) {
+      const n = parseInt(singleMatch[1], 10);
+      if (!isNaN(n)) weeks.add(n);
+    }
+  }
+
+  return Array.from(weeks).sort((a, b) => a - b);
+}
+
 // POST /api/ai/schedule-plan — 生成计划 + 存储
 router.post('/schedule-plan', authenticate, async (req, res) => {
   try {
-    const { courses, commitments, grade, major, next_monday } = req.body;
+    const { courses, commitments, grade, major, next_monday, model, current_week, custom_prompt } = req.body;
 
     if (!courses || courses.length === 0) {
       res.status(400).json({ success: false, error: '课表为空，请先上传课表' });
@@ -25,7 +98,7 @@ router.post('/schedule-plan', authenticate, async (req, res) => {
     const flaskRes = await fetch(`${FLASK_URL}/api/ai/schedule-plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ courses, commitments, grade, major, next_monday }),
+      body: JSON.stringify({ courses, commitments, grade, major, next_monday, model, current_week, custom_prompt }),
     });
     const flaskJson = await flaskRes.json();
 
@@ -122,87 +195,130 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
       return;
     }
 
-    const formData = new FormData();
-    const f = new File([file.buffer], file.originalname, { type: file.mimetype });
-    formData.append('file', f);
-
-    // Detect if it's an image or PDF
     const isPdf = file.mimetype === 'application/pdf'
       || file.originalname.toLowerCase().endsWith('.pdf');
-    const ocrEndpoint = isPdf ? '/api/ocr/pdf' : '/api/ocr/image';
 
-    const flaskRes = await fetch(`${FLASK_URL}${ocrEndpoint}`, {
-      method: 'POST',
-      body: formData,
-    });
+    // 图/PDF 都直接发 Flask，走原有逻辑
+    const fd = new FormData();
+    fd.append('file', new File([file.buffer], file.originalname, { type: file.mimetype }));
+    const ocrUrl = isPdf ? '/api/ocr/pdf' : '/api/ocr/image';
+    const r = await fetch(`${FLASK_URL}${ocrUrl}`, { method: 'POST', body: fd });
+    const data = await r.json() as Record<string, unknown>;
 
-    if (!flaskRes.ok) {
-      const errText = await flaskRes.text();
-      res.status(502).json({ success: false, error: `OCR 失败: ${errText.slice(0, 200)}` });
-      return;
-    }
-
-    const data = await flaskRes.json();
     if (!data.success) {
       res.status(422).json({ success: false, error: '未能识别课程数据，请检查图片清晰度' });
       return;
     }
 
-    // Normalize OCR output to EditableCourse format
-    // Try schedule_data first, fallback to raw_data (some schedule types put results there)
-    const rawList = (data.schedule_data?.length > 0 ? data.schedule_data : data.raw_data) || [];
+    // Mirror 课表中心: step1 mapBackendDataToArray → step2 ScheduleUploadView remap
+    const d = data as Record<string, unknown>;
+    const rawList: Record<string, unknown>[] = ((d.schedule_data as unknown[])?.length > 0 ? d.schedule_data : d.raw_data) as Record<string, unknown>[] || [];
+    if (rawList.length > 0) {
+      console.log('[ai-upload]', rawList.length, 'courses, parse_method:', d.parse_method);
+    }
+
     const courses = rawList.map((c: Record<string, unknown>, i: number) => {
-      // Normalize weeks: handle complex week objects from OCR
-      let weeks: number[] = [];
-      const weekVal = c.week;
-      if (Array.isArray(weekVal)) {
-        weeks = weekVal as number[];
-      } else if (typeof weekVal === 'object' && weekVal !== null) {
-        const w = weekVal as Record<string, unknown>;
-        if (w.type === 'range' && typeof w.start === 'number' && typeof w.end === 'number') {
-          for (let n = w.start; n <= w.end; n++) {
-            if (w.rule === 'odd' && n % 2 === 0) continue;
-            if (w.rule === 'even' && n % 2 === 1) continue;
-            weeks.push(n);
+      const rec = c as Record<string, unknown>;
+
+      // === Step 1: same as mapBackendDataToArray ===
+      // getWeekdayName: handles number | "星期一" | "未知"
+      const rawDay = rec.weekday ?? rec.day;
+      let dayStr = '';
+      if (typeof rawDay === 'number') {
+        const DAY_NAMES = ['星期一','星期二','星期三','星期四','星期五','星期六','星期日'];
+        dayStr = DAY_NAMES[rawDay - 1] || '';
+      } else if (typeof rawDay === 'string') {
+        const num = parseInt(rawDay);
+        if (!isNaN(num)) {
+          const DAY_NAMES = ['星期一','星期二','星期三','星期四','星期五','星期六','星期日'];
+          dayStr = DAY_NAMES[num - 1] || '';
+        } else {
+          const dayMap: Record<string, number> = { '一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'日':7 };
+          for (const [k, v] of Object.entries(dayMap)) {
+            if (rawDay.includes(k)) { dayStr = ['星期一','星期二','星期三','星期四','星期五','星期六','星期日'][v-1]; break; }
           }
-        } else if (w.type === 'list' && Array.isArray(w.weeks)) {
-          weeks = w.weeks as number[];
-        } else if (w.type === 'multi_range' && Array.isArray(w.ranges)) {
-          (w.ranges as Array<{ start: number; end: number }>).forEach((r) => {
-            for (let n = r.start; n <= r.end; n++) weeks.push(n);
-          });
         }
       }
 
-      // Normalize sections: OCR returns 'section' (could be array, string, or number)
-      let sections: number[] = [];
-      const rawSection = (c as Record<string, unknown>).section ?? c.sections;
-      if (Array.isArray(rawSection)) {
-        sections = rawSection.map((s: unknown) => typeof s === 'number' ? s : parseInt(String(s), 10)).filter((n: number) => !isNaN(n));
-      } else if (typeof rawSection === 'string') {
-        sections = rawSection.split(/[,，、]/).map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !isNaN(n));
-      } else if (typeof rawSection === 'number') {
-        sections = [rawSection];
+      // parsePeriod: handles "1-2节", "1-2", "1~2节", number array
+      const rawSec = rec.section ?? rec.period;
+      let sectionArray: number[] = [];
+      if (Array.isArray(rawSec)) {
+        sectionArray = (rawSec as unknown[]).filter((s: unknown) => typeof s === 'number') as number[];
+      } else if (typeof rawSec === 'string') {
+        const match = String(rawSec).match(/(\d+)[-~](\d+)节?/);
+        if (match) {
+          const s = parseInt(match[1]), e = parseInt(match[2]);
+          if (!isNaN(s) && !isNaN(e)) sectionArray = Array.from({length: e - s + 1}, (_, j) => s + j);
+        } else {
+          const singleMatch = String(rawSec).match(/第?(\d+)节/);
+          if (singleMatch) sectionArray = [parseInt(singleMatch[1])];
+        }
+      }
+      const sectionStr = sectionArray.length > 0
+        ? `${sectionArray[0]}-${sectionArray[sectionArray.length - 1]}节`
+        : '';
+      const timeStr = `${dayStr} ${sectionStr}`.trim();
+
+      // formatWeekInfo: prefers weeks_list, falls back to weeks/week string
+      const weeksList: number[] | undefined = Array.isArray(rec.weeks_list) ? (rec.weeks_list as number[]) : undefined;
+      const rawWeeks = rec.weeks ?? rec.week;
+
+      // === Step 2: same as ScheduleUploadView remap ===
+      // parseWeekday from timeStr
+      const wdMap: Record<string, number> = {
+        '星期一':1,'周一':1,'一':1,'星期二':2,'周二':2,'二':2,
+        '星期三':3,'周三':3,'三':3,'星期四':4,'周四':4,'四':4,
+        '星期五':5,'周五':5,'五':5,'星期六':6,'周六':6,'六':6,
+        '星期日':7,'周日':7,'日':7,'星期天':7
+      };
+      let weekday = 1;
+      for (const [k, v] of Object.entries(wdMap)) {
+        if (timeStr.includes(k)) { weekday = v; break; }
       }
 
-      // Normalize weekday: could be number or array from OCR
-      let weekday = 1;
-      const rawWeekday = c.weekday;
-      if (typeof rawWeekday === 'number') weekday = rawWeekday;
-      else if (Array.isArray(rawWeekday) && rawWeekday.length > 0) weekday = Number(rawWeekday[0]) || 1;
+      // parseSections from timeStr
+      const secMatch = timeStr.match(/(\d+)[-~](\d+)节?/);
+      let sections: number[] = [];
+      if (secMatch) {
+        const s = parseInt(secMatch[1]), e = parseInt(secMatch[2]);
+        if (!isNaN(s) && !isNaN(e)) sections = Array.from({length: e - s + 1}, (_, j) => s + j);
+      } else {
+        const singleMatch = timeStr.match(/第?(\d+)节?/);
+        if (singleMatch) sections = [parseInt(singleMatch[1])];
+      }
+
+      // parseWeeks: prefers weeksList
+      let weeks: number[] = [];
+      if (weeksList && weeksList.length > 0) {
+        weeks = weeksList;
+      } else if (Array.isArray(rawWeeks)) {
+        weeks = (rawWeeks as unknown[]).filter((w: unknown) => typeof w === 'number') as number[];
+      } else if (typeof rawWeeks === 'string') {
+        weeks = parseWeekString(rawWeeks);
+      }
 
       return {
         id: `ocr_${i}_${Date.now()}`,
-        course_name: String(c.course_name || c.name || c.title || c.courseName || '未识别课程'),
+        course_name: String(rec.course_name || rec.course || rec.name || '未识别课程'),
         weekday,
         sections,
         weeks,
-        teacher: String(c.teacher || ''),
-        location: String(c.location || ''),
+        teacher: '',
+        location: '',
         remark: '',
       };
     });
 
+    if (courses.length > 0) {
+      console.log(`[ai-upload] normalized ${courses.length} courses`);
+      for (let i = 0; i < Math.min(3, rawList.length); i++) {
+        const r = rawList[i];
+        const c = courses[i];
+        console.log(`[ai #${i}] raw: cn="${r.course_name||r.course}" wd="${r.weekday||r.day}" sec="${r.section||r.period}" wk=${JSON.stringify(r.weeks||r.weeks_list)}`);
+        console.log(`[ai #${i}] map: cn="${c.course_name}" wd=${c.weekday} sec=${JSON.stringify(c.sections)} wk=${JSON.stringify(c.weeks)}`);
+      }
+    }
     res.json({
       success: true,
       data: {

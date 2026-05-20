@@ -6,39 +6,48 @@ AI 文本生成端点 — 供 Express 后端调用的通用 AI 接口
 import json
 import logging
 from flask import request, jsonify, Response
-from utils.ai_client import create_ark_client, AI_MODEL, strip_thinking
+from utils.ai_client import create_ark_client, get_client_and_model, AI_VISION_MODEL, strip_thinking
 
 logger = logging.getLogger(__name__)
 
 
-def ai_text(system_prompt: str, user_message: str, temperature: float = 0.7, timeout: float = 120.0) -> str:
-    """通用文本生成。失败时 raise RuntimeError"""
-    client = create_ark_client(timeout)
+def ai_text(system_prompt: str, user_message: str, temperature: float = 0.7, timeout: float = 120.0, model: str | None = None) -> str:
+    """通用文本生成。失败时 raise RuntimeError。model 为 minimax-* 时走 MiniMax 独立 API"""
+    client, effective_model = get_client_and_model(model, timeout)
+    extra_body = {}
+    if effective_model.lower().startswith('deepseek'):
+        extra_body = {"thinking": {"type": "disabled"}}
+
     try:
         response = client.chat.completions.create(
-            model=AI_MODEL,
+            model=effective_model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
             temperature=temperature,
+            **({'extra_body': extra_body} if extra_body else {}),
         )
         content = response.choices[0].message.content
         return strip_thinking(content)
     except Exception as e:
-        logger.error(f"AI text generation failed: {e}")
+        logger.error(f"AI text generation failed (model={effective_model}): {e}")
         raise RuntimeError(f"AI 调用失败: {str(e)}")
 
 
-def ai_stream(system_prompt: str, messages: list[dict], temperature: float = 0.8):
+def ai_stream(system_prompt: str, messages: list[dict], temperature: float = 0.8, model: str | None = None):
     """SSE 流式生成，generator 内异常通过 error chunk 传出"""
+    client, effective_model = get_client_and_model(model, 300.0)
+    extra_body = {}
+    if effective_model.lower().startswith('deepseek'):
+        extra_body = {"thinking": {"type": "disabled"}}
     try:
-        client = create_ark_client(timeout=300.0)
         stream = client.chat.completions.create(
-            model=AI_MODEL,
+            model=effective_model,
             messages=[{"role": "system", "content": system_prompt}] + messages,
             temperature=temperature,
             stream=True,
+            **({'extra_body': extra_body} if extra_body else {}),
         )
         in_think = False
         for chunk in stream:
@@ -92,6 +101,7 @@ def register_ai_routes(app):
                 data['user_message'],
                 data.get('temperature', 0.7),
                 data.get('timeout', 120.0),
+                model=data.get('model'),
             )
             return jsonify({'success': True, 'text': text})
         except RuntimeError as e:
@@ -119,6 +129,7 @@ def register_ai_routes(app):
                     data['system_prompt'],
                     data['messages'],
                     data.get('temperature', 0.8),
+                    model=data.get('model'),
                 ):
                     if chunk.startswith('\n[ERROR]'):
                         yield f"data: {json.dumps({'chunk': '', 'done': True, 'error': chunk.replace(chr(10) + '[ERROR] ', '')}, ensure_ascii=False)}\n\n"

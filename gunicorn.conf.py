@@ -7,8 +7,8 @@ import os
 # 监听地址和端口
 bind = "0.0.0.0:5002"
 
-# Worker 进程数 = CPU核心数 + 1 (2核 CPU = 3 workers)
-workers = multiprocessing.cpu_count() * 2 + 1  # 最佳实践公式
+# Worker 进程数：sync worker 吃内存，限定 2 个（节省约 1GB）
+workers = 2
 
 # Worker 类型：sync 用于 CPU 密集型 OCR 任务
 worker_class = "sync"

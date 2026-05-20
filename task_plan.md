@@ -298,9 +298,15 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - [x] 19.4 OSS 环境变量配置 — docker-compose 注入
 - [x] 19.5 文件夹树修复 — allFolders 递归透传、新建后刷新
 - [x] 19.6 聊天页面布局修复 — 高度约束三件套、防竞态、防重复
-- [x] 19.7 隐藏未完成入口 — 心理咨询、AI 排课、AI 咨询
-- [ ] 19.8 服务器内存优化（115MB free）
-- [ ] 19.9 覆盖率提升
+- [x] 19.7 入口调整 — AI 排课/AI 咨询恢复显示，心理咨询隐藏
+- [x] 19.8 AI 排课页重构 — 两阶段布局（计划置顶）、日卡片 PlanTimeline、当前周自动计算、自定义提示词、双模型切换（Ark DeepSeek/Doubao + MiniMax）
+- [x] 19.9 PDF 课表识别 — 横型解析器 fallback（竖型 < 5 门时自动切换），pdfplumber + fitz 双文本提取
+- [x] 19.10 AI 提示词优化 — 加入学校作息时间表（08:20-21:00）、block 减密（每块≥1h，每天≤8块）
+- [x] 19.11 组件清理 — WeekSelector 移除右键设当前周、DashboardView 同步清理
+- [x] 19.12 DeepSeek thinking 关闭 — `extra_body: {thinking: {type: "disabled"}}`
+- [ ] 19.13 服务器内存优化（115MB free）
+- [ ] 19.14 覆盖率提升
+- [ ] 19.15 横型课表文本提取对齐（fitz vs pdfjs-dist 差异致 `parse_by_rules` 部分字段不准）
 - **Status:** in-progress
 
 ## Key Questions

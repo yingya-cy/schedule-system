@@ -195,14 +195,31 @@ def ocr_pdf():
             file.save(temp_file.name); temp_pdf_path = temp_file.name
 
         # 先尝试本地规则识别
+        records = []
         try:
-            records = parse_vertical_pdf_with_plumber(temp_pdf_path)
-            if records and len(records) > 0:
-                logger.info("PDF本地规则识别成功")
-                return jsonify({'success': True, 'schedule_data': records, 'parse_method': 'pdfplumber'})
+            records = parse_vertical_pdf_with_plumber(temp_pdf_path) or []
         except Exception as e:
-            logger.warning(f"PDF本地规则识别失败: {e}")
-        
+            logger.warning(f"PDF竖型规则识别失败: {e}")
+
+        # 竖型结果太少（可能是横型课表），尝试横型文本解析
+        if len(records) < 5:
+            try:
+                import fitz
+                doc = fitz.open(temp_pdf_path)
+                text = '\n'.join(p.get_text() for p in doc)
+                doc.close()
+                if text.strip():
+                    h_records = parse_by_rules(text) or []
+                    if len(h_records) > len(records):
+                        logger.info(f"横型解析器获得更多课程: {len(h_records)} vs {len(records)}")
+                        records = h_records
+            except Exception as e:
+                logger.warning(f"PDF横型规则识别失败: {e}")
+
+        if records and len(records) > 0:
+            logger.info(f"PDF本地规则识别成功: {len(records)} 条")
+            return jsonify({'success': True, 'schedule_data': records, 'parse_method': 'pdfplumber'})
+
         # 如果本地规则识别失败或返回空结果，尝试转换为图片并用AI识别
         logger.info("本地规则识别失败，尝试转换为图片并用AI识别...")
         

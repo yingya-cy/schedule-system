@@ -8,61 +8,53 @@ from ai_endpoints import ai_text
 
 logger = logging.getLogger(__name__)
 
-SCHEDULE_SYSTEM_PROMPT = """你是一位专业的学习规划师。你的任务是根据学生的课表和个人事项，制定一份详细的周学习计划。
+SCHEDULE_SYSTEM_PROMPT = """你是一个懂大学生的学习搭子，不是冷冰冰的排课机器。你的计划要有温度、有个性、有呼吸感。
 
-## 规划原则
-1. 课程时间不可占用 — 有课的时间段不能安排其他任务
-2. 利用碎片时间 — 课间 30-60 分钟可安排轻量复习
-3. 优先级排序 — 考试/作业 deadline 优先，日常复习其次
-4. 劳逸结合 — 每 90 分钟学习后安排 15 分钟休息
-5. 学科间交替 — 避免连续 3 小时学同一科目
-6. 早晚效率 — 早上安排需要高度集中的任务，晚上安排整理/背诵
+## 学校作息时间表（每节课 40 分钟）
+上午: 第1节 08:20-09:00 | 课间10分 | 第2节 09:10-09:50 | 大课间20分 | 第3节 10:10-10:50 | 课间10分 | 第4节 11:00-11:40
+下午: 第5节 13:50-14:30 | 课间10分 | 第6节 14:40-15:20 | 大课间20分 | 第7节 15:40-16:20 | 课间10分 | 第8节 16:30-17:10
+晚上: 第9节 18:40-19:20 | 课间10分 | 第10节 19:30-20:10 | 课间10分 | 第11节 20:20-21:00
+sections [1,2]=08:20-09:50，[3,4]=10:10-11:40，以此类推。start/end 对齐上述时间。
+
+## 你的风格
+- 像朋友一样给建议，不要像教务系统一样填表
+- 每天可以有不同的节奏：周一猛学、周三轻松、周五收尾
+- 如果用户给了偏好（夜猫子/早起鸟/某个科目焦虑），认真呼应
+- task 描述用口语化短句，比如「把第三章例题刷一遍」比「复习高数」更好
+- note 里可以夹一句鼓励或小提醒
+
+## 约束（必须遵守）
+1. 有课的时间段准确标 class，task 写课程名
+2. 每块 ≥40 分钟，相邻空闲节次合并，不切碎片
+3. 每天 block 数量不强制，有课的日子 3-5 块，没课的日子 4-6 块
+4. 每周有 1-2 天安排轻松一点，不要天天打鸡血
+5. 事项中的考试/deadline 优先安排
 
 ## 输出格式
-你必须输出严格 JSON，不要包含 ```json 标记或其他文字：
+严格 JSON：
 {
-  "weekly_plans": [
-    {
-      "week_start": "YYYY-MM-DD",
-      "daily_plans": [
-        {
-          "date": "YYYY-MM-DD",
-          "day_of_week": 1,
-          "time_blocks": [
-            {
-              "start": "HH:MM",
-              "end": "HH:MM",
-              "task": "具体任务描述",
-              "type": "study",
-              "priority": "high",
-              "note": ""
-            }
-          ]
-        }
-      ]
-    }
-  ],
-  "summary": "本周学习计划概览，2-3 句话"
-}
+  "weekly_plans": [{
+    "week_start": "YYYY-MM-DD",
+    "daily_plans": [{
+      "date": "YYYY-MM-DD",
+      "day_of_week": 1,
+      "time_blocks": [{
+        "start": "HH:MM", "end": "HH:MM",
+        "task": "口语化短句",
+        "type": "study|class|activity|break",
+        "priority": "high|medium|low",
+        "note": "鼓励或提醒，可为空"
+      }]
+    }]
+  }],
+  "summary": "像朋友总结这周，2-3 句话"
+}"""
 
-## 字段说明
-- type: "study"(自习), "class"(上课), "activity"(活动), "break"(休息)
-- priority: "high", "medium", "low"
-- note: 补充说明，可为空字符串
-- 时间块必须覆盖 08:00-22:00，相邻时间段不能有间隙
-- 每天保留午餐（12:00-13:00）和晚餐（18:00-19:00）"""
-
-SCHEDULE_USER_TEMPLATE = """学生信息：
-- 年级：{grade}
-- 专业：{major}
-
-当前课表（本学期全部课程）：
-{courses_json}
-
-手动添加的事项：
-{commitments_json}
-
-请基于以上信息，生成从 {next_monday} 开始的一周（7天）学习计划。"""
+SCHEDULE_USER_TEMPLATE = """学生：{grade}{major}（第{current_week}周）
+课表：{courses_json}
+事项：{commitments_json}
+{custom_prompt}
+生成从 {next_monday} 开始的一周计划。"""
 
 
 def register_schedule_routes(app):
@@ -83,28 +75,74 @@ def register_schedule_routes(app):
             courses_json = json.dumps(data['courses'], ensure_ascii=False, indent=2)
             commitments_json = json.dumps(data.get('commitments', []), ensure_ascii=False, indent=2)
 
+            custom = (data.get('custom_prompt') or '').strip()
+            custom_prompt = f"用户额外要求：\n{custom}" if custom else ""
+
             user_prompt = SCHEDULE_USER_TEMPLATE.format(
                 grade=data.get('grade', '未知'),
                 major=data.get('major', '未知'),
+                current_week=data.get('current_week', '?'),
                 courses_json=courses_json,
                 commitments_json=commitments_json,
+                custom_prompt=custom_prompt,
                 next_monday=data.get('next_monday', '下周一'),
             )
 
-            raw = ai_text(SCHEDULE_SYSTEM_PROMPT, user_prompt, temperature=0.3, timeout=180.0)
+            raw = ai_text(SCHEDULE_SYSTEM_PROMPT, user_prompt, temperature=0.3, timeout=180.0, model=data.get('model'))
 
-            # 尝试直接解析 JSON
+            # Strip markdown code blocks (```json ... ```)
+            import re
+            cleaned = raw.strip()
+            code_block_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', cleaned)
+            if code_block_match:
+                cleaned = code_block_match.group(1).strip()
+
+            # Try to find and fix common JSON issues
+            plan = None
+            errors = []
+
+            # Attempt 1: direct parse
             try:
-                plan = json.loads(raw)
-            except json.JSONDecodeError:
-                # 尝试提取 JSON 对象
-                import re
-                match = re.search(r'(\{[\s\S]*\})', raw)
-                if match:
-                    plan = json.loads(match.group(1))
-                else:
-                    logger.error(f"Failed to parse AI response: {raw[:500]}")
-                    return jsonify({'success': False, 'error': 'AI 返回格式异常，请重试', 'raw': raw[:1000]}), 502
+                plan = json.loads(cleaned)
+            except json.JSONDecodeError as e1:
+                errors.append(f"direct: {e1}")
+
+            # Attempt 2: extract first JSON object via regex
+            if plan is None:
+                obj_match = re.search(r'(\{[\s\S]*\})', cleaned)
+                if obj_match:
+                    try:
+                        plan = json.loads(obj_match.group(1))
+                    except json.JSONDecodeError as e2:
+                        errors.append(f"regex: {e2}")
+
+            # Attempt 3: fix trailing comma before closing brace/bracket
+            if plan is None:
+                fixed = re.sub(r',\s*([}\]])', r'\1', cleaned)
+                obj_match = re.search(r'(\{[\s\S]*\})', fixed)
+                if obj_match:
+                    try:
+                        plan = json.loads(obj_match.group(1))
+                    except json.JSONDecodeError as e3:
+                        errors.append(f"fix-commas: {e3}")
+
+            # Attempt 4: json_repair library (handles missing commas, trailing commas, etc.)
+            if plan is None:
+                try:
+                    from json_repair import repair_json
+                    repaired = repair_json(cleaned)
+                    plan = json.loads(repaired)
+                except Exception as e4:
+                    errors.append(f"json-repair: {e4}")
+
+            if plan is None:
+                logger.error(f"Failed to parse AI response after 3 attempts: {'; '.join(errors)}")
+                logger.error(f"Raw (first 800 chars): {raw[:800]}")
+                return jsonify({
+                    'success': False,
+                    'error': f'AI 返回格式异常: {errors[-1] if errors else "unknown"}',
+                    'raw': raw[:1000],
+                }), 502
 
             return jsonify({'success': True, 'data': plan})
 

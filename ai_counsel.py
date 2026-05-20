@@ -54,7 +54,7 @@ def register_counsel_routes(app):
         def generate():
             full_response = ''
             try:
-                for chunk in ai_stream(COUNSEL_SYSTEM_PROMPT, data['messages'], temperature=0.8):
+                for chunk in ai_stream(COUNSEL_SYSTEM_PROMPT, data['messages'], temperature=0.8, model=data.get('model')):
                     if chunk.startswith('\n[ERROR]'):
                         err_msg = chunk.replace('\n[ERROR] ', '')
                         yield f"data: {json.dumps({'chunk': '', 'done': True, 'error': err_msg}, ensure_ascii=False)}\n\n"
