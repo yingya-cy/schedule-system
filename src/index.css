@@ -213,7 +213,10 @@
            transition-all duration-300;
   }
   .card-interactive {
-    @apply card cursor-pointer;
+    @apply rounded-2xl border border-outline-variant/30 bg-surface-container-lowest
+           shadow-[0_1px_4px_rgba(139,119,90,0.04)]
+           cursor-pointer
+           transition-all duration-300;
     transition: box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1),
                 transform 0.25s ease-out;
   }
@@ -237,13 +240,13 @@
 
   /* ── Skeleton loading ── */
   .skeleton-text {
-    @apply skeleton h-4 w-full rounded;
+    @apply animate-pulse bg-surface-container-low h-4 w-full rounded;
   }
   .skeleton-text-sm {
-    @apply skeleton h-3 w-3/4 rounded;
+    @apply animate-pulse bg-surface-container-low h-3 w-3/4 rounded;
   }
   .skeleton-card {
-    @apply skeleton h-24 rounded-2xl;
+    @apply animate-pulse bg-surface-container-low h-24 rounded-2xl;
   }
   .empty-state-icon {
     @apply w-16 h-16 rounded-2xl bg-surface-container-low flex items-center justify-center mb-4;
