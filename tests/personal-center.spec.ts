@@ -72,7 +72,7 @@ test.describe('个人中心', () => {
     await page.getByPlaceholder('专业 (如 计算机科学)').fill('计算机科学');
     await page.getByPlaceholder('学院 (如 信息学院)').fill('信息学院');
     await page.getByPlaceholder(/当前规划/).fill('准备考研');
-    await page.getByRole('button', { name: '保存' }).last().click();
+    await page.getByRole('button', { name: '保存' }).first().click();
 
     await expect(page.getByText('2024级')).toBeVisible();
     await expect(page.getByText('计算机科学')).toBeVisible();
@@ -98,7 +98,7 @@ test.describe('个人中心', () => {
 
     await page.getByRole('button', { name: '编辑' }).click();
     await page.getByPlaceholder('年级 (如 2024级)').fill('持久化测试');
-    await page.getByRole('button', { name: '保存' }).last().click();
+    await page.getByRole('button', { name: '保存' }).first().click();
     await page.waitForTimeout(300);
 
     await page.reload();
@@ -122,20 +122,23 @@ test.describe('个人中心', () => {
     await expect(page.locator('button', { hasText: 'AI 计划' })).toHaveClass(/bg-surface/);
   });
 
-  test('右侧面板显示上传区域', async ({ page }) => {
+  test('切换到个人课表后右侧面板显示上传区域', async ({ page }) => {
+    await page.locator('button', { hasText: '个人课表' }).click();
     await expect(page.getByText('重新上传课表')).toBeVisible();
   });
 
-  test('右侧面板显示待办事项', async ({ page }) => {
+  test('切换到个人课表后右侧面板显示待办事项', async ({ page }) => {
+    await page.locator('button', { hasText: '个人课表' }).click();
     await expect(page.getByText('待办事项').first()).toBeVisible();
   });
 
-  test('右侧面板显示自定义偏好', async ({ page }) => {
+  test('切换到个人课表后右侧面板显示自定义偏好', async ({ page }) => {
+    await page.locator('button', { hasText: '个人课表' }).click();
     await expect(page.getByPlaceholder('如：我是夜猫子，晚上效率高')).toBeVisible();
   });
 
-  test('模型选择器有 DeepSeek 和 MiniMax', async ({ page }) => {
-    // Look for the model select in TopBar
+  test('AI 计划页的生成区域有模型选择器', async ({ page }) => {
+    // Model select is now next to the generate button
     const modelSelect = page.locator('select').first();
     await expect(modelSelect).toBeVisible();
     await expect(modelSelect).toHaveValue('deepseek-v4-pro');

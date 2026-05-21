@@ -21,6 +21,8 @@ function computeCurrentWeek(): number {
   return Math.max(1, Math.floor(diffDays / 7) + 1);
 }
 
+const WEEKDAY_SHORT = ['一', '二', '三', '四', '五', '六', '日'];
+
 export default function PersonalCenterPage() {
   const generatedPlan = useAiScheduleStore((s) => s.generatedPlan);
   const generating = useAiScheduleStore((s) => s.generating);
@@ -46,6 +48,7 @@ export default function PersonalCenterPage() {
   });
   const [currentWeek] = useState<number>(computeCurrentWeek);
   const [activeTab, setActiveTab] = useState<'plan' | 'schedule'>('plan');
+  const [planExpanded, setPlanExpanded] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getCurrentWeekCourses = () => courses.filter((c) => c.weeks.includes(currentWeek));
@@ -139,6 +142,7 @@ export default function PersonalCenterPage() {
     const formattedCommitments = commitments.map((c) => ({ name: c.name, date: c.date, start_time: c.start, end_time: c.end, priority: c.priority }));
     localStorage.setItem(CUSTOM_PROMPT_KEY, customPrompt);
 
+    setPlanExpanded(true);
     await generatePlan({
       courses: currentWeekCourses.map((c) => ({ name: c.course_name, weekday: c.weekday, sections: c.sections, weeks: c.weeks, teacher: c.teacher || '', location: c.location || '' })),
       commitments: formattedCommitments,
@@ -149,6 +153,15 @@ export default function PersonalCenterPage() {
     });
     fetchPlans();
   };
+
+  // Compact weekly schedule overview
+  const cwCourses = getCurrentWeekCourses();
+  const hasCourses = courses.length > 0;
+  const coursesByDay: Record<number, EditableCourse[]> = {};
+  cwCourses.forEach((c) => {
+    if (!coursesByDay[c.weekday]) coursesByDay[c.weekday] = [];
+    coursesByDay[c.weekday].push(c);
+  });
 
   if (initialLoading) {
     return (
@@ -163,40 +176,25 @@ export default function PersonalCenterPage() {
     );
   }
 
-  const cwCourses = getCurrentWeekCourses();
-  const hasCourses = courses.length > 0;
-
   return (
     <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 4rem)' }}>
       <style>{` .scrollbar-thin::-webkit-scrollbar { width: 4px; } .scrollbar-thin::-webkit-scrollbar-track { background: transparent; } .scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(var(--outline-variant)/.3); border-radius: 2px; } `}</style>
 
-      {/* TopBar */}
+      {/* TopBar — title only, clean */}
       <div className="sticky top-0 z-20 bg-surface-container-lowest/95 backdrop-blur-sm border-b border-outline-variant/30 px-4 lg:px-6 py-3">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-bold font-headline title-ink">个人中心</h2>
-            {hasCourses && (
-              <span className="text-[11px] text-on-surface-variant">
-                第{currentWeek}周 · {cwCourses.length}/{courses.length}门课
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <select value={textModel}
-              onChange={(e) => { setTextModel(e.target.value); localStorage.setItem('ai_text_model', e.target.value); }}
-              className="px-2 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-[11px] focus-ring">
-              <option value="deepseek-v4-pro">DeepSeek</option>
-              <option value="minimax-m2.7">MiniMax</option>
-            </select>
-            {hasCourses && <button onClick={handleSave} disabled={saving} className="btn-outline text-sm px-3 py-1.5">{saving ? '保存中' : '保存'}</button>}
-          </div>
+        <div className="flex items-center gap-4">
+          <h2 className="text-lg font-bold font-headline title-ink">个人中心</h2>
+          {hasCourses && (
+            <span className="text-[11px] text-on-surface-variant">
+              第{currentWeek}周 · {cwCourses.length}/{courses.length}门课
+            </span>
+          )}
         </div>
       </div>
 
       <div className="flex-1 flex min-h-0">
-        {/* Main content area */}
-        <div className="flex-1 min-w-0 overflow-y-auto scrollbar-thin p-4 lg:p-6 space-y-4">
-          {/* Profile Card */}
+        {/* Main content — full width on plan tab, shared on schedule tab */}
+        <div className={`flex-1 min-w-0 overflow-y-auto scrollbar-thin p-4 lg:p-6 space-y-4 ${activeTab === 'schedule' ? '' : ''}`}>
           <ProfileCard onChange={setProfile} />
 
           {/* Tabs */}
@@ -215,24 +213,67 @@ export default function PersonalCenterPage() {
             </button>
           </div>
 
-          {/* Tab content */}
-          {activeTab === 'plan' ? (
+          {/* ===== AI Plan Tab ===== */}
+          {activeTab === 'plan' && (
             <div className="space-y-4">
-              {hasCourses ? (
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-primary/5 border border-primary/20">
-                  <div>
-                    <p className="text-sm font-semibold text-on-surface">生成新计划</p>
-                    <p className="text-xs text-on-surface-variant mt-0.5">基于当前周课表 + 待办 + 个人资料</p>
+              {/* Weekly schedule at a glance */}
+              {hasCourses && (
+                <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low/40 p-4">
+                  <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-3">
+                    第{currentWeek}周课程
+                  </h3>
+                  <div className="grid grid-cols-7 gap-1">
+                    {WEEKDAY_SHORT.map((day, i) => {
+                      const dayCourses = coursesByDay[i + 1] || [];
+                      return (
+                        <div key={i} className="text-center">
+                          <div className="text-[10px] text-outline mb-1">{day}</div>
+                          <div className="space-y-0.5">
+                            {dayCourses.slice(0, 3).map((c) => (
+                              <div
+                                key={c.id}
+                                className="text-[9px] leading-tight px-0.5 py-0.5 rounded bg-primary/10 text-primary truncate"
+                                title={c.course_name}
+                              >
+                                {c.course_name.length > 4 ? c.course_name.slice(0, 4) + '…' : c.course_name}
+                              </div>
+                            ))}
+                            {dayCourses.length > 3 && (
+                              <div className="text-[9px] text-outline">+{dayCourses.length - 3}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <button onClick={handleGenerate} disabled={generating}
-                    className="btn-primary text-sm px-5 py-2 font-semibold shadow-sm whitespace-nowrap">
-                    {generating ? (
-                      <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
-                        AI 分析中...
-                      </span>
-                    ) : '✨ 生成'}
-                  </button>
+                </div>
+              )}
+
+              {/* Generate section — with model + save next to generate */}
+              {hasCourses ? (
+                <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4">
+                  <p className="text-sm font-semibold text-on-surface mb-1">生成新计划</p>
+                  <p className="text-xs text-on-surface-variant mb-3">基于当前周课表 + 待办 + 个人资料</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select value={textModel}
+                      onChange={(e) => { setTextModel(e.target.value); localStorage.setItem('ai_text_model', e.target.value); }}
+                      className="px-2 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-[11px] focus-ring">
+                      <option value="deepseek-v4-pro">DeepSeek</option>
+                      <option value="minimax-m2.7">MiniMax</option>
+                    </select>
+                    <button onClick={handleSave} disabled={saving} className="btn-outline text-sm px-3 py-1.5">
+                      {saving ? '保存中' : '保存'}
+                    </button>
+                    <button onClick={handleGenerate} disabled={generating}
+                      className="btn-primary text-sm px-5 py-2 font-semibold shadow-sm">
+                      {generating ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                          AI 分析中...
+                        </span>
+                      ) : '✨ 生成'}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-8">
@@ -245,16 +286,39 @@ export default function PersonalCenterPage() {
                 </div>
               )}
 
+              {/* Generated plan — collapsible card */}
               {generatedPlan && (
-                <div className="space-y-3">
-                  <PlanTimeline plan={generatedPlan} />
-                  {generateError && <div className="p-3 bg-error/10 text-error rounded-lg text-sm">{generateError}</div>}
+                <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low/40 overflow-hidden">
+                  <button
+                    onClick={() => setPlanExpanded(!planExpanded)}
+                    className="w-full text-left p-4 flex items-center justify-between hover:bg-surface-container-low/60 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{planExpanded ? '▼' : '▶'}</span>
+                      <span className="text-sm font-semibold text-on-surface">
+                        {generatedPlan.weekly_plans?.[0]?.week_start || ''} 起 · {generatedPlan.weekly_plans?.length || 0}周计划
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-on-surface-variant">
+                      {new Date().toLocaleDateString('zh-CN')}
+                    </span>
+                  </button>
+                  {planExpanded && (
+                    <div className="px-4 pb-4">
+                      <PlanTimeline plan={generatedPlan} />
+                      {generateError && <div className="mt-2 p-3 bg-error/10 text-error rounded-lg text-sm">{generateError}</div>}
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* Plan history */}
               <PlanHistoryList />
             </div>
-          ) : (
+          )}
+
+          {/* ===== 个人课表 Tab ===== */}
+          {activeTab === 'schedule' && (
             <div className="space-y-4">
               {!hasCourses ? (
                 <div className="text-center py-12">
@@ -282,36 +346,38 @@ export default function PersonalCenterPage() {
           )}
         </div>
 
-        {/* Right panel */}
-        <div className="w-60 xl:w-72 shrink-0 border-l border-outline-variant/30 overflow-y-auto scrollbar-thin p-3 space-y-3 bg-surface-container-lowest/50">
-          <div>
-            <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">课表上传</h3>
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors text-xs ${uploading ? 'border-primary bg-primary/5' : 'border-outline-variant hover:border-primary hover:bg-primary/5'}`}
-            >
-              {uploading ? '识别中...' : courses.length > 0 ? '重新上传课表' : '选择课表图片或 PDF'}
+        {/* Right panel — only visible on 个人课表 tab */}
+        {activeTab === 'schedule' && (
+          <div className="w-60 xl:w-72 shrink-0 border-l border-outline-variant/30 overflow-y-auto scrollbar-thin p-3 space-y-3 bg-surface-container-lowest/50">
+            <div>
+              <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">课表上传</h3>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors text-xs ${uploading ? 'border-primary bg-primary/5' : 'border-outline-variant hover:border-primary hover:bg-primary/5'}`}
+              >
+                {uploading ? '识别中...' : courses.length > 0 ? '重新上传课表' : '选择课表图片或 PDF'}
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleUpload} className="hidden" />
+              {uploadError && <div className="mt-2 p-2 bg-error/10 text-error rounded text-xs">{uploadError}</div>}
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleUpload} className="hidden" />
-            {uploadError && <div className="mt-2 p-2 bg-error/10 text-error rounded text-xs">{uploadError}</div>}
-          </div>
 
-          <div>
-            <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">待办事项</h3>
-            <CommitmentForm items={commitments} onChange={setCommitments} />
-          </div>
+            <div>
+              <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">待办事项</h3>
+              <CommitmentForm items={commitments} onChange={setCommitments} />
+            </div>
 
-          <div>
-            <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">自定义偏好</h3>
-            <textarea
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-              placeholder="如：我是夜猫子，晚上效率高"
-              rows={2}
-              className="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-xs focus-ring resize-none"
-            />
+            <div>
+              <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">自定义偏好</h3>
+              <textarea
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="如：我是夜猫子，晚上效率高"
+                rows={2}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-xs focus-ring resize-none"
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {generateError && activeTab !== 'plan' && (
