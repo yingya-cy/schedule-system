@@ -149,13 +149,22 @@ export default function PersonalCenterPage() {
     const formattedCommitments = commitments.map((c) => ({ name: c.name, date: c.date, start_time: c.start, end_time: c.end, priority: c.priority }));
     localStorage.setItem(CUSTOM_PROMPT_KEY, customPrompt);
 
+    // Merge profile info into prompt so AI actually uses it
+    const profileContext = [
+      profile.grade && `年级：${profile.grade}`,
+      profile.major && `专业：${profile.major}`,
+      profile.college && `学院：${profile.college}`,
+      profile.planNote && `当前规划：${profile.planNote}`,
+    ].filter(Boolean).join('；');
+    const combinedPrompt = [profileContext, customPrompt.trim()].filter(Boolean).join('；');
+
     await generatePlan({
       courses: currentWeekCourses.map((c) => ({ name: c.course_name, weekday: c.weekday, sections: c.sections, weeks: c.weeks, teacher: c.teacher || '', location: c.location || '' })),
       commitments: formattedCommitments,
       grade: profile.grade || undefined, major: profile.major || undefined,
       next_monday: getNextMonday(), model: textModel,
       current_week: currentWeek,
-      custom_prompt: customPrompt.trim() || undefined,
+      custom_prompt: combinedPrompt || undefined,
     });
     fetchPlans();
   };
@@ -271,11 +280,6 @@ export default function PersonalCenterPage() {
                   )}
                 </>
               )}
-              {activeTab === 'schedule' && hasCourses && (
-                <button onClick={handleSave} disabled={saving} className="btn-outline text-sm px-3 py-1.5">
-                  {saving ? '保存中' : '保存课表'}
-                </button>
-              )}
             </div>
           </div>
 
@@ -329,6 +333,7 @@ export default function PersonalCenterPage() {
                   </div>
                 ) : (
                   <ScheduleEditor courses={courses} onCoursesChange={setCourses}
+                    onSave={handleSave} isSaving={saving}
                     onCancel={() => { setCourses([]); clearGenerated(); }} />
                 )}
               </div>

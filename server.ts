@@ -45,10 +45,10 @@ async function startServer() {
     credentials: true,
   }));
 
-  // 全局 API 限流：15 分钟内最多 300 请求
+  // 全局 API 限流：1 分钟内最多 200 请求
   const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 300,
+    windowMs: 1 * 60 * 1000,
+    max: 200,
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, error: '请求过于频繁，请稍后再试' },
