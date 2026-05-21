@@ -11,7 +11,8 @@ import PlanTimeline from './PlanTimeline';
 import ProfileCard from './ProfileCard';
 import PlanHistoryList from './PlanHistoryList';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ChevronLeft, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, ChevronLeft, Clock, Heart } from 'lucide-react';
 
 const CUSTOM_PROMPT_KEY = 'ai_schedule_custom_prompt';
 const STORED_COURSES_KEY = 'ai_schedule_courses';
@@ -212,9 +213,41 @@ export default function PersonalCenterPage() {
     setDrawerPlan(null);
   };
 
+  const navigate = useNavigate();
   const cwCourses = getCurrentWeekCourses();
   const hasCourses = courses.length > 0;
   const hasPlan = !!generatedPlan;
+
+  // Check if today is heavy — show counsel link
+  const todayWeekday = new Date().getDay() || 7;
+  const todayCourses = courses.filter((c) => c.weeks.includes(currentWeek) && c.weekday === todayWeekday);
+  const isHeavyDay = todayCourses.length >= 5 || cwCourses.length >= 15 || commitments.length >= 3;
+
+  const buildCounselContext = () => {
+    const today = new Date().toLocaleDateString('zh-CN');
+    const lines = [`今天是${today}，第${currentWeek}周。以下是我今天的课表和待办事项：`];
+    if (todayCourses.length > 0) {
+      lines.push('今日课程：');
+      todayCourses.forEach((c) => {
+        lines.push(`- ${c.course_name}（第${c.sections.join('-')}节${c.teacher ? `，${c.teacher}` : ''}${c.location ? `，${c.location}` : ''}）`);
+      });
+    }
+    if (commitments.length > 0) {
+      lines.push('待办事项：');
+      commitments.forEach((c) => {
+        const priority = c.priority === 'high' ? '高优先' : c.priority === 'medium' ? '中优先' : '低优先';
+        lines.push(`- ${c.name}（${c.date || '未指定日期'} ${c.start}-${c.end}，${priority}）`);
+      });
+    }
+    lines.push(`\n本周共${cwCourses.length}门课程，${commitments.length}个待办事项。`);
+    lines.push('今天安排比较多，想和我聊聊怎么调整节奏、缓解压力吗？');
+    return lines.join('\n');
+  };
+
+  const handleCounselLink = () => {
+    localStorage.setItem('ai_counsel_pending_context', buildCounselContext());
+    navigate('/ai-counsel');
+  };
 
   if (initialLoading) {
     return (
@@ -308,6 +341,27 @@ export default function PersonalCenterPage() {
                 <>
                   <PlanTimeline plan={generatedPlan} />
                   {generateError && <div className="p-3 bg-error/10 text-error rounded-lg text-sm">{generateError}</div>}
+
+                  {isHeavyDay && (
+                    <button
+                      onClick={handleCounselLink}
+                      className="w-full flex items-center gap-3 p-4 rounded-2xl bg-secondary/5 border border-secondary/20 hover:bg-secondary/10 transition-colors text-left group"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0 group-hover:bg-secondary/20 transition-colors">
+                        <Heart size={18} className="text-secondary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-on-surface">今天安排比较满</p>
+                        <p className="text-xs text-on-surface-variant mt-0.5">
+                          {todayCourses.length > 0 ? `${todayCourses.length}门课` : ''}
+                          {todayCourses.length > 0 && commitments.length > 0 ? ' + ' : ''}
+                          {commitments.length > 0 ? `${commitments.length}个待办` : ''}
+                          ，和小暖聊聊调整节奏？
+                        </p>
+                      </div>
+                      <span className="text-xs text-secondary font-medium shrink-0 group-hover:translate-x-0.5 transition-transform">去聊聊 →</span>
+                    </button>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-12">

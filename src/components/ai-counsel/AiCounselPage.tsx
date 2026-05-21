@@ -34,6 +34,17 @@ export default function AiCounselPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const sendingRef = useRef(false);
+  const autoSendRef = useRef(false);
+
+  // Check for pending context from schedule page
+  useEffect(() => {
+    const ctx = localStorage.getItem('ai_counsel_pending_context');
+    if (ctx) {
+      localStorage.removeItem('ai_counsel_pending_context');
+      autoSendRef.current = true;
+      setInputText(ctx);
+    }
+  }, []);
 
   useEffect(() => {
     fetchSessions();
@@ -140,6 +151,15 @@ export default function AiCounselPage() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
+
+  // Auto-send pending context from schedule page (after handleSend is defined)
+  useEffect(() => {
+    if (autoSendRef.current && inputText && !streaming && !sendingRef.current) {
+      autoSendRef.current = false;
+      const timer = setTimeout(() => handleSend(), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [inputText, streaming]);
 
   return (
     <>
