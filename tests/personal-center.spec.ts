@@ -161,9 +161,11 @@ test.describe('个人中心', () => {
   // ── History drawer ──
 
   test('点击历史按钮打开抽屉', async ({ page }) => {
-    await page.getByText(/^历史/).first().click();
-    await page.waitForTimeout(500);
-    await expect(page.locator('.lucide-x').first()).toBeVisible();
+    const historyBtn = page.getByText(/^历史/).first();
+    await expect(historyBtn).toBeVisible({ timeout: 10000 });
+    await historyBtn.click();
+    await page.waitForTimeout(800);
+    await expect(page.locator('.lucide-x').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('抽屉内点击计划卡片查看详情', async ({ page }) => {

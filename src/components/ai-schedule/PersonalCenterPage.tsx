@@ -342,32 +342,32 @@ export default function PersonalCenterPage() {
                 <>
                   <PlanTimeline plan={generatedPlan} />
                   {generateError && <div className="p-3 bg-error/10 text-error rounded-lg text-sm">{generateError}</div>}
-
-                  {isHeavyDay && (
-                    <button
-                      onClick={handleCounselLink}
-                      className="w-full flex items-center gap-3 p-4 rounded-2xl bg-secondary/5 border border-secondary/20 hover:bg-secondary/10 transition-colors text-left group"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0 group-hover:bg-secondary/20 transition-colors">
-                        <Heart size={18} className="text-secondary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-on-surface">今天安排比较满</p>
-                        <p className="text-xs text-on-surface-variant mt-0.5">
-                          {todaySectionCount > 0 ? `${todaySectionCount}节课` : ''}
-                          {todaySectionCount > 0 && commitments.length > 0 ? ' + ' : ''}
-                          {commitments.length > 0 ? `${commitments.length}个待办` : ''}
-                          ，和小暖聊聊调整节奏？
-                        </p>
-                      </div>
-                      <span className="text-xs text-secondary font-medium shrink-0 group-hover:translate-x-0.5 transition-transform">去聊聊 →</span>
-                    </button>
-                  )}
                 </>
               ) : (
                 <div className="text-center py-12">
                   <p className="text-sm text-on-surface-variant mb-1">点击上方「✨ 生成计划」创建本周学习计划</p>
                 </div>
+              )}
+
+              {isHeavyDay && hasCourses && (
+                <button
+                  onClick={handleCounselLink}
+                  className="w-full flex items-center gap-3 p-4 rounded-2xl bg-secondary/5 border border-secondary/20 hover:bg-secondary/10 transition-colors text-left group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0 group-hover:bg-secondary/20 transition-colors">
+                    <Heart size={18} className="text-secondary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-on-surface">今天安排比较满</p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      {todaySectionCount > 0 ? `${todaySectionCount}节课` : ''}
+                      {todaySectionCount > 0 && commitments.length > 0 ? ' + ' : ''}
+                      {commitments.length > 0 ? `${commitments.length}个待办` : ''}
+                      ，和小暖聊聊调整节奏？
+                    </p>
+                  </div>
+                  <span className="text-xs text-secondary font-medium shrink-0 group-hover:translate-x-0.5 transition-transform">去聊聊 →</span>
+                </button>
               )}
             </div>
           )}
@@ -396,9 +396,32 @@ export default function PersonalCenterPage() {
                     {uploadError && <div className="mt-3 p-2 bg-error/10 text-error rounded-lg text-sm">{uploadError}</div>}
                   </div>
                 ) : (
-                  <ScheduleEditor courses={courses} onCoursesChange={setCourses}
-                    onSave={handleSave} isSaving={saving}
-                    onCancel={() => { setCourses([]); clearGenerated(); }} />
+                  <>
+                    <ScheduleEditor courses={courses} onCoursesChange={setCourses}
+                      onSave={handleSave} isSaving={saving}
+                      onCancel={() => { setCourses([]); clearGenerated(); }} />
+
+                    {isHeavyDay && (
+                      <button
+                        onClick={handleCounselLink}
+                        className="w-full flex items-center gap-3 p-4 mt-4 rounded-2xl bg-secondary/5 border border-secondary/20 hover:bg-secondary/10 transition-colors text-left group"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0 group-hover:bg-secondary/20 transition-colors">
+                          <Heart size={18} className="text-secondary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-on-surface">今天安排比较满</p>
+                          <p className="text-xs text-on-surface-variant mt-0.5">
+                            {todaySectionCount > 0 ? `${todaySectionCount}节课` : ''}
+                            {todaySectionCount > 0 && commitments.length > 0 ? ' + ' : ''}
+                            {commitments.length > 0 ? `${commitments.length}个待办` : ''}
+                            ，和小暖聊聊调整节奏？
+                          </p>
+                        </div>
+                        <span className="text-xs text-secondary font-medium shrink-0 group-hover:translate-x-0.5 transition-transform">去聊聊 →</span>
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
 
