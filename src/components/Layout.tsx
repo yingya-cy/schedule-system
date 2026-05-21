@@ -93,7 +93,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: mobileMenuOpen ? 1 : 0 }}
         transition={{ duration: 0.2 }}
-        className="fixed inset-0 bg-black/50 z-40 lg:hidden pointer-events-none"
+        className="fixed inset-0 bg-black/50 z-[var(--z-overlay)] lg:hidden pointer-events-none"
         style={{ pointerEvents: mobileMenuOpen && isMobile ? 'auto' : 'none' }}
       >
         <div
@@ -108,7 +108,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 180, damping: 24 }}
         className={cn(
-          "fixed left-0 top-0 h-full w-64 border-r border-outline-variant/40 bg-surface/90 backdrop-blur-md flex flex-col p-4 gap-2 z-50",
+          "fixed left-0 top-0 h-full w-64 border-r border-outline-variant/40 bg-surface/90 backdrop-blur-md flex flex-col p-4 gap-2",
           "lg:translate-x-0",
           isMobile ? "-translate-x-full" : mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
@@ -171,13 +171,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </motion.aside>
 
       {/* Main Content */}
-      <div className="flex-1 lg:ml-64 flex flex-col w-full pb-20 lg:pb-0">
+      <div className="flex-1 lg:ml-64 flex flex-col w-full pb-20 lg:pb-0 min-w-0 overflow-hidden">
         {/* Top Bar */}
         <header className="sticky top-0 z-40 h-16 bg-surface-container-lowest/80 backdrop-blur-md flex justify-between items-center px-4 lg:px-8 shadow-[0_4px_20px_rgba(139,119,90,0.06)]">
           <div className="flex items-center gap-4 min-w-0 flex-1">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="focus-ring lg:hidden p-2 hover:bg-surface-container-low rounded-lg transition-colors"
+              className="focus-ring lg:hidden p-3 hover:bg-surface-container-low rounded-lg transition-colors"
             >
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -196,13 +196,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               />
             </div>
             <div className="flex items-center gap-1 lg:gap-2">
-              <button className="p-2 hover:bg-surface-container-low rounded-full transition-all active:opacity-80 text-on-surface-variant">
+              <button className="p-3 hover:bg-surface-container-low rounded-full transition-all active:opacity-80 text-on-surface-variant">
                 <Bell size={20} />
               </button>
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-2 p-1.5 hover:bg-surface-container-low rounded-xl transition-all active:opacity-80"
+                  className="flex items-center gap-2 p-2 hover:bg-surface-container-low rounded-xl transition-all active:opacity-80"
                 >
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
                     {user?.name?.[0] || '?'}

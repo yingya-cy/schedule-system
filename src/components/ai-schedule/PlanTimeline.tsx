@@ -58,7 +58,7 @@ function DayCard({ day, isToday }: { day: DailyPlan; isToday: boolean }) {
 
 export default function PlanTimeline({ plan }: { plan: PlanData }) {
   if (!plan.weekly_plans?.length) {
-    return <div className="text-center py-8 text-sm text-on-surface-variant">计划数据为空</div>;
+    return <div className="empty-state"><p className="empty-state-title">计划数据为空</p><p className="empty-state-desc">上传课表后点击"生成学习计划"</p></div>;
   }
 
   const week = plan.weekly_plans[0];
