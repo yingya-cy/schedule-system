@@ -30,11 +30,11 @@
   --color-outline: #cec7bd;
   --color-outline-variant: #e2dbd1;
 
-  /* Semantic — bold & crisp, matching blue primary weight */
-  --color-success: #4d8b65;
-  --color-secondary: #9b8cb8;
-  --color-warning: #b8854a;
-  --color-error: #b46058;
+  /* Semantic — desaturated to match watercolor softness */
+  --color-success: #6a8d78;
+  --color-secondary: #8c819f;
+  --color-warning: #b89462;
+  --color-error: #b4726c;
 
   --color-on-secondary: #ffffff;
   --color-on-warning: #ffffff;
@@ -86,6 +86,19 @@
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline tracking-tight;
+  }
+
+  /* Ink-wash title — gradient from dark to slightly faded */
+  .title-ink {
+    background: linear-gradient(
+      135deg,
+      #302b26 0%,
+      #302b26 60%,
+      rgba(48, 43, 38, 0.7) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   /* Z-index scale: 10(dropdown), 20(sticky), 30(modal), 40(overlay), 50(toast) */
@@ -193,16 +206,31 @@
     @apply text-on-surface-variant text-sm max-w-md;
   }
 
-  /* ── Cards (unified border-radius + subtle hover) ── */
+  /* ── Cards (unified border-radius + water-blur hover) ── */
   .card {
     @apply rounded-2xl border border-outline-variant/30 bg-surface-container-lowest
            shadow-[0_1px_4px_rgba(139,119,90,0.04)]
-           transition-all duration-200;
+           transition-all duration-300;
+    /* Irregular edge — subtle torn-paper fade */
+    mask-image: radial-gradient(
+      ellipse at center,
+      rgba(0, 0, 0, 0.03) 0%,
+      rgba(0, 0, 0, 0) 90%
+    );
+    mask-composite: exclude;
   }
   .card-interactive {
-    @apply card cursor-pointer
-           hover:shadow-[0_4px_12px_rgba(139,119,90,0.08)]
-           hover:-translate-y-0.5;
+    @apply card cursor-pointer;
+    /* Water-blur hover: shadow spreads like wet pigment on paper */
+    box-shadow: 0 1px 4px rgba(139, 119, 90, 0.04);
+    transition: box-shadow 0.4s ease-out, transform 0.2s ease-out;
+  }
+  .card-interactive:hover {
+    box-shadow:
+      0 2px 8px rgba(139, 119, 90, 0.06),
+      0 8px 24px rgba(139, 119, 90, 0.04),
+      0 0 0 6px rgba(80, 146, 176, 0.03);
+    transform: translateY(-1px);
   }
 
   /* ── Shadows (3-level system) ── */

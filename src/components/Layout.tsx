@@ -181,7 +181,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
-            <h2 className="text-base sm:text-lg lg:text-xl font-bold tracking-tighter text-primary font-headline truncate"
+            <h2 className="text-base sm:text-lg lg:text-xl font-bold tracking-tighter text-primary font-headline truncate title-ink"
               title={ROUTE_LABELS[currentPath as RoutePath] || ROUTE_LABELS['/dashboard']}>
               {ROUTE_LABELS[currentPath as RoutePath] || ROUTE_LABELS['/dashboard']}
             </h2>
