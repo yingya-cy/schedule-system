@@ -192,6 +192,40 @@
   .empty-state-desc {
     @apply text-on-surface-variant text-sm max-w-md;
   }
+
+  /* ── Cards (unified border-radius + subtle hover) ── */
+  .card {
+    @apply rounded-2xl border border-outline-variant/30 bg-surface-container-lowest
+           shadow-[0_1px_4px_rgba(139,119,90,0.04)]
+           transition-all duration-200;
+  }
+  .card-interactive {
+    @apply card cursor-pointer
+           hover:shadow-[0_4px_12px_rgba(139,119,90,0.08)]
+           hover:-translate-y-0.5;
+  }
+
+  /* ── Shadows (3-level system) ── */
+  .shadow-card {
+    box-shadow: 0 1px 4px rgba(139, 119, 90, 0.04);
+  }
+  .shadow-modal {
+    box-shadow: 0 8px 30px rgba(139, 119, 90, 0.10);
+  }
+  .shadow-nav {
+    box-shadow: 0 4px 20px rgba(139, 119, 90, 0.06);
+  }
+
+  /* ── Skeleton loading ── */
+  .skeleton-text {
+    @apply skeleton h-4 w-full rounded;
+  }
+  .skeleton-text-sm {
+    @apply skeleton h-3 w-3/4 rounded;
+  }
+  .skeleton-card {
+    @apply skeleton h-24 rounded-2xl;
+  }
   .empty-state-icon {
     @apply w-16 h-16 rounded-2xl bg-surface-container-low flex items-center justify-center mb-4;
   }

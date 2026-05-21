@@ -208,7 +208,7 @@ export default function AiSchedulePage() {
   // ===== PHASE 2: Plan is hero =====
   if (generatedPlan) {
     return (
-      <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 4rem)' }}>
+      <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 4rem)' }}>
         <style>{` .scrollbar-thin::-webkit-scrollbar { width: 4px; } .scrollbar-thin::-webkit-scrollbar-track { background: transparent; } .scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(var(--outline-variant)/.3); border-radius: 2px; } `}</style>
         <TopBar planMode />
         <div className="flex-1 overflow-y-auto scrollbar-thin p-4 lg:p-6 space-y-5">
@@ -235,7 +235,7 @@ export default function AiSchedulePage() {
 
   // ===== PHASE 1: Setup =====
   return (
-    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 4rem)' }}>
+    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 4rem)' }}>
       <style>{` .scrollbar-thin::-webkit-scrollbar { width: 4px; } .scrollbar-thin::-webkit-scrollbar-track { background: transparent; } .scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(var(--outline-variant)/.3); border-radius: 2px; } `}</style>
       <TopBar planMode={false} />
 

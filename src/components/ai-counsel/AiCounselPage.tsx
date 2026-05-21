@@ -149,7 +149,7 @@ export default function AiCounselPage() {
         .scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(var(--outline-variant)/.3); border-radius: 2px; }
         .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgb(var(--outline)/.4); }
       `}</style>
-    <div className="flex flex-col overflow-hidden h-[calc(100vh-96px)] lg:h-[calc(100vh-128px)]">
+    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 6rem)' }}>
       <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
       <div className={`${showSidebar ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-64 border-r border-outline-variant/40 shrink-0`}>

@@ -74,7 +74,7 @@ export default function PlanTimeline({ plan }: { plan: PlanData }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7 gap-2">
         {days.map((d) => (
           <DayCard key={d.date} day={d} isToday={d.date === today} />
         ))}
