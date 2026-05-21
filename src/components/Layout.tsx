@@ -171,7 +171,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </motion.aside>
 
       {/* Main Content */}
-      <div className="flex-1 lg:ml-64 flex flex-col w-full pb-20 lg:pb-0 min-w-0 overflow-hidden">
+      <div className="flex-1 lg:ml-64 flex flex-col w-full pb-4 lg:pb-0 min-w-0 overflow-hidden">
         {/* Top Bar */}
         <header className="sticky top-0 z-40 h-16 bg-surface-container-lowest/80 backdrop-blur-md flex justify-between items-center px-4 lg:px-8 shadow-nav">
           <div className="flex items-center gap-4 min-w-0 flex-1">

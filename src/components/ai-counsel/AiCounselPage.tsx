@@ -149,7 +149,7 @@ export default function AiCounselPage() {
         .scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(var(--outline-variant)/.3); border-radius: 2px; }
         .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgb(var(--outline)/.4); }
       `}</style>
-    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 4rem)' }}>
+    <div className="flex flex-col overflow-hidden h-full">
       <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
       <div className={`${showSidebar ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-64 border-r border-outline-variant/40 shrink-0`}>
@@ -174,8 +174,8 @@ export default function AiCounselPage() {
             sessions.map((s) => (
               <div key={s.id} className="relative group border-b border-outline-variant/20">
                 <button onClick={() => { setActiveSession(s.id); setShowSidebar(false); }}
-                  className={`w-full text-left px-3 py-2 hover:bg-surface-container-low transition-colors ${s.id === activeSessionId ? 'bg-primary/5' : ''}`}>
-                  <span className="text-[0.8125rem] text-on-surface truncate block pr-6">{s.title}</span>
+                  className={`w-full text-left px-4 py-3 hover:bg-surface-container-low transition-colors ${s.id === activeSessionId ? 'bg-primary/5' : ''}`}>
+                  <span className="text-sm text-on-surface truncate block pr-6">{s.title}</span>
                   <span className="text-xs text-on-surface-variant">{new Date(s.updated_at).toLocaleDateString('zh-CN')}</span>
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
@@ -191,7 +191,7 @@ export default function AiCounselPage() {
       {/* Chat area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Header */}
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-outline-variant/40 shrink-0">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-outline-variant/40 shrink-0">
           <button onClick={() => setShowSidebar(!showSidebar)} className="lg:hidden text-sm text-primary">
             {showSidebar ? '关闭' : '历史'}
           </button>
@@ -203,7 +203,7 @@ export default function AiCounselPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2.5 bg-surface-container-low/30">
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-3 bg-surface-container-low/30">
           {messagesLoading ? (
             <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="skeleton h-12 rounded-lg w-3/4" />)}</div>
           ) : messages.length === 0 ? (
@@ -218,7 +218,7 @@ export default function AiCounselPage() {
           ) : (
             messages.map((m) => (
               <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[70%] px-3 py-1.5 rounded-2xl text-[0.8125rem] leading-relaxed ${m.role === 'user'
+                <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${m.role === 'user'
                   ? 'bg-primary-container text-on-surface rounded-br-md'
                   : 'bg-secondary/10 text-on-surface rounded-bl-md'}`}>
                   <p className="whitespace-pre-wrap break-words">{m.content}{m.id === 0 && streaming && <span className="animate-pulse">▊</span>}</p>
