@@ -309,9 +309,16 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - [x] 19.15 服务器内存优化 — Gunicorn workers 5→2、Docker limit 1.5G→512M、MySQL buffer pool 256→128M、日志限制 10MB×3
 - [x] 19.16 UI/UX 改善 — touch targets ≥44px、z-index scale、prefers-reduced-motion、100vh→dvh、skeleton loading、border-radius/shadow 统一、语义色柔化、AI 咨询密度缩小、消息溢出 min-h-0
 - [x] 19.17 测试补充 — AI 排课 save-schedule/latest-schedule、空 course_name 归一化、会话默认标题、空课表错误信息 (+4 tests, 505→509)
-- [ ] 19.18 横型课表文本提取对齐（fitz vs pdfjs-dist，已验证 fitz 兼容，待关闭）
+- [x] 19.18 AI 排课 → 个人中心改造 — 资料卡片 + 计划历史 + Tab 切换 + AI 咨询串联 + 19 E2E 测试
+  - ProfileCard：可编辑资料卡片（年级/专业/学院/规划），localStorage 持久化
+  - PlanHistoryList：历史计划列表 + 右侧 720px 抽屉查看详情 + 悬停删除按钮
+  - PlanTimeline：时间块点击展开截断任务名，compact prop 控制列数
+  - 布局：去页面顶栏、按钮上移至 Tab 行、右侧面板仅个人课表 Tab 显示
+  - AI 咨询串联：今日节数≥5 或待办≥3 → 暖心卡片 → 点击新开会话自动发送上下文
+  - Bug 修复：上传不清计划、generate 不覆盖完整课程、后端只更新 plan_data
+  - E2E: tests/personal-center.spec.ts (19 tests)
 - [ ] 19.19 覆盖率提升
-- **Status:** fix/ux-improvements 分支，待合回 main
+- **Status:** main 分支，19.1-19.18 已完成，19.19 待定
 
 ## Key Questions
 1. 登录系统是独立用户体系还是对接学校 SSO/LDAP？→ **独立用户体系（用户名+密码+JWT），不开放注册，管理员后台创建**
