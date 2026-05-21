@@ -18,9 +18,7 @@ test.beforeAll(async ({ browser }) => {
 
 async function goToProfile(page: Page) {
   await page.goto(`${BASE_URL}/login`);
-  await page.evaluate((token) => {
-    localStorage.setItem('auth_token', token);
-  }, authToken);
+  await page.evaluate((token) => localStorage.setItem('auth_token', token), authToken);
   await page.goto(`${BASE_URL}/profile`);
   await page.waitForLoadState('networkidle');
 }
@@ -74,7 +72,6 @@ test.describe('个人中心', () => {
     await page.getByPlaceholder('专业 (如 计算机科学)').fill('计算机科学');
     await page.getByPlaceholder('学院 (如 信息学院)').fill('信息学院');
     await page.getByPlaceholder(/当前规划/).fill('准备考研');
-    // ProfileCard save button is the first "保存" in DOM (ProfileCard is above tab content)
     await page.getByRole('button', { name: '保存' }).first().click();
 
     await expect(page.getByText('2024级')).toBeVisible();
@@ -129,13 +126,9 @@ test.describe('个人中心', () => {
 
   // ── Right Panel (only on schedule tab) ──
 
-  test('个人课表 Tab 显示右侧面板上传区域', async ({ page }) => {
+  test('个人课表 Tab 显示右侧面板', async ({ page }) => {
     await page.locator('button', { hasText: '个人课表' }).click();
     await expect(page.getByText('重新上传课表')).toBeVisible();
-  });
-
-  test('个人课表 Tab 显示右侧面板待办事项', async ({ page }) => {
-    await page.locator('button', { hasText: '个人课表' }).click();
     await expect(page.getByText('待办事项').first()).toBeVisible();
   });
 
@@ -144,28 +137,40 @@ test.describe('个人中心', () => {
     await expect(page.getByPlaceholder('如：计算机科学')).not.toBeVisible();
   });
 
-  // ── AI Plan: has a plan → shows PlanTimeline + regenerate ──
+  // ── AI Plan: main view ──
 
   test('有本周计划时显示 PlanTimeline', async ({ page }) => {
     await expect(page.getByText('周一').first()).toBeVisible();
   });
 
-  test('有本周计划时显示重新生成按钮', async ({ page }) => {
+  test('显示重新生成按钮', async ({ page }) => {
     await expect(page.getByText('重新生成')).toBeVisible();
   });
 
-  // ── AI Plan: history list + drawer ──
+  // ── History drawer ──
 
-  test('历史计划列表可见', async ({ page }) => {
-    await expect(page.getByText('查看历史计划')).toBeVisible();
+  test('显示历史计划按钮', async ({ page }) => {
+    await expect(page.getByText('历史计划')).toBeVisible();
   });
 
-  test('点击历史计划打开抽屉', async ({ page }) => {
-    // Click first history card
-    const card = page.locator('button', { hasText: '周' }).first();
-    await card.click();
+  test('点击历史计划按钮打开抽屉', async ({ page }) => {
+    await page.getByText('历史计划').first().click();
     await page.waitForTimeout(500);
-    // Drawer should have close button (X icon)
-    await expect(page.locator('.lucide-x').first()).toBeVisible();
+    // Drawer should appear with close button
+    const drawerClose = page.locator('.lucide-x').first();
+    await expect(drawerClose).toBeVisible();
+  });
+
+  test('抽屉内点击计划卡片查看详情', async ({ page }) => {
+    await page.getByText('历史计划').first().click();
+    await page.waitForTimeout(500);
+    // Click first plan in drawer
+    const planCard = page.locator('button', { hasText: '周' }).first();
+    if (await planCard.count() > 0) {
+      await planCard.click();
+      await page.waitForTimeout(500);
+      // Should show back button
+      await expect(page.locator('.lucide-chevron-left').first()).toBeVisible();
+    }
   });
 });

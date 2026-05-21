@@ -9,7 +9,7 @@ import PlanTimeline from './PlanTimeline';
 import ProfileCard from './ProfileCard';
 import PlanHistoryList from './PlanHistoryList';
 import { motion, AnimatePresence } from 'motion/react';
-import { X } from 'lucide-react';
+import { X, ChevronLeft, Clock } from 'lucide-react';
 
 const CUSTOM_PROMPT_KEY = 'ai_schedule_custom_prompt';
 const STORED_COURSES_KEY = 'ai_schedule_courses';
@@ -31,6 +31,7 @@ export default function PersonalCenterPage() {
   const clearGenerated = useAiScheduleStore((s) => s.clearGenerated);
   const fetchPlans = useAiScheduleStore((s) => s.fetchPlans);
   const fetchPlanDetail = useAiScheduleStore((s) => s.fetchPlanDetail);
+  const plans = useAiScheduleStore((s) => s.plans);
 
   const [courses, setCourses] = useState<EditableCourse[]>([]);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
@@ -50,6 +51,7 @@ export default function PersonalCenterPage() {
   const [currentWeek] = useState<number>(computeCurrentWeek);
   const [activeTab, setActiveTab] = useState<'plan' | 'schedule'>('plan');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerView, setDrawerView] = useState<'list' | 'detail'>('list');
   const [drawerTitle, setDrawerTitle] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -155,16 +157,28 @@ export default function PersonalCenterPage() {
     fetchPlans();
   };
 
+  // ── Drawer ──
+
+  const openHistoryDrawer = () => {
+    fetchPlans();
+    setDrawerView('list');
+    setDrawerTitle('历史计划');
+    setDrawerOpen(true);
+  };
+
   const handleHistorySelect = async (id: number) => {
     await fetchPlanDetail(id);
     const store = useAiScheduleStore.getState();
     const plan = store.generatedPlan;
     if (plan?.weekly_plans?.[0]) {
-      setDrawerTitle(`${plan.weekly_plans[0].week_start} 起 · ${plan.weekly_plans.length}周计划`);
-    } else {
-      setDrawerTitle('计划详情');
+      setDrawerTitle(`${plan.weekly_plans[0].week_start} 起 · ${plan.weekly_plans.length}周`);
     }
-    setDrawerOpen(true);
+    setDrawerView('detail');
+  };
+
+  const handleDrawerBack = () => {
+    setDrawerView('list');
+    setDrawerTitle('历史计划');
   };
 
   const closeDrawer = () => {
@@ -239,7 +253,6 @@ export default function PersonalCenterPage() {
                   </button>
                 </div>
               ) : hasPlan ? (
-                /* Has plan: show it prominently */
                 <div className="space-y-4">
                   <PlanTimeline plan={generatedPlan} />
                   {generateError && <div className="p-3 bg-error/10 text-error rounded-lg text-sm">{generateError}</div>}
@@ -266,21 +279,21 @@ export default function PersonalCenterPage() {
                     </button>
                   </div>
 
-                  {/* History button */}
-                  <div className="pt-2 border-t border-outline-variant/20">
-                    <button
-                      onClick={() => { fetchPlans(); }}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      查看历史计划 →
-                    </button>
-                    <div className="mt-2">
-                      <PlanHistoryList onSelect={handleHistorySelect} />
+                  {/* Compact history button */}
+                  <button
+                    onClick={openHistoryDrawer}
+                    className="w-full flex items-center justify-between p-3 rounded-xl border border-outline-variant/20 bg-surface-container-low/40 hover:bg-surface-container-low transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} className="text-outline" />
+                      <span className="text-xs font-medium text-on-surface">
+                        历史计划 {plans.length > 0 && <span className="text-outline">({plans.length})</span>}
+                      </span>
                     </div>
-                  </div>
+                    <span className="text-[10px] text-outline">查看全部 →</span>
+                  </button>
                 </div>
               ) : (
-                /* Has courses but no plan yet */
                 <div className="space-y-4">
                   <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4">
                     <p className="text-sm font-semibold text-on-surface mb-1">还没有本周计划</p>
@@ -304,13 +317,19 @@ export default function PersonalCenterPage() {
                     </div>
                   </div>
 
-                  {/* History */}
-                  <div className="pt-2 border-t border-outline-variant/20">
-                    <button onClick={() => { fetchPlans(); }} className="text-xs text-primary hover:underline mb-2">
-                      查看历史计划 →
-                    </button>
-                    <PlanHistoryList onSelect={handleHistorySelect} />
-                  </div>
+                  {/* Compact history button */}
+                  <button
+                    onClick={openHistoryDrawer}
+                    className="w-full flex items-center justify-between p-3 rounded-xl border border-outline-variant/20 bg-surface-container-low/40 hover:bg-surface-container-low transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} className="text-outline" />
+                      <span className="text-xs font-medium text-on-surface">
+                        历史计划 {plans.length > 0 && <span className="text-outline">({plans.length})</span>}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-outline">查看全部 →</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -378,11 +397,10 @@ export default function PersonalCenterPage() {
           </div>
         )}
 
-        {/* Plan detail drawer */}
+        {/* History drawer */}
         <AnimatePresence>
           {drawerOpen && (
             <>
-              {/* Backdrop */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -391,25 +409,38 @@ export default function PersonalCenterPage() {
                 className="fixed inset-0 bg-black/20 z-30"
                 onClick={closeDrawer}
               />
-              {/* Drawer */}
               <motion.div
                 initial={{ x: '100%' }}
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                className="absolute right-0 top-0 bottom-0 w-[420px] max-w-[90vw] bg-surface-container-lowest border-l border-outline-variant/30 z-40 flex flex-col shadow-2xl"
+                className="absolute right-0 top-0 bottom-0 w-[520px] max-w-[92vw] bg-surface-container-lowest border-l border-outline-variant/30 z-40 flex flex-col shadow-2xl"
               >
+                {/* Drawer header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant/20 shrink-0">
-                  <h3 className="text-sm font-semibold text-on-surface truncate">{drawerTitle}</h3>
-                  <button onClick={closeDrawer} className="p-1 hover:bg-surface-container-low rounded-lg transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {drawerView === 'detail' && (
+                      <button onClick={handleDrawerBack} className="p-1 hover:bg-surface-container-low rounded-lg transition-colors shrink-0">
+                        <ChevronLeft size={18} className="text-on-surface-variant" />
+                      </button>
+                    )}
+                    <h3 className="text-sm font-semibold text-on-surface truncate">{drawerTitle}</h3>
+                  </div>
+                  <button onClick={closeDrawer} className="p-1 hover:bg-surface-container-low rounded-lg transition-colors shrink-0">
                     <X size={18} className="text-on-surface-variant" />
                   </button>
                 </div>
+
+                {/* Drawer body */}
                 <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
-                  {generatedPlan ? (
-                    <PlanTimeline plan={generatedPlan} />
+                  {drawerView === 'list' ? (
+                    <PlanHistoryList onSelect={handleHistorySelect} />
                   ) : (
-                    <div className="text-sm text-on-surface-variant">加载中...</div>
+                    generatedPlan ? (
+                      <PlanTimeline plan={generatedPlan} />
+                    ) : (
+                      <div className="text-sm text-on-surface-variant text-center py-8">加载中...</div>
+                    )
                   )}
                 </div>
               </motion.div>
