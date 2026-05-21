@@ -16,9 +16,7 @@ test.beforeAll(async ({ browser }) => {
   await ctx.close();
 });
 
-// Inject token before each test
 async function goToProfile(page: Page) {
-  // Go to login page first (on the correct origin), set token, then navigate to profile
   await page.goto(`${BASE_URL}/login`);
   await page.evaluate((token) => {
     localStorage.setItem('auth_token', token);
@@ -31,6 +29,8 @@ test.describe('个人中心', () => {
   test.beforeEach(async ({ page }) => {
     await goToProfile(page);
   });
+
+  // ── Navigation ──
 
   test('侧边栏显示个人中心导航项', async ({ page }) => {
     await expect(page.locator('aside').getByText('个人中心')).toBeVisible();
@@ -45,6 +45,8 @@ test.describe('个人中心', () => {
     await page.waitForURL('**/profile');
     expect(page.url()).toContain('/profile');
   });
+
+  // ── ProfileCard ──
 
   test('展示态：显示角色徽章', async ({ page }) => {
     await expect(page.getByText('管理员', { exact: true })).toBeVisible();
@@ -72,6 +74,7 @@ test.describe('个人中心', () => {
     await page.getByPlaceholder('专业 (如 计算机科学)').fill('计算机科学');
     await page.getByPlaceholder('学院 (如 信息学院)').fill('信息学院');
     await page.getByPlaceholder(/当前规划/).fill('准备考研');
+    // ProfileCard save button is the first "保存" in DOM (ProfileCard is above tab content)
     await page.getByRole('button', { name: '保存' }).first().click();
 
     await expect(page.getByText('2024级')).toBeVisible();
@@ -106,6 +109,8 @@ test.describe('个人中心', () => {
     await expect(page.getByText('持久化测试')).toBeVisible();
   });
 
+  // ── Tabs ──
+
   test('默认 AI 计划 Tab 激活', async ({ page }) => {
     await expect(page.locator('button', { hasText: 'AI 计划' })).toHaveClass(/bg-surface/);
   });
@@ -122,26 +127,16 @@ test.describe('个人中心', () => {
     await expect(page.locator('button', { hasText: 'AI 计划' })).toHaveClass(/bg-surface/);
   });
 
-  test('切换到个人课表后右侧面板显示上传区域', async ({ page }) => {
+  // ── Right Panel (only on schedule tab) ──
+
+  test('个人课表 Tab 显示右侧面板上传区域', async ({ page }) => {
     await page.locator('button', { hasText: '个人课表' }).click();
     await expect(page.getByText('重新上传课表')).toBeVisible();
   });
 
-  test('切换到个人课表后右侧面板显示待办事项', async ({ page }) => {
+  test('个人课表 Tab 显示右侧面板待办事项', async ({ page }) => {
     await page.locator('button', { hasText: '个人课表' }).click();
     await expect(page.getByText('待办事项').first()).toBeVisible();
-  });
-
-  test('切换到个人课表后右侧面板显示自定义偏好', async ({ page }) => {
-    await page.locator('button', { hasText: '个人课表' }).click();
-    await expect(page.getByPlaceholder('如：我是夜猫子，晚上效率高')).toBeVisible();
-  });
-
-  test('AI 计划页的生成区域有模型选择器', async ({ page }) => {
-    // Model select is now next to the generate button
-    const modelSelect = page.locator('select').first();
-    await expect(modelSelect).toBeVisible();
-    await expect(modelSelect).toHaveValue('deepseek-v4-pro');
   });
 
   test('年级/专业输入框已移除', async ({ page }) => {
@@ -149,4 +144,28 @@ test.describe('个人中心', () => {
     await expect(page.getByPlaceholder('如：计算机科学')).not.toBeVisible();
   });
 
+  // ── AI Plan: has a plan → shows PlanTimeline + regenerate ──
+
+  test('有本周计划时显示 PlanTimeline', async ({ page }) => {
+    await expect(page.getByText('周一').first()).toBeVisible();
+  });
+
+  test('有本周计划时显示重新生成按钮', async ({ page }) => {
+    await expect(page.getByText('重新生成')).toBeVisible();
+  });
+
+  // ── AI Plan: history list + drawer ──
+
+  test('历史计划列表可见', async ({ page }) => {
+    await expect(page.getByText('查看历史计划')).toBeVisible();
+  });
+
+  test('点击历史计划打开抽屉', async ({ page }) => {
+    // Click first history card
+    const card = page.locator('button', { hasText: '周' }).first();
+    await card.click();
+    await page.waitForTimeout(500);
+    // Drawer should have close button (X icon)
+    await expect(page.locator('.lucide-x').first()).toBeVisible();
+  });
 });

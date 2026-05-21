@@ -8,6 +8,8 @@ import type { Commitment } from './CommitmentForm';
 import PlanTimeline from './PlanTimeline';
 import ProfileCard from './ProfileCard';
 import PlanHistoryList from './PlanHistoryList';
+import { motion, AnimatePresence } from 'motion/react';
+import { X } from 'lucide-react';
 
 const CUSTOM_PROMPT_KEY = 'ai_schedule_custom_prompt';
 const STORED_COURSES_KEY = 'ai_schedule_courses';
@@ -21,8 +23,6 @@ function computeCurrentWeek(): number {
   return Math.max(1, Math.floor(diffDays / 7) + 1);
 }
 
-const WEEKDAY_SHORT = ['一', '二', '三', '四', '五', '六', '日'];
-
 export default function PersonalCenterPage() {
   const generatedPlan = useAiScheduleStore((s) => s.generatedPlan);
   const generating = useAiScheduleStore((s) => s.generating);
@@ -30,6 +30,7 @@ export default function PersonalCenterPage() {
   const generatePlan = useAiScheduleStore((s) => s.generatePlan);
   const clearGenerated = useAiScheduleStore((s) => s.clearGenerated);
   const fetchPlans = useAiScheduleStore((s) => s.fetchPlans);
+  const fetchPlanDetail = useAiScheduleStore((s) => s.fetchPlanDetail);
 
   const [courses, setCourses] = useState<EditableCourse[]>([]);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
@@ -48,7 +49,8 @@ export default function PersonalCenterPage() {
   });
   const [currentWeek] = useState<number>(computeCurrentWeek);
   const [activeTab, setActiveTab] = useState<'plan' | 'schedule'>('plan');
-  const [planExpanded, setPlanExpanded] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTitle, setDrawerTitle] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getCurrentWeekCourses = () => courses.filter((c) => c.weeks.includes(currentWeek));
@@ -142,7 +144,6 @@ export default function PersonalCenterPage() {
     const formattedCommitments = commitments.map((c) => ({ name: c.name, date: c.date, start_time: c.start, end_time: c.end, priority: c.priority }));
     localStorage.setItem(CUSTOM_PROMPT_KEY, customPrompt);
 
-    setPlanExpanded(true);
     await generatePlan({
       courses: currentWeekCourses.map((c) => ({ name: c.course_name, weekday: c.weekday, sections: c.sections, weeks: c.weeks, teacher: c.teacher || '', location: c.location || '' })),
       commitments: formattedCommitments,
@@ -154,14 +155,26 @@ export default function PersonalCenterPage() {
     fetchPlans();
   };
 
-  // Compact weekly schedule overview
+  const handleHistorySelect = async (id: number) => {
+    await fetchPlanDetail(id);
+    const store = useAiScheduleStore.getState();
+    const plan = store.generatedPlan;
+    if (plan?.weekly_plans?.[0]) {
+      setDrawerTitle(`${plan.weekly_plans[0].week_start} 起 · ${plan.weekly_plans.length}周计划`);
+    } else {
+      setDrawerTitle('计划详情');
+    }
+    setDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    useAiScheduleStore.setState({ selectedPlan: null, generatedPlan: null });
+  };
+
   const cwCourses = getCurrentWeekCourses();
   const hasCourses = courses.length > 0;
-  const coursesByDay: Record<number, EditableCourse[]> = {};
-  cwCourses.forEach((c) => {
-    if (!coursesByDay[c.weekday]) coursesByDay[c.weekday] = [];
-    coursesByDay[c.weekday].push(c);
-  });
+  const hasPlan = !!generatedPlan;
 
   if (initialLoading) {
     return (
@@ -180,7 +193,7 @@ export default function PersonalCenterPage() {
     <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 4rem)' }}>
       <style>{` .scrollbar-thin::-webkit-scrollbar { width: 4px; } .scrollbar-thin::-webkit-scrollbar-track { background: transparent; } .scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(var(--outline-variant)/.3); border-radius: 2px; } `}</style>
 
-      {/* TopBar — title only, clean */}
+      {/* TopBar */}
       <div className="sticky top-0 z-20 bg-surface-container-lowest/95 backdrop-blur-sm border-b border-outline-variant/30 px-4 lg:px-6 py-3">
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-bold font-headline title-ink">个人中心</h2>
@@ -192,9 +205,9 @@ export default function PersonalCenterPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex min-h-0">
-        {/* Main content — full width on plan tab, shared on schedule tab */}
-        <div className={`flex-1 min-w-0 overflow-y-auto scrollbar-thin p-4 lg:p-6 space-y-4 ${activeTab === 'schedule' ? '' : ''}`}>
+      <div className="flex-1 flex min-h-0 relative">
+        {/* Main content */}
+        <div className="flex-1 min-w-0 overflow-y-auto scrollbar-thin p-4 lg:p-6 space-y-4">
           <ProfileCard onChange={setProfile} />
 
           {/* Tabs */}
@@ -216,44 +229,22 @@ export default function PersonalCenterPage() {
           {/* ===== AI Plan Tab ===== */}
           {activeTab === 'plan' && (
             <div className="space-y-4">
-              {/* Weekly schedule at a glance */}
-              {hasCourses && (
-                <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low/40 p-4">
-                  <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-3">
-                    第{currentWeek}周课程
-                  </h3>
-                  <div className="grid grid-cols-7 gap-1">
-                    {WEEKDAY_SHORT.map((day, i) => {
-                      const dayCourses = coursesByDay[i + 1] || [];
-                      return (
-                        <div key={i} className="text-center">
-                          <div className="text-[10px] text-outline mb-1">{day}</div>
-                          <div className="space-y-0.5">
-                            {dayCourses.slice(0, 3).map((c) => (
-                              <div
-                                key={c.id}
-                                className="text-[9px] leading-tight px-0.5 py-0.5 rounded bg-primary/10 text-primary truncate"
-                                title={c.course_name}
-                              >
-                                {c.course_name.length > 4 ? c.course_name.slice(0, 4) + '…' : c.course_name}
-                              </div>
-                            ))}
-                            {dayCourses.length > 3 && (
-                              <div className="text-[9px] text-outline">+{dayCourses.length - 3}</div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+              {!hasCourses ? (
+                <div className="text-center py-8">
+                  <div className="text-3xl mb-3 opacity-30">📋</div>
+                  <p className="text-sm font-medium text-on-surface mb-1">还没有课表</p>
+                  <p className="text-xs text-on-surface-variant mb-4">在「个人课表」Tab 上传课表后开始使用</p>
+                  <button onClick={() => setActiveTab('schedule')} className="btn-outline text-sm px-4 py-2">
+                    去上传课表
+                  </button>
                 </div>
-              )}
+              ) : hasPlan ? (
+                /* Has plan: show it prominently */
+                <div className="space-y-4">
+                  <PlanTimeline plan={generatedPlan} />
+                  {generateError && <div className="p-3 bg-error/10 text-error rounded-lg text-sm">{generateError}</div>}
 
-              {/* Generate section — with model + save next to generate */}
-              {hasCourses ? (
-                <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4">
-                  <p className="text-sm font-semibold text-on-surface mb-1">生成新计划</p>
-                  <p className="text-xs text-on-surface-variant mb-3">基于当前周课表 + 待办 + 个人资料</p>
+                  {/* Action bar */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <select value={textModel}
                       onChange={(e) => { setTextModel(e.target.value); localStorage.setItem('ai_text_model', e.target.value); }}
@@ -271,49 +262,57 @@ export default function PersonalCenterPage() {
                           <span className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
                           AI 分析中...
                         </span>
-                      ) : '✨ 生成'}
+                      ) : '✨ 重新生成'}
                     </button>
+                  </div>
+
+                  {/* History button */}
+                  <div className="pt-2 border-t border-outline-variant/20">
+                    <button
+                      onClick={() => { fetchPlans(); }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      查看历史计划 →
+                    </button>
+                    <div className="mt-2">
+                      <PlanHistoryList onSelect={handleHistorySelect} />
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <div className="text-3xl mb-3 opacity-30">📋</div>
-                  <p className="text-sm font-medium text-on-surface mb-1">还没有课表</p>
-                  <p className="text-xs text-on-surface-variant mb-4">在「个人课表」Tab 上传课表后开始使用</p>
-                  <button onClick={() => setActiveTab('schedule')} className="btn-outline text-sm px-4 py-2">
-                    去上传课表
-                  </button>
+                /* Has courses but no plan yet */
+                <div className="space-y-4">
+                  <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4">
+                    <p className="text-sm font-semibold text-on-surface mb-1">还没有本周计划</p>
+                    <p className="text-xs text-on-surface-variant mb-3">基于当前周课表 + 待办 + 个人资料生成</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <select value={textModel}
+                        onChange={(e) => { setTextModel(e.target.value); localStorage.setItem('ai_text_model', e.target.value); }}
+                        className="px-2 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-[11px] focus-ring">
+                        <option value="deepseek-v4-pro">DeepSeek</option>
+                        <option value="minimax-m2.7">MiniMax</option>
+                      </select>
+                      <button onClick={handleGenerate} disabled={generating}
+                        className="btn-primary text-sm px-5 py-2 font-semibold shadow-sm">
+                        {generating ? (
+                          <span className="flex items-center gap-2">
+                            <span className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                            AI 分析中...
+                          </span>
+                        ) : '✨ 生成计划'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* History */}
+                  <div className="pt-2 border-t border-outline-variant/20">
+                    <button onClick={() => { fetchPlans(); }} className="text-xs text-primary hover:underline mb-2">
+                      查看历史计划 →
+                    </button>
+                    <PlanHistoryList onSelect={handleHistorySelect} />
+                  </div>
                 </div>
               )}
-
-              {/* Generated plan — collapsible card */}
-              {generatedPlan && (
-                <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low/40 overflow-hidden">
-                  <button
-                    onClick={() => setPlanExpanded(!planExpanded)}
-                    className="w-full text-left p-4 flex items-center justify-between hover:bg-surface-container-low/60 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{planExpanded ? '▼' : '▶'}</span>
-                      <span className="text-sm font-semibold text-on-surface">
-                        {generatedPlan.weekly_plans?.[0]?.week_start || ''} 起 · {generatedPlan.weekly_plans?.length || 0}周计划
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-on-surface-variant">
-                      {new Date().toLocaleDateString('zh-CN')}
-                    </span>
-                  </button>
-                  {planExpanded && (
-                    <div className="px-4 pb-4">
-                      <PlanTimeline plan={generatedPlan} />
-                      {generateError && <div className="mt-2 p-3 bg-error/10 text-error rounded-lg text-sm">{generateError}</div>}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Plan history */}
-              <PlanHistoryList />
             </div>
           )}
 
@@ -346,7 +345,7 @@ export default function PersonalCenterPage() {
           )}
         </div>
 
-        {/* Right panel — only visible on 个人课表 tab */}
+        {/* Right panel — only on 个人课表 tab */}
         {activeTab === 'schedule' && (
           <div className="w-60 xl:w-72 shrink-0 border-l border-outline-variant/30 overflow-y-auto scrollbar-thin p-3 space-y-3 bg-surface-container-lowest/50">
             <div>
@@ -378,6 +377,45 @@ export default function PersonalCenterPage() {
             </div>
           </div>
         )}
+
+        {/* Plan detail drawer */}
+        <AnimatePresence>
+          {drawerOpen && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 bg-black/20 z-30"
+                onClick={closeDrawer}
+              />
+              {/* Drawer */}
+              <motion.div
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                className="absolute right-0 top-0 bottom-0 w-[420px] max-w-[90vw] bg-surface-container-lowest border-l border-outline-variant/30 z-40 flex flex-col shadow-2xl"
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant/20 shrink-0">
+                  <h3 className="text-sm font-semibold text-on-surface truncate">{drawerTitle}</h3>
+                  <button onClick={closeDrawer} className="p-1 hover:bg-surface-container-low rounded-lg transition-colors">
+                    <X size={18} className="text-on-surface-variant" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
+                  {generatedPlan ? (
+                    <PlanTimeline plan={generatedPlan} />
+                  ) : (
+                    <div className="text-sm text-on-surface-variant">加载中...</div>
+                  )}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
 
       {generateError && activeTab !== 'plan' && (
