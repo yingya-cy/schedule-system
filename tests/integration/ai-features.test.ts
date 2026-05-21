@@ -270,3 +270,194 @@ describe('AI Counsel — default title', () => {
     expect(created.title).toBe('New Chat');
   });
 });
+
+// =============================================
+// Plan detail / deletion / 404 / 401
+// =============================================
+
+describe('GET /api/ai/schedule-plans/:id', () => {
+  it('returns 404 for non-existent plan', async () => {
+    const res = await supertest(app)
+      .get('/api/ai/schedule-plans/99999')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(404);
+    expect(res.body.error).toContain('不存在');
+  });
+
+  it('returns 401 without auth', async () => {
+    await supertest(app)
+      .get('/api/ai/schedule-plans/1')
+      .expect(401);
+  });
+
+  it('returns plan detail after save', async () => {
+    // Save a schedule first
+    const saveRes = await supertest(app)
+      .post('/api/ai/save-schedule')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({
+        courses: [{ id: 't1', course_name: '详情测试', weekday: 1, sections: [1, 2], weeks: [1], teacher: '', location: '', remark: '' }],
+        commitments: [],
+      })
+      .expect(200);
+
+    // Now fetch the plan detail
+    const id = saveRes.body.data.id;
+    const res = await supertest(app)
+      .get(`/api/ai/schedule-plans/${id}`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.id).toBe(id);
+
+    // Clean up
+    await supertest(app)
+      .delete(`/api/ai/schedule-plans/${id}`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+  });
+});
+
+describe('DELETE /api/ai/schedule-plans/:id', () => {
+  it('returns 401 without auth', async () => {
+    await supertest(app)
+      .delete('/api/ai/schedule-plans/1')
+      .expect(401);
+  });
+
+  it('returns 200 even for non-existent (idempotent)', async () => {
+    await supertest(app)
+      .delete('/api/ai/schedule-plans/99999')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+  });
+});
+
+// =============================================
+// save-schedule validation
+// =============================================
+
+describe('POST /api/ai/save-schedule — validation', () => {
+  it('returns 400 when courses is empty', async () => {
+    const res = await supertest(app)
+      .post('/api/ai/save-schedule')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ courses: [], commitments: [] })
+      .expect(400);
+    expect(res.body.error).toContain('为空');
+  });
+
+  it('returns 401 without auth', async () => {
+    await supertest(app)
+      .post('/api/ai/save-schedule')
+      .send({ courses: [{ id: 'x', course_name: 'x', weekday: 1, sections: [1], weeks: [1], teacher: '', location: '', remark: '' }] })
+      .expect(401);
+  });
+});
+
+// =============================================
+// latest-schedule without data
+// =============================================
+
+describe('GET /api/ai/latest-schedule — edge cases', () => {
+  it('returns 401 without auth', async () => {
+    await supertest(app)
+      .get('/api/ai/latest-schedule')
+      .expect(401);
+  });
+
+  it('returns empty data for user with no schedule', async () => {
+    const res = await supertest(app)
+      .get('/api/ai/latest-schedule')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toBeTruthy();
+  });
+});
+
+// =============================================
+// AI Counsel — session/message auth guards
+// =============================================
+
+describe('AI Counsel — auth guards', () => {
+  it('GET sessions returns 401 without auth', async () => {
+    await supertest(app)
+      .get('/api/ai/counsel/sessions')
+      .expect(401);
+  });
+
+  it('POST sessions returns 401 without auth', async () => {
+    await supertest(app)
+      .post('/api/ai/counsel/sessions')
+      .expect(401);
+  });
+
+  it('GET messages returns 401 without auth', async () => {
+    await supertest(app)
+      .get('/api/ai/counsel/sessions/1/messages')
+      .expect(401);
+  });
+
+  it('POST messages returns 401 without auth', async () => {
+    await supertest(app)
+      .post('/api/ai/counsel/sessions/1/messages')
+      .send({ role: 'user', content: 'hi' })
+      .expect(401);
+  });
+
+  it('DELETE session returns 401 without auth', async () => {
+    await supertest(app)
+      .delete('/api/ai/counsel/sessions/1')
+      .expect(401);
+  });
+});
+
+// =============================================
+// AI Counsel — message validation edge cases
+// =============================================
+
+describe('AI Counsel — message validation', () => {
+  let sessionId: number;
+
+  beforeAll(async () => {
+    const res = await supertest(app)
+      .post('/api/ai/counsel/sessions')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+    sessionId = res.body.data.id;
+  });
+
+  it('returns 500 when role is missing (DB constraint)', async () => {
+    const res = await supertest(app)
+      .post(`/api/ai/counsel/sessions/${sessionId}/messages`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ content: 'no role' })
+      .expect(500);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns 500 when content is missing (DB constraint)', async () => {
+    const res = await supertest(app)
+      .post(`/api/ai/counsel/sessions/${sessionId}/messages`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ role: 'user' })
+      .expect(500);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns 404 for non-existent session messages', async () => {
+    const res = await supertest(app)
+      .get('/api/ai/counsel/sessions/99999/messages')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+    expect(res.body.data).toEqual([]);
+  });
+
+  // Cleanup
+  afterAll(async () => {
+    await supertest(app)
+      .delete(`/api/ai/counsel/sessions/${sessionId}`)
+      .set('Authorization', `Bearer ${studentToken}`);
+  });
+});
