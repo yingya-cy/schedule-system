@@ -1,5 +1,5 @@
 // Route paths
-export type RoutePath = '/dashboard' | '/files' | '/courses' | '/contacts' | '/schedule' | '/chat' | '/scoring' | '/login' | '/users' | '/file-center' | '/psychology' | '/ai-schedule' | '/ai-counsel';
+export type RoutePath = '/dashboard' | '/files' | '/courses' | '/contacts' | '/schedule' | '/chat' | '/scoring' | '/login' | '/users' | '/file-center' | '/psychology' | '/ai-schedule' | '/ai-counsel' | '/profile';
 
 export const ROUTE_LABELS: Record<RoutePath, string> = {
   '/dashboard': '仪表盘',
@@ -15,6 +15,7 @@ export const ROUTE_LABELS: Record<RoutePath, string> = {
   '/psychology': '心理咨询',
   '/ai-schedule': 'AI 排课',
   '/ai-counsel': 'AI 咨询',
+  '/profile': '个人中心',
 };
 
 export interface NavItem {
@@ -203,3 +204,11 @@ export const COURSE_COLORS = [
 
 // 学期周数
 export const WEEK_COUNT = 20;
+
+// 用户个人资料（扩展字段，存 localStorage）
+export interface ProfileData {
+  grade: string;
+  major: string;
+  college: string;
+  planNote: string;
+}

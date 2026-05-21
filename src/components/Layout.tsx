@@ -19,7 +19,8 @@ import {
   Bot,
   Smile,
   LogOut,
-  Shield
+  Shield,
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NavItem, ROUTE_LABELS, RoutePath } from '@/types';
@@ -33,7 +34,7 @@ const navItems: NavItem[] = [
   { id: 'scoring', label: '比赛评分', icon: 'trophy' },
   { id: 'users', label: '用户管理', icon: 'users', adminOnly: true },
   // { id: 'psychology', label: '心理咨询', icon: 'heart' },
-  { id: 'ai-schedule', label: 'AI 排课', icon: 'bot' },
+  { id: 'profile', label: '个人中心', icon: 'user' },
   { id: 'ai-counsel', label: 'AI 咨询', icon: 'smile' },
 ];
 
@@ -82,6 +83,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       case 'heart': return <Heart size={20} />;
       case 'bot': return <Bot size={20} />;
       case 'smile': return <Smile size={20} />;
+      case 'user': return <User size={20} />;
       default: return <LayoutDashboard size={20} />;
     }
   };
@@ -171,7 +173,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </motion.aside>
 
       {/* Main Content */}
-      <div className="flex-1 lg:ml-64 flex flex-col w-full pb-4 lg:pb-0 min-w-0 overflow-hidden">
+      <div className="flex-1 lg:ml-64 flex flex-col w-full pb-20 lg:pb-0 min-w-0 overflow-hidden">
         {/* Top Bar */}
         <header className="sticky top-0 z-40 h-16 bg-surface-container-lowest/80 backdrop-blur-md flex justify-between items-center px-4 lg:px-8 shadow-nav">
           <div className="flex items-center gap-4 min-w-0 flex-1">
