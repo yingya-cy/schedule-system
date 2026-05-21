@@ -221,7 +221,8 @@ export default function PersonalCenterPage() {
   // Check if today is heavy — show counsel link
   const todayWeekday = new Date().getDay() || 7;
   const todayCourses = courses.filter((c) => c.weeks.includes(currentWeek) && c.weekday === todayWeekday);
-  const isHeavyDay = todayCourses.length >= 5 || cwCourses.length >= 15 || commitments.length >= 3;
+  const todaySectionCount = todayCourses.reduce((sum, c) => sum + c.sections.length, 0);
+  const isHeavyDay = todaySectionCount >= 5 || commitments.length >= 3;
 
   const buildCounselContext = () => {
     const today = new Date().toLocaleDateString('zh-CN');
@@ -353,8 +354,8 @@ export default function PersonalCenterPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-on-surface">今天安排比较满</p>
                         <p className="text-xs text-on-surface-variant mt-0.5">
-                          {todayCourses.length > 0 ? `${todayCourses.length}门课` : ''}
-                          {todayCourses.length > 0 && commitments.length > 0 ? ' + ' : ''}
+                          {todaySectionCount > 0 ? `${todaySectionCount}节课` : ''}
+                          {todaySectionCount > 0 && commitments.length > 0 ? ' + ' : ''}
                           {commitments.length > 0 ? `${commitments.length}个待办` : ''}
                           ，和小暖聊聊调整节奏？
                         </p>
