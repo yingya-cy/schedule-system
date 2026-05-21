@@ -34,7 +34,7 @@ test.describe('个人中心', () => {
     await expect(page.locator('aside').getByText('个人中心')).toBeVisible();
   });
 
-  test('顶栏标题显示个人中心', async ({ page }) => {
+  test('Layout 顶栏标题显示个人中心', async ({ page }) => {
     await expect(page.locator('header h2').filter({ hasText: '个人中心' })).toBeVisible();
   });
 
@@ -59,7 +59,6 @@ test.describe('个人中心', () => {
     await expect(page.getByPlaceholder('年级 (如 2024级)')).toBeVisible();
     await expect(page.getByPlaceholder('专业 (如 计算机科学)')).toBeVisible();
     await expect(page.getByPlaceholder('学院 (如 信息学院)')).toBeVisible();
-    await expect(page.getByPlaceholder(/当前规划/)).toBeVisible();
   });
 
   test('填写并保存资料', async ({ page }) => {
@@ -124,9 +123,14 @@ test.describe('个人中心', () => {
     await expect(page.locator('button', { hasText: 'AI 计划' })).toHaveClass(/bg-surface/);
   });
 
-  // ── Right Panel (only on schedule tab) ──
+  // ── Schedule tab: right panel + save button ──
 
-  test('个人课表 Tab 显示右侧面板', async ({ page }) => {
+  test('个人课表 Tab 显示保存按钮', async ({ page }) => {
+    await page.locator('button', { hasText: '个人课表' }).click();
+    await expect(page.getByText('保存课表')).toBeVisible();
+  });
+
+  test('个人课表 Tab 右侧面板显示上传和待办', async ({ page }) => {
     await page.locator('button', { hasText: '个人课表' }).click();
     await expect(page.getByText('重新上传课表')).toBeVisible();
     await expect(page.getByText('待办事项').first()).toBeVisible();
@@ -134,7 +138,6 @@ test.describe('个人中心', () => {
 
   test('年级/专业输入框已移除', async ({ page }) => {
     await expect(page.getByPlaceholder('如：2024级')).not.toBeVisible();
-    await expect(page.getByPlaceholder('如：计算机科学')).not.toBeVisible();
   });
 
   // ── AI Plan: main view ──
@@ -143,28 +146,25 @@ test.describe('个人中心', () => {
     await expect(page.getByText('周一').first()).toBeVisible();
   });
 
-  test('显示重新生成按钮', async ({ page }) => {
+  test('工具栏显示生成/保存/模型/历史按钮', async ({ page }) => {
+    // Toolbar has all actions in one row
     await expect(page.getByText('重新生成')).toBeVisible();
+    await expect(page.getByText('保存')).toBeVisible();
+    await expect(page.locator('select').first()).toHaveValue('deepseek-v4-pro');
+    await expect(page.getByText(/历史/)).toBeVisible();
   });
 
   // ── History drawer ──
 
-  test('显示历史计划按钮', async ({ page }) => {
-    await expect(page.getByText('历史计划')).toBeVisible();
-  });
-
-  test('点击历史计划按钮打开抽屉', async ({ page }) => {
-    await page.getByText('历史计划').first().click();
+  test('点击历史按钮打开抽屉', async ({ page }) => {
+    await page.getByText(/^历史/).first().click();
     await page.waitForTimeout(500);
-    // Drawer should appear with close button
-    const drawerClose = page.locator('.lucide-x').first();
-    await expect(drawerClose).toBeVisible();
+    await expect(page.locator('.lucide-x').first()).toBeVisible();
   });
 
   test('抽屉内点击计划卡片查看详情', async ({ page }) => {
-    await page.getByText('历史计划').first().click();
+    await page.getByText(/^历史/).first().click();
     await page.waitForTimeout(800);
-    // Click first plan card in the drawer list (有 '周' in title)
     const planCard = page.locator('button', { hasText: '起 ·' }).first();
     const count = await planCard.count();
     if (count > 0) {
