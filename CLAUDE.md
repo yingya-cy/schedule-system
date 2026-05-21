@@ -197,3 +197,29 @@ URL.revokeObjectURL(url);
 3. 文件中心"分别下载" — `<a href=...>` 不带 token → 401
 
 **检查清单：** 任何新增的下载/预览功能，确认是否走了 `fetch` + header 认证。
+
+## 部署到服务器
+
+**服务器**: `ssh root@47.120.29.188`，项目路径 `/root/workspace/schedule-system`
+
+**自动判断部署方式：**
+```bash
+changed=$(git diff --name-only HEAD~1)
+if echo "$changed" | grep -qE 'Dockerfile|package.json'; then
+  # 改动了 Dockerfile/依赖 → 全量重建（~3min）
+  scp 改动的文件 && ssh 服务器 "npm run build && docker compose build backend --no-cache && docker compose up -d --force-recreate && sleep 10 && docker exec schedule-nginx nginx -s reload"
+elif echo "$changed" | grep -qE 'server\.ts|src/routes/'; then
+  # 改动了后端代码 → 重建 backend（~40s，用缓存）
+  scp 改动的文件 && ssh 服务器 "npm run build && docker compose build backend && docker compose up -d --force-recreate && sleep 10 && docker exec schedule-nginx nginx -s reload"
+else
+  # 只有前端/CSS → 只 rebuild dist + 重启 nginx（~15s）
+  scp 改动的文件 && ssh 服务器 "npm run build && docker compose restart nginx"
+fi
+```
+
+**关键修复记录（不要反复踩坑）：**
+- 单独重建 backend 后 nginx 缓存旧 IP → 必须 `docker exec schedule-nginx nginx -s reload`
+- FLASK_URL 必须注入 docker-compose: `FLASK_URL=http://ai-service:5002`
+- `server.ts` / AI Python 文件必须 SCP 后 rebuild（COPY 在 build 时生效）
+- 新增表/字段用 `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ADD COLUMN`
+- Node 18 兼容：`new File(...)` → `new Blob(...)`
