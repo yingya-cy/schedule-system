@@ -307,9 +307,11 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - [x] 19.13 服务器部署修复 — FLASK_URL 注入、File→Blob（Node 18 兼容）、MySQL 字符集双重编码、AI 表创建、nginx DNS resolver、dist 重建、server.ts 路由注册
 - [x] 19.14 AI 咨询显示 — 恢复导航入口、会话标题乱码修复（ASCII 默认值）、DeepSeek 关 thinking、模型参数透传
 - [x] 19.15 服务器内存优化 — Gunicorn workers 5→2、Docker limit 1.5G→512M、MySQL buffer pool 256→128M、日志限制 10MB×3
-- [ ] 19.16 覆盖率提升
-- [ ] 19.17 横型课表文本提取对齐（fitz vs pdfjs-dist 差异致 `parse_by_rules` 部分字段不准）
-- **Status:** in-progress
+- [x] 19.16 UI/UX 改善 — touch targets ≥44px、z-index scale、prefers-reduced-motion、100vh→dvh、skeleton loading、border-radius/shadow 统一、语义色柔化、AI 咨询密度缩小、消息溢出 min-h-0
+- [x] 19.17 测试补充 — AI 排课 save-schedule/latest-schedule、空 course_name 归一化、会话默认标题、空课表错误信息 (+4 tests, 505→509)
+- [ ] 19.18 横型课表文本提取对齐（fitz vs pdfjs-dist，已验证 fitz 兼容，待关闭）
+- [ ] 19.19 覆盖率提升
+- **Status:** fix/ux-improvements 分支，待合回 main
 
 ## Key Questions
 1. 登录系统是独立用户体系还是对接学校 SSO/LDAP？→ **独立用户体系（用户名+密码+JWT），不开放注册，管理员后台创建**
