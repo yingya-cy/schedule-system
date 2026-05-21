@@ -148,8 +148,13 @@ export default function AiSchedulePage() {
 
   if (initialLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 4rem)' }}>
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
+          <div className="skeleton h-8 w-48 rounded" />
+          <div className="skeleton h-32 rounded-2xl" />
+          <div className="skeleton h-48 rounded-2xl" />
+          <div className="skeleton-card" />
+        </div>
       </div>
     );
   }

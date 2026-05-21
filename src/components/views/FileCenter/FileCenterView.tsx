@@ -782,7 +782,9 @@ export default function FileCenterView() {
 
 
               {loading ? (
-                <p className="text-sm text-on-surface-variant py-8 text-center">加载中...</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 p-4">
+                  {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton-card" />)}
+                </div>
               ) : !selectedFolderId ? (
                 /* Root level — show root folders from the tree */
                 (() => {
