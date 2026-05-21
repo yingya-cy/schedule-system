@@ -6,40 +6,40 @@
   --font-headline: "Ma Shan Zheng", "Noto Serif SC", serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* ── Watercolor palette (refined) ── */
+  /* ── 敦煌暖调配色 — 赭石 · 金 · 米白 · 墨褐 ── */
 
-  /* Primary — watercolor blue */
-  --color-primary: #5092b0;
-  --color-primary-container: #a8c8db;
-  --color-on-primary: #fefcf9;
+  /* Primary — 赭石 (cave-painting red-brown) */
+  --color-primary: #AA6B4F;
+  --color-primary-container: #E8C7B2;
+  --color-on-primary: #FDF8F3;
 
-  /* Background — cool paper with depth */
-  --color-background: #f0f0f2;
-  --color-surface: #fafaf8;
-  --color-surface-container: #f3f1ee;
-  --color-surface-container-low: #f7f5f2;
-  --color-surface-container-high: #ebe7e1;
-  --color-surface-container-highest: #e2ddd5;
-  --color-surface-container-lowest: #ffffff;
+  /* Background — 米白 silk paper */
+  --color-background: #F3EEE5;
+  --color-surface: #FBF8F2;
+  --color-surface-container: #F5F1E8;
+  --color-surface-container-low: #F8F4EC;
+  --color-surface-container-high: #EDE7D9;
+  --color-surface-container-highest: #E4DCCB;
+  --color-surface-container-lowest: #FFFFFF;
 
-  /* Text — warm but crisp */
-  --color-on-surface: #302b26;
-  --color-on-surface-variant: #736d65;
+  /* Text — 墨褐 ink + 暖灰 variant */
+  --color-on-surface: #3D2C1E;
+  --color-on-surface-variant: #8B7B6B;
 
-  /* Borders — defined but soft */
-  --color-outline: #cec7bd;
-  --color-outline-variant: #e2dbd1;
+  /* Borders — 暖沙 beige */
+  --color-outline: #D4C8B3;
+  --color-outline-variant: #E8DED0;
 
-  /* Semantic — desaturated to match watercolor softness */
-  --color-success: #6a8d78;
-  --color-secondary: #8c819f;
-  --color-warning: #b89462;
-  --color-error: #b4726c;
+  /* Semantic — matched to warm palette */
+  --color-success: #7A9B6F;
+  --color-secondary: #C4A265;
+  --color-warning: #C48B52;
+  --color-error: #B4675A;
 
-  --color-on-secondary: #ffffff;
-  --color-on-warning: #ffffff;
-  --color-on-error: #ffffff;
-  --color-on-success: #ffffff;
+  --color-on-secondary: #FFFFFF;
+  --color-on-warning: #FFFFFF;
+  --color-on-error: #FFFFFF;
+  --color-on-success: #FFFFFF;
 
   /* Font sizes */
   --text-xs: 0.75rem;
@@ -59,7 +59,7 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background: #f0f0f2;
+    background: #F3EEE5;
   }
 
   /* Paper fiber grain — CSS radial-gradient micro-dots, no SVG filter */
@@ -71,11 +71,11 @@
     z-index: 9998; /* Above all content, below toasts/modals */
     opacity: 0.25;
     background-image:
-      radial-gradient(circle at 15% 25%, rgba(120, 110, 100, 0.07) 0.4px, transparent 0.4px),
-      radial-gradient(circle at 55% 65%, rgba(120, 110, 100, 0.05) 0.3px, transparent 0.3px),
-      radial-gradient(circle at 80% 15%, rgba(120, 110, 100, 0.04) 0.5px, transparent 0.5px),
-      radial-gradient(circle at 35% 80%, rgba(120, 110, 100, 0.05) 0.3px, transparent 0.3px),
-      radial-gradient(circle at 70% 45%, rgba(120, 110, 100, 0.04) 0.4px, transparent 0.4px);
+      radial-gradient(circle at 15% 25%, rgba(160, 130, 100, 0.07) 0.4px, transparent 0.4px),
+      radial-gradient(circle at 55% 65%, rgba(180, 150, 120, 0.05) 0.3px, transparent 0.3px),
+      radial-gradient(circle at 80% 15%, rgba(160, 130, 100, 0.04) 0.5px, transparent 0.5px),
+      radial-gradient(circle at 35% 80%, rgba(180, 150, 120, 0.05) 0.3px, transparent 0.3px),
+      radial-gradient(circle at 70% 45%, rgba(160, 130, 100, 0.04) 0.4px, transparent 0.4px);
     background-size: 8px 8px, 6px 6px, 10px 10px, 7px 7px, 9px 9px;
   }
 
@@ -209,12 +209,12 @@
   /* ── Cards (unified border-radius + water-blur hover) ── */
   .card {
     @apply rounded-2xl border border-outline-variant/30 bg-surface-container-lowest
-           shadow-[0_1px_4px_rgba(139,119,90,0.04)]
+           shadow-[0_1px_4px_rgba(170,140,110,0.05)]
            transition-all duration-300;
   }
   .card-interactive {
     @apply rounded-2xl border border-outline-variant/30 bg-surface-container-lowest
-           shadow-[0_1px_4px_rgba(139,119,90,0.04)]
+           shadow-[0_1px_4px_rgba(170,140,110,0.05)]
            cursor-pointer
            transition-all duration-300;
     transition: box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1),
@@ -222,20 +222,20 @@
   }
   .card-interactive:hover {
     box-shadow:
-      0 4px 16px rgba(139, 119, 90, 0.10),
-      0 0 0 4px rgba(80, 146, 176, 0.08);
+      0 4px 16px rgba(170, 140, 110, 0.12),
+      0 0 0 4px rgba(170, 107, 79, 0.08);
     transform: translateY(-1px);
   }
 
   /* ── Shadows (3-level system) ── */
   .shadow-card {
-    box-shadow: 0 1px 4px rgba(139, 119, 90, 0.04);
+    box-shadow: 0 1px 4px rgba(170, 140, 110, 0.05);
   }
   .shadow-modal {
-    box-shadow: 0 8px 30px rgba(139, 119, 90, 0.10);
+    box-shadow: 0 8px 30px rgba(170, 140, 110, 0.12);
   }
   .shadow-nav {
-    box-shadow: 0 4px 20px rgba(139, 119, 90, 0.06);
+    box-shadow: 0 4px 20px rgba(170, 140, 110, 0.07);
   }
 
   /* ── Skeleton loading ── */
@@ -270,8 +270,8 @@
   .btn-primary {
     @apply bg-primary text-on-primary font-semibold rounded-2xl
            border border-primary/20
-           shadow-[0_4px_14px_rgba(80,146,176,0.25)]
-           hover:shadow-[0_6px_20px_rgba(80,146,176,0.35)]
+           shadow-[0_4px_14px_rgba(170,107,79,0.25)]
+           hover:shadow-[0_6px_20px_rgba(170,107,79,0.35)]
            hover:brightness-105
            active:brightness-95
            transition-all duration-200 ease-out;
