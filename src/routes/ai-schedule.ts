@@ -120,9 +120,10 @@ router.post('/schedule-plan', authenticate, async (req, res) => {
 
     let planId: number;
     if (existingRow) {
+      // Only update plan_data, preserve existing input_data (full course list)
       await pool.query(
-        'UPDATE ai_schedule_plans SET input_data = ?, plan_data = ? WHERE id = ?',
-        [inputJson, planJson, existingRow.id]
+        'UPDATE ai_schedule_plans SET plan_data = ? WHERE id = ?',
+        [planJson, existingRow.id]
       );
       planId = existingRow.id;
     } else {

@@ -32,6 +32,7 @@ export default function PersonalCenterPage() {
   const generatePlan = useAiScheduleStore((s) => s.generatePlan);
   const clearGenerated = useAiScheduleStore((s) => s.clearGenerated);
   const fetchPlans = useAiScheduleStore((s) => s.fetchPlans);
+  const deletePlan = useAiScheduleStore((s) => s.deletePlan);
   const plans = useAiScheduleStore((s) => s.plans);
 
   const [courses, setCourses] = useState<EditableCourse[]>([]);
@@ -121,7 +122,6 @@ export default function PersonalCenterPage() {
       const recognized = data.data.courses || [];
       if (recognized.length === 0) { setUploadError('未能识别到课程'); return; }
       setCourses(recognized);
-      clearGenerated();
       setPlanId(null);
     } catch (err: unknown) { setUploadError(err instanceof Error ? err.message : '上传失败'); }
     finally { setUploading(false); }
@@ -144,7 +144,8 @@ export default function PersonalCenterPage() {
 
   const handleGenerate = async () => {
     if (courses.length === 0) return;
-    await handleSave();
+    // Don't auto-save here — save is explicit via button. Sending current-week
+    // courses to AI should not overwrite the full course list in DB.
     const currentWeekCourses = getCurrentWeekCourses();
     const formattedCommitments = commitments.map((c) => ({ name: c.name, date: c.date, start_time: c.start, end_time: c.end, priority: c.priority }));
     localStorage.setItem(CUSTOM_PROMPT_KEY, customPrompt);
@@ -196,6 +197,14 @@ export default function PersonalCenterPage() {
     setDrawerView('list');
     setDrawerTitle('历史计划');
     setDrawerPlan(null);
+  };
+
+  const handleDeletePlan = async (id: number) => {
+    await deletePlan(id);
+    // If deleted plan was being viewed, go back to list
+    if (drawerView === 'detail') {
+      handleDrawerBack();
+    }
   };
 
   const closeDrawer = () => {
@@ -407,7 +416,7 @@ export default function PersonalCenterPage() {
 
                 <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
                   {drawerView === 'list' ? (
-                    <PlanHistoryList onSelect={handleHistorySelect} />
+                    <PlanHistoryList onSelect={handleHistorySelect} onDelete={handleDeletePlan} />
                   ) : drawerLoading ? (
                     <div className="text-sm text-on-surface-variant text-center py-8">加载中...</div>
                   ) : drawerPlan ? (
