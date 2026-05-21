@@ -156,7 +156,13 @@ export default function AiCounselPage() {
   useEffect(() => {
     if (autoSendRef.current && inputText && !streaming && !sendingRef.current) {
       autoSendRef.current = false;
-      const timer = setTimeout(() => handleSend(), 400);
+      const timer = setTimeout(async () => {
+        // Always start a fresh session for schedule context
+        const newId = await createSession();
+        setActiveSession(newId);
+        useAiCounselStore.setState({ messages: [] });
+        handleSend();
+      }, 400);
       return () => clearTimeout(timer);
     }
   }, [inputText, streaming]);
