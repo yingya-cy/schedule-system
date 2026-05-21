@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { PlanData, DailyPlan, TimeBlock } from '../../services/aiScheduleApi';
 
 const DAY_NAMES = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
@@ -14,14 +15,18 @@ const PRIORITY_BADGES: Record<string, string> = {
 };
 
 function TimeBlockRow({ b }: { b: TimeBlock }) {
+  const [expanded, setExpanded] = useState(false);
   const s = TYPE_STYLES[b.type] || TYPE_STYLES.study;
   return (
-    <div className={`flex items-start gap-2 px-3 py-2 rounded-lg ${s.bg} border-l-2 ${s.bar}`}>
+    <button
+      onClick={() => setExpanded(!expanded)}
+      className={`w-full text-left flex items-start gap-2 px-3 py-2 rounded-lg ${s.bg} border-l-2 ${s.bar} hover:brightness-95 transition-all cursor-pointer`}
+    >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-on-surface truncate">{b.task}</span>
+          <span className={`text-xs font-medium text-on-surface ${expanded ? '' : 'truncate'}`}>{b.task}</span>
           {b.priority === 'high' && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${PRIORITY_BADGES.high}`}>核心</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 bg-error/15 text-error">核心</span>
           )}
         </div>
         <div className="flex items-center gap-2 mt-0.5 text-[10px] text-on-surface-variant">
@@ -30,13 +35,13 @@ function TimeBlockRow({ b }: { b: TimeBlock }) {
         </div>
         {b.note && <p className="text-[10px] text-outline mt-0.5">{b.note}</p>}
       </div>
-    </div>
+    </button>
   );
 }
 
 function DayCard({ day, isToday }: { day: DailyPlan; isToday: boolean }) {
   const dn = DAY_NAMES[day.day_of_week] || '';
-  const dateLabel = day.date.slice(5); // MM-DD
+  const dateLabel = day.date.slice(5);
   const hasContent = day.time_blocks.length > 0;
 
   return (
@@ -56,7 +61,7 @@ function DayCard({ day, isToday }: { day: DailyPlan; isToday: boolean }) {
   );
 }
 
-export default function PlanTimeline({ plan }: { plan: PlanData }) {
+export default function PlanTimeline({ plan, compact }: { plan: PlanData; compact?: boolean }) {
   if (!plan.weekly_plans?.length) {
     return <div className="empty-state"><p className="empty-state-title">计划数据为空</p><p className="empty-state-desc">上传课表后点击"生成学习计划"</p></div>;
   }
@@ -64,6 +69,9 @@ export default function PlanTimeline({ plan }: { plan: PlanData }) {
   const week = plan.weekly_plans[0];
   const days = week.daily_plans;
   const today = new Date().toISOString().slice(0, 10);
+  const gridCols = compact
+    ? 'grid-cols-1 sm:grid-cols-2'
+    : 'grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7';
 
   return (
     <div className="space-y-4">
@@ -74,7 +82,7 @@ export default function PlanTimeline({ plan }: { plan: PlanData }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7 gap-2">
+      <div className={`grid ${gridCols} gap-2`}>
         {days.map((d) => (
           <DayCard key={d.date} day={d} isToday={d.date === today} />
         ))}

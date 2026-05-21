@@ -163,13 +163,13 @@ test.describe('个人中心', () => {
 
   test('抽屉内点击计划卡片查看详情', async ({ page }) => {
     await page.getByText('历史计划').first().click();
-    await page.waitForTimeout(500);
-    // Click first plan in drawer
-    const planCard = page.locator('button', { hasText: '周' }).first();
-    if (await planCard.count() > 0) {
+    await page.waitForTimeout(800);
+    // Click first plan card in the drawer list (有 '周' in title)
+    const planCard = page.locator('button', { hasText: '起 ·' }).first();
+    const count = await planCard.count();
+    if (count > 0) {
       await planCard.click();
-      await page.waitForTimeout(500);
-      // Should show back button
+      await page.waitForTimeout(800);
       await expect(page.locator('.lucide-chevron-left').first()).toBeVisible();
     }
   });

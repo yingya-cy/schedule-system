@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAiScheduleStore } from '../../stores/aiScheduleStore';
 import type { EditableCourse, ProfileData } from '../../types';
+import type { SchedulePlan } from '../../services/aiScheduleApi';
+import { aiScheduleApi } from '../../services/aiScheduleApi';
 import ScheduleEditor from '../ScheduleEditor';
 import CommitmentForm from './CommitmentForm';
 import type { Commitment } from './CommitmentForm';
@@ -30,7 +32,6 @@ export default function PersonalCenterPage() {
   const generatePlan = useAiScheduleStore((s) => s.generatePlan);
   const clearGenerated = useAiScheduleStore((s) => s.clearGenerated);
   const fetchPlans = useAiScheduleStore((s) => s.fetchPlans);
-  const fetchPlanDetail = useAiScheduleStore((s) => s.fetchPlanDetail);
   const plans = useAiScheduleStore((s) => s.plans);
 
   const [courses, setCourses] = useState<EditableCourse[]>([]);
@@ -53,6 +54,8 @@ export default function PersonalCenterPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<'list' | 'detail'>('list');
   const [drawerTitle, setDrawerTitle] = useState('');
+  const [drawerPlan, setDrawerPlan] = useState<SchedulePlan['plan_data'] | null>(null);
+  const [drawerLoading, setDrawerLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getCurrentWeekCourses = () => courses.filter((c) => c.weeks.includes(currentWeek));
@@ -157,7 +160,7 @@ export default function PersonalCenterPage() {
     fetchPlans();
   };
 
-  // ── Drawer ──
+  // ── Drawer (uses local state, NOT store.generatedPlan) ──
 
   const openHistoryDrawer = () => {
     fetchPlans();
@@ -167,23 +170,30 @@ export default function PersonalCenterPage() {
   };
 
   const handleHistorySelect = async (id: number) => {
-    await fetchPlanDetail(id);
-    const store = useAiScheduleStore.getState();
-    const plan = store.generatedPlan;
-    if (plan?.weekly_plans?.[0]) {
-      setDrawerTitle(`${plan.weekly_plans[0].week_start} 起 · ${plan.weekly_plans.length}周`);
+    setDrawerLoading(true);
+    try {
+      const data = await aiScheduleApi.getPlan(id);
+      const planData = data.plan_data;
+      setDrawerPlan(planData);
+      if (planData?.weekly_plans?.[0]) {
+        setDrawerTitle(`${planData.weekly_plans[0].week_start} 起 · ${planData.weekly_plans.length}周`);
+      }
+      setDrawerView('detail');
+    } catch {
+      // silently fail
     }
-    setDrawerView('detail');
+    finally { setDrawerLoading(false); }
   };
 
   const handleDrawerBack = () => {
     setDrawerView('list');
     setDrawerTitle('历史计划');
+    setDrawerPlan(null);
   };
 
   const closeDrawer = () => {
     setDrawerOpen(false);
-    useAiScheduleStore.setState({ selectedPlan: null, generatedPlan: null });
+    setDrawerPlan(null);
   };
 
   const cwCourses = getCurrentWeekCourses();
@@ -224,20 +234,31 @@ export default function PersonalCenterPage() {
         <div className="flex-1 min-w-0 overflow-y-auto scrollbar-thin p-4 lg:p-6 space-y-4">
           <ProfileCard onChange={setProfile} />
 
-          {/* Tabs */}
-          <div className="flex items-center gap-1 bg-surface-container-low/50 rounded-xl p-1 w-fit">
-            <button
-              onClick={() => setActiveTab('plan')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'plan' ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
-            >
-              AI 计划
-            </button>
-            <button
-              onClick={() => setActiveTab('schedule')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'schedule' ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
-            >
-              个人课表
-            </button>
+          {/* Tabs + History button */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-1 bg-surface-container-low/50 rounded-xl p-1">
+              <button
+                onClick={() => setActiveTab('plan')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'plan' ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+              >
+                AI 计划
+              </button>
+              <button
+                onClick={() => setActiveTab('schedule')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'schedule' ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+              >
+                个人课表
+              </button>
+            </div>
+            {activeTab === 'plan' && (
+              <button
+                onClick={openHistoryDrawer}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 bg-surface-container-low/40 hover:bg-surface-container-low transition-colors text-xs text-on-surface-variant"
+              >
+                <Clock size={13} />
+                历史计划{plans.length > 0 && ` (${plans.length})`}
+              </button>
+            )}
           </div>
 
           {/* ===== AI Plan Tab ===== */}
@@ -257,7 +278,6 @@ export default function PersonalCenterPage() {
                   <PlanTimeline plan={generatedPlan} />
                   {generateError && <div className="p-3 bg-error/10 text-error rounded-lg text-sm">{generateError}</div>}
 
-                  {/* Action bar */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <select value={textModel}
                       onChange={(e) => { setTextModel(e.target.value); localStorage.setItem('ai_text_model', e.target.value); }}
@@ -278,58 +298,28 @@ export default function PersonalCenterPage() {
                       ) : '✨ 重新生成'}
                     </button>
                   </div>
-
-                  {/* Compact history button */}
-                  <button
-                    onClick={openHistoryDrawer}
-                    className="w-full flex items-center justify-between p-3 rounded-xl border border-outline-variant/20 bg-surface-container-low/40 hover:bg-surface-container-low transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Clock size={14} className="text-outline" />
-                      <span className="text-xs font-medium text-on-surface">
-                        历史计划 {plans.length > 0 && <span className="text-outline">({plans.length})</span>}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-outline">查看全部 →</span>
-                  </button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4">
-                    <p className="text-sm font-semibold text-on-surface mb-1">还没有本周计划</p>
-                    <p className="text-xs text-on-surface-variant mb-3">基于当前周课表 + 待办 + 个人资料生成</p>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <select value={textModel}
-                        onChange={(e) => { setTextModel(e.target.value); localStorage.setItem('ai_text_model', e.target.value); }}
-                        className="px-2 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-[11px] focus-ring">
-                        <option value="deepseek-v4-pro">DeepSeek</option>
-                        <option value="minimax-m2.7">MiniMax</option>
-                      </select>
-                      <button onClick={handleGenerate} disabled={generating}
-                        className="btn-primary text-sm px-5 py-2 font-semibold shadow-sm">
-                        {generating ? (
-                          <span className="flex items-center gap-2">
-                            <span className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
-                            AI 分析中...
-                          </span>
-                        ) : '✨ 生成计划'}
-                      </button>
-                    </div>
+                <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4">
+                  <p className="text-sm font-semibold text-on-surface mb-1">还没有本周计划</p>
+                  <p className="text-xs text-on-surface-variant mb-3">基于当前周课表 + 待办 + 个人资料生成</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select value={textModel}
+                      onChange={(e) => { setTextModel(e.target.value); localStorage.setItem('ai_text_model', e.target.value); }}
+                      className="px-2 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-[11px] focus-ring">
+                      <option value="deepseek-v4-pro">DeepSeek</option>
+                      <option value="minimax-m2.7">MiniMax</option>
+                    </select>
+                    <button onClick={handleGenerate} disabled={generating}
+                      className="btn-primary text-sm px-5 py-2 font-semibold shadow-sm">
+                      {generating ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                          AI 分析中...
+                        </span>
+                      ) : '✨ 生成计划'}
+                    </button>
                   </div>
-
-                  {/* Compact history button */}
-                  <button
-                    onClick={openHistoryDrawer}
-                    className="w-full flex items-center justify-between p-3 rounded-xl border border-outline-variant/20 bg-surface-container-low/40 hover:bg-surface-container-low transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Clock size={14} className="text-outline" />
-                      <span className="text-xs font-medium text-on-surface">
-                        历史计划 {plans.length > 0 && <span className="text-outline">({plans.length})</span>}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-outline">查看全部 →</span>
-                  </button>
                 </div>
               )}
             </div>
@@ -414,9 +404,8 @@ export default function PersonalCenterPage() {
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                className="absolute right-0 top-0 bottom-0 w-[520px] max-w-[92vw] bg-surface-container-lowest border-l border-outline-variant/30 z-40 flex flex-col shadow-2xl"
+                className="absolute right-0 top-0 bottom-0 w-[720px] max-w-[95vw] bg-surface-container-lowest border-l border-outline-variant/30 z-40 flex flex-col shadow-2xl"
               >
-                {/* Drawer header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant/20 shrink-0">
                   <div className="flex items-center gap-2 min-w-0">
                     {drawerView === 'detail' && (
@@ -431,16 +420,15 @@ export default function PersonalCenterPage() {
                   </button>
                 </div>
 
-                {/* Drawer body */}
                 <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
                   {drawerView === 'list' ? (
                     <PlanHistoryList onSelect={handleHistorySelect} />
+                  ) : drawerLoading ? (
+                    <div className="text-sm text-on-surface-variant text-center py-8">加载中...</div>
+                  ) : drawerPlan ? (
+                    <PlanTimeline plan={drawerPlan} compact />
                   ) : (
-                    generatedPlan ? (
-                      <PlanTimeline plan={generatedPlan} />
-                    ) : (
-                      <div className="text-sm text-on-surface-variant text-center py-8">加载中...</div>
-                    )
+                    <div className="text-sm text-on-surface-variant text-center py-8">加载失败</div>
                   )}
                 </div>
               </motion.div>
