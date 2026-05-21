@@ -42,6 +42,12 @@ services:
       - DB_NAME=schedule_system
       - JWT_SECRET=${JWT_SECRET}
       - AI_SERVICE_URL=http://ai-service:5002
+      - FLASK_URL=http://ai-service:5002
+      - OSS_REGION=${OSS_REGION}
+      - OSS_ACCESS_KEY_ID=${OSS_ACCESS_KEY_ID}
+      - OSS_ACCESS_KEY_SECRET=${OSS_ACCESS_KEY_SECRET}
+      - OSS_BUCKET=${OSS_BUCKET}
+      - OSS_ENDPOINT=${OSS_ENDPOINT}
     volumes:
       - uploads:/app/uploads
     depends_on:
@@ -73,6 +79,11 @@ services:
       - AI_API_KEY=${AI_API_KEY}
       - AI_BASE_URL=${AI_BASE_URL}
       - AI_MODEL=${AI_MODEL}
+      - AI_VISION_MODEL=${AI_VISION_MODEL}
+      - AI_TEXT_MODEL=${AI_TEXT_MODEL}
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+      - MINIMAX_BASE_URL=${MINIMAX_BASE_URL}
+      - MINIMAX_MODEL=${MINIMAX_MODEL}
     deploy:
       resources:
         limits:

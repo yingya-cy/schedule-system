@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import supertest from 'supertest';
 import { createApp, loginAs, createTestUser } from '../helpers/testServer.ts';
 
+
 let app: ReturnType<typeof createApp>;
 let adminToken: string;
 let studentToken: string;
@@ -120,7 +121,7 @@ describe('AI Counsel Sessions CRUD', () => {
       .expect(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data.length).toBeGreaterThanOrEqual(1);
-    expect(res.body.data[0].title).toBe('新对话');
+    expect(res.body.data[0].title).toBe('New Chat');
   });
 
   it('GET session messages returns empty', async () => {
@@ -173,5 +174,99 @@ describe('POST /api/ai/counsel/stream', () => {
       .send({ messages: [{ role: 'user', content: 'x'.repeat(2001) }] })
       .expect(400);
     expect(res.body.error).toContain('过长');
+  });
+});
+
+// =============================================
+// New: schedule-plan parameter forwarding
+// =============================================
+
+describe('POST /api/ai/schedule-plan — parameter forwarding', () => {
+  it('rejects empty courses with 400', async () => {
+    const res = await supertest(app)
+      .post('/api/ai/schedule-plan')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ courses: [], commitments: [], model: 'deepseek-v4-pro' })
+      .expect(400);
+    expect(res.body.error).toContain('为空');
+  });
+});
+
+// =============================================
+// New: save-schedule / latest-schedule
+// =============================================
+
+describe('POST /api/ai/save-schedule + GET /api/ai/latest-schedule', () => {
+  it('saves and retrieves schedule with commitments', async () => {
+    const saveRes = await supertest(app)
+      .post('/api/ai/save-schedule')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({
+        courses: [{ id: 'c1', course_name: '测试课程', weekday: 3, sections: [5, 6], weeks: [1, 2, 3], teacher: '张老师', location: 'A101', remark: '' }],
+        commitments: [{ name: '考试', date: '2026-06-15', start_time: '09:00', end_time: '11:00', priority: 'high' }],
+      })
+      .expect(200);
+    expect(saveRes.body.success).toBe(true);
+    expect(saveRes.body.data.id).toBeTruthy();
+
+    const getRes = await supertest(app)
+      .get('/api/ai/latest-schedule')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+    expect(getRes.body.success).toBe(true);
+    expect(getRes.body.data.courses.length).toBeGreaterThanOrEqual(1);
+    expect(getRes.body.data.courses[0].course_name).toBe('测试课程');
+    expect(getRes.body.data.commitments.length).toBe(1);
+
+    // Clean up: delete the plan so it doesn't affect next test
+    await supertest(app)
+      .delete(`/api/ai/schedule-plans/${saveRes.body.data.id}`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+  });
+
+  it('normalizes missing course_name to "未识别课程"', async () => {
+    const saveRes = await supertest(app)
+      .post('/api/ai/save-schedule')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({
+        courses: [{ id: 'c2', weekday: 1, sections: [1, 2], weeks: [1], teacher: '', location: '', remark: '' }],
+        commitments: [],
+      })
+      .expect(200);
+
+    // latest-schedule normalizes: course_name || name → '未识别课程'
+    const getRes = await supertest(app)
+      .get('/api/ai/latest-schedule')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+    expect(getRes.body.data.courses[0].course_name).toBe('未识别课程');
+
+    // Clean up
+    await supertest(app)
+      .delete(`/api/ai/schedule-plans/${saveRes.body.data.id}`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+  });
+});
+
+// =============================================
+// New: session default title is ASCII "New Chat"
+// =============================================
+
+describe('AI Counsel — default title', () => {
+  it('creates session with ASCII default title', async () => {
+    const res = await supertest(app)
+      .post('/api/ai/counsel/sessions')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+    expect(res.body.success).toBe(true);
+
+    const sessions = await supertest(app)
+      .get('/api/ai/counsel/sessions')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+    const created = sessions.body.data.find((s: { id: number }) => s.id === res.body.data.id);
+    expect(created.title).toBe('New Chat');
   });
 });

@@ -5,6 +5,7 @@ import { RowDataPacket, ResultSetHeader, getErrorMessage } from '../utils/db-typ
 
 const router = Router();
 const FLASK_URL = process.env.FLASK_URL || 'http://localhost:5002';
+const DEFAULT_TITLE = 'New Chat';
 
 // POST /api/ai/counsel/stream — SSE 代理
 router.post('/counsel/stream', authenticate, async (req, res) => {
@@ -39,12 +40,13 @@ router.post('/counsel/stream', authenticate, async (req, res) => {
         'INSERT INTO ai_counsel_messages (session_id, role, content) VALUES (?, ?, ?)',
         [sessionId, 'user', lastMsg.content]
       );
-      // Update session title from first 20 chars
+      // Update session title from first user message
       const [sessions] = await pool.query(
-        'SELECT title FROM ai_counsel_sessions WHERE id = ? AND title = ?',
-        [sessionId, '新对话']
+        'SELECT title FROM ai_counsel_sessions WHERE id = ?',
+        [sessionId]
       );
-      if ((sessions as RowDataPacket[]).length > 0) {
+      const row = (sessions as RowDataPacket[])[0];
+      if (row && (row.title === DEFAULT_TITLE || row.title === '新对话' || row.title.length === 0)) {
         await pool.query(
           'UPDATE ai_counsel_sessions SET title = ? WHERE id = ?',
           [lastMsg.content.slice(0, 30), sessionId]
@@ -90,12 +92,7 @@ router.post('/counsel/stream', authenticate, async (req, res) => {
       res.write(text);
     }
 
-    // Save AI response to DB
-    if (sessionId) {
-      // Extract the full content from the SSE stream
-      // Since we don't have the full text in the proxy, store a placeholder
-      // The frontend should save via REST when stream completes
-    }
+    // Note: AI response saved by frontend via POST /sessions/:id/messages after stream completes
   } catch (err: unknown) {
     if (!controller.signal.aborted) {
       const msg = getErrorMessage(err);
@@ -110,8 +107,8 @@ router.post('/counsel/stream', authenticate, async (req, res) => {
 router.post('/counsel/sessions', authenticate, async (req, res) => {
   try {
     const [result] = await pool.query(
-      'INSERT INTO ai_counsel_sessions (user_id) VALUES (?)',
-      [req.user!.userId]
+      'INSERT INTO ai_counsel_sessions (user_id, title) VALUES (?, ?)',
+      [req.user!.userId, DEFAULT_TITLE]
     );
     res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {

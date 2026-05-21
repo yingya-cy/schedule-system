@@ -166,7 +166,7 @@ export default function AiSchedulePage() {
     <div className="sticky top-0 z-20 bg-surface-container-lowest/95 backdrop-blur-sm border-b border-outline-variant/30 px-4 lg:px-6 py-3">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-bold text-on-surface font-headline title-ink">{planMode ? '学习计划' : 'AI 日程安排'}</h2>
+          <h2 className="text-lg font-bold font-headline title-ink">{planMode ? '学习计划' : 'AI 日程安排'}</h2>
           {hasCourses && (
             <span className="text-[11px] text-on-surface-variant">
               第{currentWeek}周 · {cwCourses.length}/{courses.length}门课

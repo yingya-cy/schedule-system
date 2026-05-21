@@ -38,6 +38,9 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 # 复制代码
 COPY service.py ./
 COPY gunicorn.conf.py ./
+COPY ai_endpoints.py ./
+COPY ai_schedule.py ./
+COPY ai_counsel.py ./
 COPY prompts/ ./prompts/
 COPY utils/ ./utils/
 

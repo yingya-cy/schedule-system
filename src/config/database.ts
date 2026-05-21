@@ -29,10 +29,10 @@ export const dbConfig = {
 // 创建连接池
 const pool = mysql.createPool(dbConfig);
 
-// ✅ 每次获取连接时强制设置 utf8mb4，防止中文乱码
+// ✅ 每个连接建立时强制 SET NAMES utf8mb4
 pool.on('connection', (connection) => {
-  connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci', (err) => {
-    if (err) console.error('Failed to set charset:', err.message);
+  connection.query('SET NAMES utf8mb4', (err) => {
+    if (err) console.error('SET NAMES failed:', err.message);
   });
 });
 

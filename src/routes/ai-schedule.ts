@@ -200,7 +200,8 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 
     // 图/PDF 都直接发 Flask，走原有逻辑
     const fd = new FormData();
-    fd.append('file', new File([file.buffer], file.originalname, { type: file.mimetype }));
+    const blob = new Blob([file.buffer], { type: file.mimetype });
+    fd.append('file', blob, file.originalname);
     const ocrUrl = isPdf ? '/api/ocr/pdf' : '/api/ocr/image';
     const r = await fetch(`${FLASK_URL}${ocrUrl}`, { method: 'POST', body: fd });
     const data = await r.json() as Record<string, unknown>;

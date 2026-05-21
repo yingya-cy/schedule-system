@@ -304,9 +304,11 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - [x] 19.10 AI 提示词优化 — 加入学校作息时间表（08:20-21:00）、block 减密（每块≥1h，每天≤8块）
 - [x] 19.11 组件清理 — WeekSelector 移除右键设当前周、DashboardView 同步清理
 - [x] 19.12 DeepSeek thinking 关闭 — `extra_body: {thinking: {type: "disabled"}}`
-- [ ] 19.13 服务器内存优化（115MB free）
-- [ ] 19.14 覆盖率提升
-- [ ] 19.15 横型课表文本提取对齐（fitz vs pdfjs-dist 差异致 `parse_by_rules` 部分字段不准）
+- [x] 19.13 服务器部署修复 — FLASK_URL 注入、File→Blob（Node 18 兼容）、MySQL 字符集双重编码、AI 表创建、nginx DNS resolver、dist 重建、server.ts 路由注册
+- [x] 19.14 AI 咨询显示 — 恢复导航入口、会话标题乱码修复（ASCII 默认值）、DeepSeek 关 thinking、模型参数透传
+- [x] 19.15 服务器内存优化 — Gunicorn workers 5→2、Docker limit 1.5G→512M、MySQL buffer pool 256→128M、日志限制 10MB×3
+- [ ] 19.16 覆盖率提升
+- [ ] 19.17 横型课表文本提取对齐（fitz vs pdfjs-dist 差异致 `parse_by_rules` 部分字段不准）
 - **Status:** in-progress
 
 ## Key Questions
