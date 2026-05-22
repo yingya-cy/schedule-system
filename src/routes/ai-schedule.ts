@@ -10,6 +10,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 
 const router = Router();
 const FLASK_URL = process.env.FLASK_URL || 'http://localhost:5002';
+const DIFY_URL = process.env.DIFY_URL || 'http://localhost:5001';
+const DIFY_SCHEDULE_API_KEY = process.env.DIFY_SCHEDULE_API_KEY || '';
 
 function parseSectionString(raw: string): number[] {
   // Handle "1-2节", "1-2", "3-4节" range format
@@ -94,20 +96,74 @@ router.post('/schedule-plan', authenticate, async (req, res) => {
       return;
     }
 
-    // 调用 Flask
-    const flaskRes = await fetch(`${FLASK_URL}/api/ai/schedule-plan`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ courses, commitments, grade, major, next_monday, model, current_week, custom_prompt }),
-    });
-    const flaskJson = await flaskRes.json();
+    const useDify = process.env.AI_BACKEND === 'dify';
+    let plan;
 
-    if (!flaskJson.success) {
-      res.status(502).json(flaskJson);
-      return;
+    if (useDify) {
+      // 调用 Dify 工作流
+      const difyRes = await fetch(`${DIFY_URL}/v1/workflows/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${DIFY_SCHEDULE_API_KEY}`,
+        },
+        body: JSON.stringify({
+          inputs: {
+            grade: grade || '未知',
+            major: major || '未知',
+            current_week: String(current_week || '?'),
+            courses_json: JSON.stringify(courses),
+            commitments_json: JSON.stringify(commitments || []),
+            custom_prompt: custom_prompt || '',
+            next_monday: next_monday || '下周一',
+          },
+          response_mode: 'blocking',
+          user: String(req.user!.userId),
+        }),
+      });
+      const difyJson = await difyRes.json();
+
+      if (!difyRes.ok || difyJson.error) {
+        res.status(502).json({ success: false, error: difyJson.error || difyJson.message || 'Dify 调用失败' });
+        return;
+      }
+
+      let rawOutput = difyJson.data?.outputs?.text || '';
+      rawOutput = rawOutput.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      try {
+        plan = JSON.parse(rawOutput);
+      } catch {
+        const firstBrace = rawOutput.indexOf('{');
+        if (firstBrace === -1) {
+          res.status(502).json({ success: false, error: 'Dify 返回无 JSON', raw: rawOutput.slice(0, 500) });
+          return;
+        }
+        let depth = 0, end = -1;
+        for (let i = firstBrace; i < rawOutput.length; i++) {
+          if (rawOutput[i] === '{') depth++;
+          else if (rawOutput[i] === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
+        }
+        if (end > 0) {
+          try { plan = JSON.parse(rawOutput.slice(firstBrace, end)); } catch {
+            res.status(502).json({ success: false, error: 'Dify JSON 解析失败', raw: rawOutput.slice(0, 500) });
+            return;
+          }
+        } else {
+          res.status(502).json({ success: false, error: 'Dify 返回格式异常', raw: rawOutput.slice(0, 500) });
+          return;
+        }
+      }
+    } else {
+      // 走 Flask
+      const flaskRes = await fetch(`${FLASK_URL}/api/ai/schedule-plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courses, commitments, grade, major, next_monday, model, current_week, custom_prompt }),
+      });
+      const flaskJson = await flaskRes.json();
+      if (!flaskJson.success) { res.status(502).json(flaskJson); return; }
+      plan = flaskJson.data;
     }
-
-    const plan = flaskJson.data;
     const inputJson = JSON.stringify({ courses, commitments, grade, major });
     const planJson = JSON.stringify(plan);
 
@@ -338,8 +394,12 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 // GET /api/ai/latest-schedule — 加载用户最近的课表和计划
 router.get('/latest-schedule', authenticate, async (req, res) => {
   try {
+    // Prefer rows with plan_data; fall back to latest draft
     const [plans] = await pool.query(
-      'SELECT id, input_data, plan_data, created_at FROM ai_schedule_plans WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
+      `SELECT id, input_data, plan_data, created_at FROM ai_schedule_plans
+       WHERE user_id = ?
+       ORDER BY CASE WHEN plan_data IS NOT NULL THEN 0 ELSE 1 END, created_at DESC
+       LIMIT 1`,
       [req.user!.userId]
     );
     const latestPlan = (plans as RowDataPacket[])[0];
@@ -380,7 +440,7 @@ router.get('/latest-schedule', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/ai/save-schedule — 保存课表（生成计划前持久化）
+// POST /api/ai/save-schedule — 保存课表（幂等：已有待生成行则更新，否则新建）
 router.post('/save-schedule', authenticate, async (req, res) => {
   try {
     const { courses, commitments } = req.body;
@@ -389,12 +449,32 @@ router.post('/save-schedule', authenticate, async (req, res) => {
       return;
     }
 
-    const [result] = await pool.query(
-      'INSERT INTO ai_schedule_plans (user_id, input_data) VALUES (?, ?)',
-      [req.user!.userId, JSON.stringify({ courses, commitments: commitments || [] })]
-    );
+    const inputJson = JSON.stringify({ courses, commitments: commitments || [] });
+    const userId = req.user!.userId;
 
-    res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
+    // Update existing pending row if any, otherwise insert
+    const [updateResult] = await pool.query(
+      'UPDATE ai_schedule_plans SET input_data = ? WHERE user_id = ? AND plan_data IS NULL ORDER BY created_at DESC LIMIT 1',
+      [inputJson, userId]
+    );
+    const affected = (updateResult as ResultSetHeader).affectedRows;
+
+    let planId: number;
+    if (affected > 0) {
+      const [rows] = await pool.query(
+        'SELECT id FROM ai_schedule_plans WHERE user_id = ? AND plan_data IS NULL ORDER BY created_at DESC LIMIT 1',
+        [userId]
+      );
+      planId = (rows as RowDataPacket[])[0].id;
+    } else {
+      const [result] = await pool.query(
+        'INSERT INTO ai_schedule_plans (user_id, input_data) VALUES (?, ?)',
+        [userId, inputJson]
+      );
+      planId = (result as ResultSetHeader).insertId;
+    }
+
+    res.json({ success: true, data: { id: planId } });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: getErrorMessage(error) });
   }

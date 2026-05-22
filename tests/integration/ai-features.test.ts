@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import supertest from 'supertest';
 import { createApp, loginAs, createTestUser } from '../helpers/testServer.ts';
-
+import pool from '../../src/config/database';
 
 let app: ReturnType<typeof createApp>;
 let adminToken: string;
@@ -373,6 +373,49 @@ describe('GET /api/ai/latest-schedule — edge cases', () => {
       .expect(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data).toBeTruthy();
+  });
+
+  it('prefers plan_data rows over newer drafts', async () => {
+    // Simulate: save → plan generated → save again → latest-schedule still returns plan
+    const courses = [{ id: 'p1', course_name: '持久化测试', weekday: 1, sections: [1, 2], weeks: [1], teacher: '', location: '', remark: '' }];
+
+    // Step 1: save schedule (creates draft row)
+    const save1 = await supertest(app).post('/api/ai/save-schedule')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ courses, commitments: [] })
+      .expect(200);
+    const draftId = save1.body.data.id;
+
+    // Step 2: simulate plan generation — directly set plan_data on the draft row
+    // (can't call /schedule-plan in test because it hits external AI)
+    await pool.query(
+      'UPDATE ai_schedule_plans SET plan_data = ? WHERE id = ?',
+      [JSON.stringify({ weekly_plans: [], summary: '模拟计划' }), draftId]
+    );
+
+    // Step 3: save schedule again — with idempotent save, no new row is inserted
+    // (the previous draft was filled, so there's no pending row → new one is inserted)
+    const save2 = await supertest(app).post('/api/ai/save-schedule')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ courses, commitments: [] })
+      .expect(200);
+
+    // Step 4: latest-schedule should prefer the row WITH plan_data
+    // over the newer draft row without plan
+    const getRes = await supertest(app)
+      .get('/api/ai/latest-schedule')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+    expect(getRes.body.data.plan).not.toBeNull();
+    expect(getRes.body.data.plan.summary).toBe('模拟计划');
+
+    // Clean up
+    await supertest(app).delete(`/api/ai/schedule-plans/${draftId}`)
+      .set('Authorization', `Bearer ${studentToken}`);
+    if (save2.body.data.id !== draftId) {
+      await supertest(app).delete(`/api/ai/schedule-plans/${save2.body.data.id}`)
+        .set('Authorization', `Bearer ${studentToken}`);
+    }
   });
 });
 

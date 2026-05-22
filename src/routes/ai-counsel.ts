@@ -5,6 +5,8 @@ import { RowDataPacket, ResultSetHeader, getErrorMessage } from '../utils/db-typ
 
 const router = Router();
 const FLASK_URL = process.env.FLASK_URL || 'http://localhost:5002';
+const DIFY_URL = process.env.DIFY_URL || 'http://localhost:5001';
+const DIFY_COUNSEL_API_KEY = process.env.DIFY_COUNSEL_API_KEY || '';
 const DEFAULT_TITLE = 'New Chat';
 
 // POST /api/ai/counsel/stream — SSE 代理
@@ -54,45 +56,86 @@ router.post('/counsel/stream', authenticate, async (req, res) => {
       }
     }
 
-    // Proxy to Flask SSE
-    const flaskRes = await fetch(`${FLASK_URL}/api/ai/counsel/stream`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, model }),
-      signal: controller.signal,
-    });
+    const useDify = process.env.AI_BACKEND === 'dify';
 
-    if (!flaskRes.ok || !flaskRes.body) {
-      res.write(`data: ${JSON.stringify({ error: 'AI 服务不可用' })}\n\n`);
-      res.end();
-      return;
-    }
+    if (useDify) {
+      // Call Dify chat streaming
+      const difyBody: Record<string, unknown> = {
+        inputs: {},
+        query: lastMsg.content,
+        response_mode: 'streaming',
+        user: String(req.user!.userId),
+      };
+      const difyConvId = (req.headers['x-dify-conversation-id'] as string) || '';
+      if (difyConvId) difyBody.conversation_id = difyConvId;
 
-    const reader = flaskRes.body.getReader();
-    const decoder = new TextDecoder();
-    let fullContent = '';
+      const difyRes = await fetch(`${DIFY_URL}/v1/chat-messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${DIFY_COUNSEL_API_KEY}`,
+        },
+        body: JSON.stringify(difyBody),
+        signal: controller.signal,
+      });
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const text = decoder.decode(value, { stream: true });
-
-      // Parse SSE frames and track full response
-      for (const line of text.split('\n')) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            if (data.done && !data.error) {
-              fullContent = data.full_length ? '(streamed)' : data.chunk || '';
-            }
-          } catch { /* ignore parse errors */ }
-        }
+      if (!difyRes.ok || !difyRes.body) {
+        res.write(`data: ${JSON.stringify({ error: 'AI 服务不可用' })}\n\n`);
+        res.end();
+        return;
       }
 
-      res.write(text);
+      const reader = difyRes.body.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
+
+        for (const line of text.split('\n')) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.event === 'message') {
+                fullContent += data.answer || '';
+                res.write(`data: ${JSON.stringify({ chunk: data.answer })}\n\n`);
+              } else if (data.event === 'message_end') {
+                res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+              } else if (data.event === 'error') {
+                res.write(`data: ${JSON.stringify({ error: data.message || '未知错误' })}\n\n`);
+              }
+            } catch { /* ignore parse errors */ }
+          }
+        }
+      }
+    } else {
+      // 走 Flask SSE
+      const flaskRes = await fetch(`${FLASK_URL}/api/ai/counsel/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, model }),
+        signal: controller.signal,
+      });
+
+      if (!flaskRes.ok || !flaskRes.body) {
+        res.write(`data: ${JSON.stringify({ error: 'AI 服务不可用' })}\n\n`);
+        res.end();
+        return;
+      }
+
+      const reader = flaskRes.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(decoder.decode(value, { stream: true }));
+      }
     }
 
-    // Note: AI response saved by frontend via POST /sessions/:id/messages after stream completes
+    // AI response saved by frontend via POST /sessions/:id/messages
   } catch (err: unknown) {
     if (!controller.signal.aborted) {
       const msg = getErrorMessage(err);

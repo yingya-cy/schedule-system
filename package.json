@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:flask\"",
     "dev:server": "tsx server.ts",
-    "dev:flask": "python service.py",
+    "dev:flask": "python -B service.py",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",

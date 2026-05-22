@@ -1,13 +1,25 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useAiCounselStore } from '../../stores/aiCounselStore';
 import { aiCounselApi } from '../../services/aiCounselApi';
 import type { CounselMessage } from '../../services/aiCounselApi';
+import { marked } from 'marked';
 
 const HOTLINE = '全国心理援助热线 400-161-9995';
 const CRISIS_KEYWORDS = ['自杀', '自伤', '自残', '想死', '不想活', '结束生命', '伤害自己', '伤害他人'];
 
 function checkCrisis(text: string): boolean {
   return CRISIS_KEYWORDS.some((kw) => text.includes(kw));
+}
+
+function MarkdownContent({ content }: { content: string }) {
+  const html = useMemo(() => {
+    const raw = marked.parse(content, { async: false }) as string;
+    return raw
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/\son\w+="[^"]*"/gi, '');
+  }, [content]);
+
+  return <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 export default function AiCounselPage() {
@@ -35,6 +47,19 @@ export default function AiCounselPage() {
   const controllerRef = useRef<AbortController | null>(null);
   const sendingRef = useRef(false);
   const autoSendRef = useRef(false);
+  const chunkBuf = useRef('');
+  const flushRaf = useRef(0);
+
+  const flushStreamChunks = () => {
+    if (flushRaf.current) {
+      cancelAnimationFrame(flushRaf.current);
+      flushRaf.current = 0;
+    }
+    if (chunkBuf.current) {
+      appendStreamChunk(chunkBuf.current);
+      chunkBuf.current = '';
+    }
+  };
 
   // Check for pending context from schedule page
   useEffect(() => {
@@ -126,12 +151,17 @@ export default function AiCounselPage() {
               if (data.done) break;
               if (data.chunk) {
                 fullResponse += data.chunk;
-                appendStreamChunk(data.chunk);
+                chunkBuf.current += data.chunk;
+                if (!flushRaf.current) {
+                  flushRaf.current = requestAnimationFrame(() => flushStreamChunks());
+                }
               }
             } catch { /* ignore */ }
           }
         }
       }
+
+      flushStreamChunks();
 
       // Save AI response (no fetchMessages — would duplicate user msg from DB)
       if (fullResponse) {
@@ -174,6 +204,25 @@ export default function AiCounselPage() {
         .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
         .scrollbar-thin::-webkit-scrollbar-thumb { background: rgb(var(--outline-variant)/.3); border-radius: 2px; }
         .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgb(var(--outline)/.4); }
+        .markdown-content p { margin: 0.25em 0; }
+        .markdown-content p:first-child { margin-top: 0; }
+        .markdown-content p:last-child { margin-bottom: 0; }
+        .markdown-content ul, .markdown-content ol { margin: 0.25em 0; padding-left: 1.25em; }
+        .markdown-content li { margin: 0.125em 0; }
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 { margin: 0.5em 0 0.25em; font-weight: 600; }
+        .markdown-content h1 { font-size: 1.2em; }
+        .markdown-content h2 { font-size: 1.1em; }
+        .markdown-content h3 { font-size: 1em; }
+        .markdown-content h4, .markdown-content h5, .markdown-content h6 { font-size: 0.95em; margin: 0.25em 0; font-weight: 600; }
+        .markdown-content code { background: rgb(var(--primary)/.1); padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
+        .markdown-content pre { background: rgb(var(--surface-container-low)); padding: 0.6em 0.8em; border-radius: 6px; overflow-x: auto; margin: 0.4em 0; }
+        .markdown-content pre code { background: none; padding: 0; }
+        .markdown-content blockquote { border-left: 2px solid rgb(var(--primary)/.4); margin: 0.25em 0; padding: 0.1em 0.6em; color: rgb(var(--on-surface-variant)); }
+        .markdown-content a { color: rgb(var(--primary)); text-decoration: underline; }
+        .markdown-content strong { font-weight: 600; }
+        .markdown-content hr { border: none; border-top: 1px solid rgb(var(--outline-variant)/.5); margin: 0.5em 0; }
+        .markdown-content table { border-collapse: collapse; margin: 0.25em 0; font-size: 0.9em; }
+        .markdown-content th, .markdown-content td { border: 1px solid rgb(var(--outline-variant)/.4); padding: 0.25em 0.5em; text-align: left; }
       `}</style>
     <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 6rem)' }}>
       <div className="flex flex-1 min-h-0">
@@ -247,7 +296,12 @@ export default function AiCounselPage() {
                 <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${m.role === 'user'
                   ? 'bg-primary-container text-on-surface rounded-br-md'
                   : 'bg-secondary/10 text-on-surface rounded-bl-md'}`}>
-                  <p className="whitespace-pre-wrap break-words">{m.content}{m.id === 0 && streaming && <span className="animate-pulse">▊</span>}</p>
+                  {m.role === 'user' ? (
+                    <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                  ) : (
+                    <MarkdownContent content={m.content} />
+                  )}
+                  {m.id === 0 && streaming && <span className="animate-pulse">▊</span>}
                 </div>
               </div>
             ))
