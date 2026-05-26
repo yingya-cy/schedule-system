@@ -72,6 +72,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    volumes:
+      - ./dify-kb:/app/dify-kb
     ports:
       - "5002:5002"
     environment:
@@ -84,6 +86,8 @@ services:
       - MINIMAX_API_KEY=${MINIMAX_API_KEY}
       - MINIMAX_BASE_URL=${MINIMAX_BASE_URL}
       - MINIMAX_MODEL=${MINIMAX_MODEL}
+      - KB_PATH=/app/dify-kb
+      - SEMESTER_START=
     deploy:
       resources:
         limits:
