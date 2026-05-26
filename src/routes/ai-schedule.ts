@@ -392,11 +392,10 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 // GET /api/ai/latest-schedule — 加载用户最近的课表和计划
 router.get('/latest-schedule', authenticate, async (req, res) => {
   try {
-    // Prefer rows with plan_data; fall back to latest draft
     const [plans] = await pool.query(
       `SELECT id, input_data, plan_data, created_at FROM ai_schedule_plans
        WHERE user_id = ?
-       ORDER BY CASE WHEN plan_data IS NOT NULL THEN 0 ELSE 1 END, created_at DESC
+       ORDER BY created_at DESC
        LIMIT 1`,
       [req.user!.userId]
     );
