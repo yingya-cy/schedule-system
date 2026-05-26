@@ -56,34 +56,61 @@ def _load_kb():
     for fname in sorted(os.listdir(kb_dir)):
         if not fname.endswith(".txt"):
             continue
-        content = open(os.path.join(kb_dir, fname), encoding="utf-8").read()
-        for sec in re.split(r"\n===+", content):
+        raw = open(os.path.join(kb_dir, fname), encoding="utf-8").read()
+        sections = re.split(r"\n===", raw)
+
+        # 第一个 section 是结构化数据头（JSON-like），提取中文纯文本
+        if sections:
+            header = sections[0].strip()
+            if header and not header.startswith("###"):
+                cn_texts = re.findall(r"[一-鿿\d：:、，。；;!！?？\w]+", header)
+                cn_clean = " ".join(t for t in cn_texts if len(t) > 3)
+                fname_map = {
+                    "01-campus-life.txt": "校园生活信息总览（各校区地址、交通、图书馆、食堂、宿舍、自习室等）",
+                    "02-academics.txt": "教务信息总览",
+                    "03-psychology.txt": "心理健康信息总览",
+                    "04-career.txt": "就业资助信息总览",
+                    "05-safety.txt": "安全信息总览",
+                }
+                title = fname_map.get(os.path.basename(fname), "")
+                if title:
+                    articles.append({"title": title, "text": cn_clean[:3000]})
+
+        # 后续 section 是具体文章
+        for sec in sections[1:]:
             sec = sec.strip()
             if not sec or len(sec) < 80:
                 continue
             m = re.search(r"^### (.+)$", sec, re.MULTILINE)
             title = m.group(1).strip() if m else ""
-            articles.append({"title": title, "text": sec[:1500]})
+            articles.append({"title": title, "text": sec[:2000]})
     logger.info(f"Loaded {len(articles)} KB articles from {kb_dir}")
     return articles
 
 
 def _search_kb(query: str, top_k: int = 3) -> list[dict]:
-    """简单关键词重叠检索，零依赖"""
+    """关键词匹配检索，零依赖"""
     if not KB_ARTICLES:
         return []
-    query_chars = set(query)
-    # 提取 2-4 字中文词作为额外关键词
     keywords = set(re.findall(r"[一-鿿]{2,4}", query))
     scored = []
     for a in KB_ARTICLES:
-        text = a["title"] + " " + a["text"][:800]
-        text_chars = set(text[:800])
-        score = len(query_chars & text_chars)
+        title = a["title"]
+        text = a["text"]
+        score = 0
+        # 标题命中加权
         for kw in keywords:
-            if kw in text:
-                score += 3
-        if score >= 4 or (len(query) <= 3 and score >= 2):
+            if kw in title:
+                score += 10
+        # 正文命中
+        search_text = title + " " + text[:2000]
+        for kw in keywords:
+            if kw in search_text:
+                score += 1
+        # 单字重叠（短查询的兜底）
+        if len(query) <= 3:
+            score += len(set(query) & set(search_text[:500]))
+        if score > 0:
             scored.append((score, a))
     scored.sort(key=lambda x: -x[0])
     return [a for _, a in scored[:top_k]]
