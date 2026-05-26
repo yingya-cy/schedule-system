@@ -164,28 +164,26 @@ router.post('/schedule-plan', authenticate, async (req, res) => {
       if (!flaskJson.success) { res.status(502).json(flaskJson); return; }
       plan = flaskJson.data;
     }
-    const inputJson = JSON.stringify({ courses, commitments, grade, major });
     const planJson = JSON.stringify(plan);
 
-    // Upsert: update the latest pending plan (no plan_data), or insert new
+    // Upsert: update the latest pending plan, or insert new
     const [existing] = await pool.query(
-      'SELECT id FROM ai_schedule_plans WHERE user_id = ? AND plan_data IS NULL ORDER BY created_at DESC LIMIT 1',
+      'SELECT id, input_data FROM ai_schedule_plans WHERE user_id = ? AND plan_data IS NULL ORDER BY created_at DESC LIMIT 1',
       [req.user!.userId]
     );
     const existingRow = (existing as RowDataPacket[])[0];
 
     let planId: number;
     if (existingRow) {
-      // Only update plan_data, preserve existing input_data (full course list)
-      await pool.query(
-        'UPDATE ai_schedule_plans SET plan_data = ? WHERE id = ?',
-        [planJson, existingRow.id]
-      );
+      // Only update plan_data, preserve existing input_data
+      await pool.query('UPDATE ai_schedule_plans SET plan_data = ? WHERE id = ?', [planJson, existingRow.id]);
       planId = existingRow.id;
     } else {
+      // Use request courses as fallback when no saved schedule exists
+      const fallbackInput = JSON.stringify({ courses, commitments, grade, major });
       const [result] = await pool.query(
         'INSERT INTO ai_schedule_plans (user_id, input_data, plan_data) VALUES (?, ?, ?)',
-        [req.user!.userId, inputJson, planJson]
+        [req.user!.userId, fallbackInput, planJson]
       );
       planId = (result as ResultSetHeader).insertId;
     }
@@ -452,9 +450,9 @@ router.post('/save-schedule', authenticate, async (req, res) => {
     const inputJson = JSON.stringify({ courses, commitments: commitments || [] });
     const userId = req.user!.userId;
 
-    // Update existing pending row if any, otherwise insert
+    // Update latest row regardless of plan_data status, otherwise insert
     const [updateResult] = await pool.query(
-      'UPDATE ai_schedule_plans SET input_data = ? WHERE user_id = ? AND plan_data IS NULL ORDER BY created_at DESC LIMIT 1',
+      'UPDATE ai_schedule_plans SET input_data = ? WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
       [inputJson, userId]
     );
     const affected = (updateResult as ResultSetHeader).affectedRows;
@@ -462,7 +460,7 @@ router.post('/save-schedule', authenticate, async (req, res) => {
     let planId: number;
     if (affected > 0) {
       const [rows] = await pool.query(
-        'SELECT id FROM ai_schedule_plans WHERE user_id = ? AND plan_data IS NULL ORDER BY created_at DESC LIMIT 1',
+        'SELECT id FROM ai_schedule_plans WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
         [userId]
       );
       planId = (rows as RowDataPacket[])[0].id;
