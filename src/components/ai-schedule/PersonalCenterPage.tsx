@@ -63,7 +63,10 @@ export default function PersonalCenterPage() {
   const getCurrentWeekCourses = () => courses.filter((c) => c.weeks.includes(currentWeek));
 
   useEffect(() => {
-    if (courses.length > 0) localStorage.setItem(STORED_COURSES_KEY, JSON.stringify(courses));
+    if (courses.length > 0) {
+      console.log('[PersonalCenter] saving to localStorage:', courses.length, 'courses');
+      localStorage.setItem(STORED_COURSES_KEY, JSON.stringify(courses));
+    }
   }, [courses]);
   useEffect(() => {
     if (commitments.length > 0) localStorage.setItem(STORED_COMMITMENTS_KEY, JSON.stringify(commitments));
@@ -77,6 +80,7 @@ export default function PersonalCenterPage() {
           headers: { Authorization: `Bearer ${token}` },
         });
         const json = await res.json();
+        console.log('[PersonalCenter] API loaded:', json.data?.courses?.length || 0, 'courses');
         if (json.success && json.data) {
           if (json.data.courses?.length > 0) setCourses(json.data.courses);
           if (json.data.commitments?.length > 0) {
@@ -397,7 +401,7 @@ export default function PersonalCenterPage() {
                   </div>
                 ) : (
                   <>
-                    <ScheduleEditor courses={courses} onCoursesChange={setCourses}
+                    <ScheduleEditor courses={courses} onCoursesChange={(newCourses) => { console.log('[PersonalCenter] ScheduleEditor changed courses:', newCourses.length); setCourses(newCourses); }}
                       onSave={handleSave} isSaving={saving}
                       onCancel={() => { setCourses([]); clearGenerated(); }} />
 
