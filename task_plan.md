@@ -4,7 +4,7 @@
 构建完整的学术管理平台，包含课表管理、比赛评分、登录认证、网盘系统、即时通讯等功能模块。
 
 ## Current Phase
-Phase 19: 迭代优化 — 文件预览、移动端适配、Bug 修复（进行中）
+Phase 19: 迭代优化 — 文件预览、移动端适配、Bug 修复（进行中）→ Phase 20: Dify 智能体集成（已完成）
 
 ## Phases
 
@@ -320,6 +320,24 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - [ ] 19.19 覆盖率提升
 - **Status:** main 分支，19.1-19.18 已完成，19.19 待定
 
+### Phase 20: Dify 智能体编排平台集成
+- [x] 20.1-20.9 基础集成（Docker部署/插件安装/双后端/JSON解析/pycache修复）
+- [x] 20.10 校园知识库构建（44公众号/1013篇索引/432篇全文/777块/6类/Embedding+Rerank）
+- [x] 20.11 小暖联网版工作流（知识检索+Tavily联网搜索+对话记忆+用户画像注入）
+- [x] 20.12 知识库增量同步脚本 sync_kb.py + Windows计划任务
+- [x] 20.13 公众号全自动管线（搜号→拉列表→下全文→清洗→分块→入库）
+- **Status:** completed
+- [x] 20.1 Docker 部署 Dify（12 容器，端口 3000/5001），配置 DNS 和 pip 镜像
+- [x] 20.2 安装 DeepSeek / MiniMax 插件
+- [x] 20.3 创建日程规划工作流（`app-PrCny5QgnSfhqidhuRHkLTPD`），Python 原 prompt 一比一迁移
+- [x] 20.4 创建心理陪伴聊天助手（`app-CxiyatMUQCGpEuIOZ4SVunNR`），原 system prompt 迁移
+- [x] 20.5 Express 端 Dify/Flask 双后端切换（`.env` `AI_BACKEND` 开关）
+- [x] 20.6 Dify SSE 格式→前端格式转换（event→chunk/done）
+- [x] 20.7 修复 Dify 日程 JSON 提取（think 标签剥离 + 大括号深度计数）
+- [x] 20.8 修复 Flask `__pycache__` 导致路由 404（`package.json` `python -B`）
+- [x] 20.9 修复心理消息重复保存（后端去重）
+- **Status:** completed
+
 ## Key Questions
 1. 登录系统是独立用户体系还是对接学校 SSO/LDAP？→ **独立用户体系（用户名+密码+JWT），不开放注册，管理员后台创建**
 2. 网盘系统是否需要版本管理？单个文件大小上限？→ **v1 不做版本管理，OSS 直传单文件上限 5GB（预签名URL限制）**
@@ -337,6 +355,8 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 
 | PDF预览空白+自动下载 | V2签名response headers被OSS拒绝 | 服务端代理端点 `GET /oss/preview?key=` fetch OSS后设置 `Content-Disposition: inline` |
 | OSS presigned URL Content-Disposition | 上传时加 `Content-Disposition: inline` header | OSS不保留该header到对象元数据，代理方案解决 |
+| 日程走 Flask(34s)、心理可走 Dify | Flask 走火山 Coding Plan 快 5.6 倍；Dify 有对话记忆价值 |
+| Flask `python -B` 永久解决 pycache | 旧 .pyc 导致路由注册失败返回 404 |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
@@ -355,3 +375,34 @@ Phase 2 (登录认证) ──→ Phase 3 (网盘系统) ──→ Phase 4 (功�
 - OSS key 格式：`file-center/{活动名}/{文件夹路径}/{fileId}_{原始文件名}`，先建 DB 记录再拼 key
 - 下载走服务端代理 `GET /oss/download`，使用原始文件名作为 Content-Disposition
 - 文件存储使用 SHA256 去重，上传目录为 `uploads/`
+
+- **flask 路由 404 修复**：`package.json` 中 `dev:flask` 改为 `python -B service.py`，禁止 pycache 缓存
+
+### 当前状态
+
+| 模块 | 后端 | 速度 | 备注 |
+|------|------|------|------|
+| AI 日程规划 | Flask | 34s | 走火山引擎 Coding Plan |
+| AI 心理陪伴 | Flask | 正常 | SSE 流式 |
+| AI 课表 OCR | Flask | — | 不变 |
+| 心理咨询预约 | Express | — | 后端全齐 |
+| Dify 集成 | ✅ | — | 开关随时切 |
+
+### 决策
+
+| 决定 | 原因 |
+|------|------|
+| 日程走 Flask，心理保留 Dify 选项 | Flask 34s vs Dify 190s，日程不需要 Dify 编排；心理有对话记忆价值 |
+| Python -B 永久解决 pycache 问题 | 旧 pyc 导致路由注册失败，404 |
+
+### 比赛相关
+
+- 设计文档草稿：`C:\Users\MR\Desktop\作品报告草稿.md`，3300字，缺封面/截图/架构图
+- 报名截止：5/23，作品提交：6/10
+
+### 待办
+
+- [ ] 评分页加作品视频预览（`contestants` 表加 `work_oss_key`）
+- [ ] 比赛文档补截图 + 架构图 + 演示视频
+- [ ] 知识库方案（学校信息注入 Prompt / Dify 知识库）
+- [ ] 新模块测试（psychology/AI 路由）

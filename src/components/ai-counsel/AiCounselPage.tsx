@@ -43,6 +43,7 @@ export default function AiCounselPage() {
   const [inputText, setInputText] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
   const [showCrisis, setShowCrisis] = useState(false);
+  const [followups, setFollowups] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const sendingRef = useRef(false);
@@ -92,6 +93,66 @@ export default function AiCounselPage() {
     setShowSidebar(false);
   };
 
+  const profileDebounce = useRef(0);
+
+  const updateProfileInsights = async () => {
+    const msgs = useAiCounselStore.getState().messages;
+    if (msgs.length < 4) return; // 至少两轮对话
+    // 每3次对话才更新一次
+    profileDebounce.current += 1;
+    if (profileDebounce.current % 3 !== 0) return;
+
+    try {
+      const summary = await aiCounselApi.getProfileSummary(
+        msgs.slice(-12).map(m => ({ role: m.role, content: m.content }))
+      );
+      const st = summary as Record<string, unknown>;
+      if (st && Object.keys(st).length > 0) {
+        const raw = localStorage.getItem('user_profile');
+        const existing = raw ? JSON.parse(raw) : {};
+        const merged = { ...existing };
+        if (Array.isArray(st.topics)) {
+          const allTopics = new Set([...(existing.topics || []), ...st.topics as string[]]);
+          merged.topics = [...allTopics].slice(-10);
+        }
+        if (Array.isArray(st.needs)) {
+          const allNeeds = new Set([...(existing.needs || []), ...st.needs as string[]]);
+          merged.needs = [...allNeeds].slice(-10);
+        }
+        if (st.mood) merged.mood = String(st.mood);
+        if (st.identity) merged.identity = String(st.identity);
+        localStorage.setItem('user_profile', JSON.stringify(merged));
+      }
+    } catch { /* 静默失败 */ }
+  };
+
+  const autoTitleIfNew = async (sessionId: number) => {
+    try {
+      const msgs = useAiCounselStore.getState().messages;
+      if (msgs.filter(m => m.role === 'assistant').length > 1) return; // 仅首次
+      const result = await aiCounselApi.autoTitle(
+        msgs.slice(0, 4).map(m => ({ role: m.role, content: m.content })), sessionId
+      );
+      if (result.title) {
+        // 刷新侧栏标题
+        const sessions = useAiCounselStore.getState().sessions.map(s =>
+          s.id === sessionId ? { ...s, title: result.title! } : s
+        );
+        useAiCounselStore.setState({ sessions });
+      }
+    } catch { /* 静默 */ }
+  };
+
+  const fetchFollowups = async () => {
+    try {
+      const msgs = useAiCounselStore.getState().messages;
+      const questions = await aiCounselApi.getFollowups(
+        msgs.slice(-4).map(m => ({ role: m.role, content: m.content }))
+      );
+      if (questions.length > 0) setFollowups(questions);
+    } catch { /* 静默 */ }
+  };
+
   const handleSend = async () => {
     if (sendingRef.current) return;
     const text = inputText.trim();
@@ -99,6 +160,7 @@ export default function AiCounselPage() {
     sendingRef.current = true;
     setInputText('');
     setStreamError(null);
+    setFollowups([]);
 
     // Crisis keyword check
     if (checkCrisis(text)) setShowCrisis(true);
@@ -163,9 +225,15 @@ export default function AiCounselPage() {
 
       flushStreamChunks();
 
-      // Save AI response (no fetchMessages — would duplicate user msg from DB)
+      // Save AI response
       if (fullResponse) {
         await saveMessage(sessionId, 'assistant', fullResponse);
+        // 数据飞轮 + 自动标题 + 追问建议（并行）
+        Promise.allSettled([
+          updateProfileInsights(),
+          autoTitleIfNew(sessionId),
+          fetchFollowups(),
+        ]);
       }
     } catch (err: unknown) {
       if (!controller.signal.aborted) {
@@ -218,13 +286,13 @@ export default function AiCounselPage() {
         .markdown-content pre { background: rgb(var(--surface-container-low)); padding: 0.6em 0.8em; border-radius: 6px; overflow-x: auto; margin: 0.4em 0; }
         .markdown-content pre code { background: none; padding: 0; }
         .markdown-content blockquote { border-left: 2px solid rgb(var(--primary)/.4); margin: 0.25em 0; padding: 0.1em 0.6em; color: rgb(var(--on-surface-variant)); }
-        .markdown-content a { color: rgb(var(--primary)); text-decoration: underline; }
+.markdown-content a { color: rgb(var(--primary)); text-decoration: underline; }
         .markdown-content strong { font-weight: 600; }
         .markdown-content hr { border: none; border-top: 1px solid rgb(var(--outline-variant)/.5); margin: 0.5em 0; }
         .markdown-content table { border-collapse: collapse; margin: 0.25em 0; font-size: 0.9em; }
         .markdown-content th, .markdown-content td { border: 1px solid rgb(var(--outline-variant)/.4); padding: 0.25em 0.5em; text-align: left; }
       `}</style>
-    <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100dvh - 6rem)' }}>
+    <div className="flex flex-col overflow-hidden h-[calc(100dvh-6rem)] lg:h-[calc(100dvh-8rem)]">
       <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
       <div className={`${showSidebar ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-64 border-r border-outline-variant/40 shrink-0`}>
@@ -291,8 +359,8 @@ export default function AiCounselPage() {
               <p className="text-xs text-outline mt-4">{HOTLINE}</p>
             </div>
           ) : (
-            messages.map((m) => (
-              <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            messages.map((m, i) => (
+              <div key={m.id || `pending-${i}`} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${m.role === 'user'
                   ? 'bg-primary-container text-on-surface rounded-br-md'
                   : 'bg-secondary/10 text-on-surface rounded-bl-md'}`}>
@@ -301,7 +369,6 @@ export default function AiCounselPage() {
                   ) : (
                     <MarkdownContent content={m.content} />
                   )}
-                  {m.id === 0 && streaming && <span className="animate-pulse">▊</span>}
                 </div>
               </div>
             ))
@@ -310,6 +377,25 @@ export default function AiCounselPage() {
             <div className="text-center text-sm text-error py-2">
               {streamError}
               <button onClick={handleSend} className="ml-2 underline">重试</button>
+            </div>
+          )}
+          {streaming && messages[messages.length - 1]?.role === 'user' && (
+            <div className="flex justify-start pb-2">
+              <div className="bg-secondary/10 rounded-2xl rounded-bl-md px-4 py-2.5 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-on-surface-variant/50 rounded-full animate-bounce" />
+                <span className="w-1.5 h-1.5 bg-on-surface-variant/50 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
+                <span className="w-1.5 h-1.5 bg-on-surface-variant/50 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+              </div>
+            </div>
+          )}
+          {followups.length > 0 && !streaming && (
+            <div className="flex flex-wrap gap-2 px-4 pb-3 pt-1">
+              {followups.map((q, i) => (
+                <button key={i} onClick={() => { setInputText(q); setFollowups([]); }}
+                  className="text-xs px-3 py-1.5 rounded-full border border-outline-variant/60 text-on-surface-variant hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-colors">
+                  {q}
+                </button>
+              ))}
             </div>
           )}
           <div ref={bottomRef} />
@@ -321,11 +407,15 @@ export default function AiCounselPage() {
           <div className="flex items-end gap-2">
             <textarea value={inputText} onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown} placeholder="说点什么吧..."
-              disabled={streaming}
               className="flex-1 px-3 py-2 rounded-xl border border-outline-variant bg-surface-container-low text-sm resize-none focus-ring h-10 max-h-32"
               rows={1} maxLength={2000} />
-            <button onClick={handleSend} disabled={!inputText.trim() || streaming}
-              className="btn-primary px-4 py-2 text-sm shrink-0">发送</button>
+            {streaming ? (
+              <button onClick={() => controllerRef.current?.abort()}
+                className="bg-error text-white px-4 py-2 text-sm rounded-xl shrink-0 hover:bg-error/80 transition-colors">停止</button>
+            ) : (
+              <button onClick={handleSend} disabled={!inputText.trim()}
+                className="btn-primary px-4 py-2 text-sm shrink-0">发送</button>
+            )}
           </div>
         </div>
       </div>

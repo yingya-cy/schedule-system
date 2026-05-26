@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Font families */
   --font-sans: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
@@ -308,5 +310,55 @@
   /* Warm left accent bar */
   .warm-accent-left {
     @apply border-l-[3px] border-primary/30 pl-4;
+  }
+}
+
+/* ── Dark mode ── */
+@layer base {
+  .dark {
+    --color-background: #1a1b1e;
+    --color-surface: #242528;
+    --color-surface-container: #2a2b2f;
+    --color-surface-container-low: #1f2024;
+    --color-surface-container-lowest: #1a1b1e;
+    --color-surface-container-high: #333438;
+    --color-surface-container-highest: #3c3d41;
+    --color-on-surface: #e8e6e0;
+    --color-on-surface-variant: #b8b4ac;
+    --color-outline: #5a5752;
+    --color-outline-variant: #3c3a36;
+    --color-primary: #6aacc8;
+    --color-primary-container: #3a5a6a;
+    --color-on-primary: #1a1b1e;
+    --color-success: #7da88c;
+    --color-secondary: #a49ab8;
+    --color-warning: #c9a572;
+    --color-error: #cf8a82;
+    --color-on-secondary: #1a1b1e;
+    --color-on-warning: #1a1b1e;
+    --color-on-error: #1a1b1e;
+    --color-on-success: #1a1b1e;
+  }
+
+  .dark body {
+    background: #1a1b1e;
+  }
+
+  .dark body::after {
+    opacity: 0.08; /* reduce paper grain in dark */
+  }
+
+  /* Dark card shadows */
+  .dark .paper-card {
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3), 0 2px 16px rgba(0, 0, 0, 0.2);
+  }
+  .dark .btn-primary {
+    box-shadow: 0 4px 14px rgba(106, 172, 200, 0.2);
+  }
+  .dark .card {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+  .dark .card-interactive:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 4px rgba(106, 172, 200, 0.12);
   }
 }

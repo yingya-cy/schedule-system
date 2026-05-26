@@ -54,14 +54,41 @@ export const aiCounselApi = {
   /** SSE 流式请求 — 返回 ReadableStream */
   streamChat: (messages: { role: string; content: string }[], sessionId: number, signal?: AbortSignal, model?: string) => {
     const token = localStorage.getItem('auth_token');
+    // 读取用户个人资料
+    let profile = {};
+    try {
+      const raw = localStorage.getItem('user_profile');
+      if (raw) profile = JSON.parse(raw);
+    } catch { /* ignore */ }
     return fetch('/api/ai/counsel/stream', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ messages, session_id: sessionId, model }),
+      body: JSON.stringify({ messages, session_id: sessionId, model, profile }),
       signal,
     });
   },
+
+  /** 对话后提取用户画像 */
+  getProfileSummary: (messages: { role: string; content: string }[]) =>
+    request<Record<string, unknown>>('/counsel/profile-summary', {
+      method: 'POST',
+      body: JSON.stringify({ messages }),
+    }),
+
+  /** AI 生成对话标题 */
+  autoTitle: (messages: { role: string; content: string }[], sessionId: number) =>
+    request<{ title?: string }>('/counsel/auto-title', {
+      method: 'POST',
+      body: JSON.stringify({ messages, sessionId }),
+    }),
+
+  /** AI 生成追问建议 */
+  getFollowups: (messages: { role: string; content: string }[]) =>
+    request<string[]>('/counsel/followups', {
+      method: 'POST',
+      body: JSON.stringify({ messages }),
+    }),
 };

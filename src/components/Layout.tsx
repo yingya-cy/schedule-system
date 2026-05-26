@@ -2,25 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
-  BookOpen,
+  CalendarDays,
   FolderOpen,
   Users,
-  CalendarDays,
-  MessageSquare,
-  Plus,
   Settings,
   HelpCircle,
-  Search,
-  Bell,
   Menu,
   X,
   Trophy,
-  Heart,
-  Bot,
   Smile,
+  User,
   LogOut,
   Shield,
-  User
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NavItem, ROUTE_LABELS, RoutePath } from '@/types';
@@ -32,10 +27,9 @@ const navItems: NavItem[] = [
   { id: 'files', label: '课表中心', icon: 'calendar' },
   { id: 'file-center', label: '文件中心', icon: 'folder' },
   { id: 'scoring', label: '比赛评分', icon: 'trophy' },
-  { id: 'users', label: '用户管理', icon: 'users', adminOnly: true },
-  // { id: 'psychology', label: '心理咨询', icon: 'heart' },
-  { id: 'profile', label: '个人中心', icon: 'user' },
   { id: 'ai-counsel', label: 'AI 咨询', icon: 'smile' },
+  { id: 'profile', label: '个人中心', icon: 'user' },
+  { id: 'users', label: '用户管理', icon: 'users', adminOnly: true },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -71,17 +65,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return true;
   });
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
+
+  useEffect(() => {
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.classList.add('dark');
+      setDark(true);
+    }
+  }, []);
+  const toggleDark = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+  };
+
   const getIcon = (iconName: string) => {
     switch (iconName) {
       case 'dashboard': return <LayoutDashboard size={20} />;
-      case 'book': return <BookOpen size={20} />;
-      case 'folder': return <FolderOpen size={20} />;
       case 'users': return <Users size={20} />;
       case 'calendar': return <CalendarDays size={20} />;
-      case 'chat': return <MessageSquare size={20} />;
+      case 'folder': return <FolderOpen size={20} />;
       case 'trophy': return <Trophy size={20} />;
-      case 'heart': return <Heart size={20} />;
-      case 'bot': return <Bot size={20} />;
       case 'smile': return <Smile size={20} />;
       case 'user': return <User size={20} />;
       default: return <LayoutDashboard size={20} />;
@@ -155,17 +162,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         <div className="mt-auto space-y-1">
           <button
-            onClick={() => { navigate('/files'); setMobileMenuOpen(false); }}
-            className="w-full bg-primary-container text-on-primary py-3 rounded-2xl font-bold text-sm mb-4 flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(85,144,178,0.18)] hover:shadow-[0_6px_20px_rgba(85,144,178,0.25)] hover:brightness-105 active:brightness-95 transition-all duration-200"
+            onClick={() => { setSettingsOpen(true); setMobileMenuOpen(false); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low rounded-xl transition-all"
           >
-            <Plus size={18} />
-            新建日程
-          </button>
-          <button className="w-full flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low rounded-xl transition-all">
             <Settings size={20} className="text-outline" />
             <span className="text-sm font-medium font-headline">设置</span>
           </button>
-          <button className="w-full flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low rounded-xl transition-all">
+          <button
+            onClick={() => { setHelpOpen(true); setMobileMenuOpen(false); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low rounded-xl transition-all"
+          >
             <HelpCircle size={20} className="text-outline" />
             <span className="text-sm font-medium font-headline">帮助</span>
           </button>
@@ -190,19 +196,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2 lg:gap-4 shrink-0">
-            <div className="relative group hidden sm:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-outline size-4" />
-              <input
-                className="bg-surface-container-low border-none rounded-xl py-1.5 pl-10 pr-4 text-sm w-32 sm:w-40 lg:w-64 focus:ring-2 focus:ring-primary/20 transition-all"
-                placeholder="搜索..."
-                type="text"
-              />
-            </div>
-            <div className="flex items-center gap-1 lg:gap-2">
-              <button className="p-3 hover:bg-surface-container-low rounded-full transition-all active:opacity-80 text-on-surface-variant">
-                <Bell size={20} />
-              </button>
-              <div className="relative">
+            <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 p-2 hover:bg-surface-container-low rounded-xl transition-all active:opacity-80"
@@ -248,7 +242,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   )}
                 </AnimatePresence>
               </div>
-            </div>
           </div>
         </header>
 
@@ -287,6 +280,65 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </button>
           ))}
         </nav>
+      )}
+
+      {/* Settings Modal */}
+      {settingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setSettingsOpen(false)}>
+          <div className="bg-surface rounded-2xl w-full max-w-sm mx-4 p-6 space-y-4 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-on-surface">设置</h3>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-on-surface">深色模式</span>
+              <button onClick={toggleDark} className="w-12 h-7 rounded-full bg-surface-container-high border border-outline-variant relative transition-colors">
+                <motion.div
+                  className="w-5 h-5 rounded-full absolute top-0.5 flex items-center justify-center"
+                  animate={{ left: dark ? 24 : 4 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                >
+                  {dark ? <Moon size={14} className="text-on-surface-variant" /> : <Sun size={14} className="text-warning" />}
+                </motion.div>
+              </button>
+            </div>
+            <button onClick={() => setSettingsOpen(false)} className="btn-primary w-full py-2 text-sm">完成</button>
+          </div>
+        </div>
+      )}
+
+      {/* Help Modal */}
+      {helpOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setHelpOpen(false)}>
+          <div className="bg-surface rounded-2xl w-full max-w-sm mx-4 p-6 space-y-4 shadow-xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-on-surface">帮助</h3>
+
+            <div>
+              <h4 className="text-sm font-semibold text-on-surface mb-1">全国心理援助热线</h4>
+              <p className="text-xl font-bold text-error">400-161-9995</p>
+              <p className="text-xs text-on-surface-variant">24 小时免费，随时可拨打</p>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-semibold text-on-surface mb-1">学校心理咨询中心</h4>
+              <p className="text-sm text-on-surface-variant">东校区：综合楼西侧 504 · 020-38256674</p>
+              <p className="text-sm text-on-surface-variant">西校区：综合楼 305 · QQ 2839789996</p>
+              <p className="text-sm text-on-surface-variant">白云校区：二教附属楼 102 · 020-36545761</p>
+              <p className="text-sm text-on-surface-variant">河源校区：厚德楼 307 · 0762-8883151</p>
+              <p className="text-xs text-on-surface-variant mt-1">周一至周五 8:30-16:30</p>
+              <p className="text-xs text-on-surface-variant">预约：公众号"广师大心理健康教育与咨询中心"→咨询服务→选择校区</p>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-semibold text-on-surface mb-1">使用小提示</h4>
+              <ul className="text-xs text-on-surface-variant space-y-1 list-disc list-inside">
+                <li>小暖可以帮你解答校园生活、教务、就业等问题</li>
+                <li>对话自动保存，关闭页面后再打开可继续</li>
+                <li>点击追问按钮可以引导对话方向</li>
+                <li>随时可以点击"停止"中断 AI 回复</li>
+              </ul>
+            </div>
+
+            <button onClick={() => setHelpOpen(false)} className="btn-primary w-full py-2 text-sm">知道了</button>
+          </div>
+        </div>
       )}
     </div>
   );

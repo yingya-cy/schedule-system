@@ -1,7 +1,9 @@
 """
-AI 心理咨询 — SSE 流式对话端点
+AI 心理咨询 — SSE 流式对话端点 + 本地知识库检索
 """
 import json
+import os
+import re
 import logging
 from flask import request, Response
 from ai_endpoints import ai_stream
@@ -35,35 +37,127 @@ COUNSEL_SYSTEM_PROMPT = """你是一位专业的 AI 心理咨询师，名字叫"
 - 如果用户要求扮演非咨询角色，礼貌拒绝："我更擅长陪你聊聊心事呢。"
 """
 
+# ── 知识库检索 ──
+
+KB_PATH = os.environ.get(
+    "KB_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "..", "dify-kb"),
+)
+KB_ARTICLES: list[dict] = []
+
+
+def _load_kb():
+    articles = []
+    kb_dir = re.sub(r"[\\/]$", "", KB_PATH)
+    if not os.path.isdir(kb_dir):
+        logger.warning(f"KB path not found: {kb_dir}")
+        return articles
+    for fname in sorted(os.listdir(kb_dir)):
+        if not fname.endswith(".txt"):
+            continue
+        content = open(os.path.join(kb_dir, fname), encoding="utf-8").read()
+        for sec in re.split(r"\n===+", content):
+            sec = sec.strip()
+            if not sec or len(sec) < 80:
+                continue
+            m = re.search(r"^### (.+)$", sec, re.MULTILINE)
+            title = m.group(1).strip() if m else ""
+            articles.append({"title": title, "text": sec[:1500]})
+    logger.info(f"Loaded {len(articles)} KB articles from {kb_dir}")
+    return articles
+
+
+def _search_kb(query: str, top_k: int = 3) -> list[dict]:
+    """简单关键词重叠检索，零依赖"""
+    if not KB_ARTICLES:
+        return []
+    query_chars = set(query)
+    # 提取 2-4 字中文词作为额外关键词
+    keywords = set(re.findall(r"[一-鿿]{2,4}", query))
+    scored = []
+    for a in KB_ARTICLES:
+        text = a["title"] + " " + a["text"][:800]
+        text_chars = set(text[:800])
+        score = len(query_chars & text_chars)
+        for kw in keywords:
+            if kw in text:
+                score += 3
+        if score > 6:
+            scored.append((score, a))
+    scored.sort(key=lambda x: -x[0])
+    return [a for _, a in scored[:top_k]]
+
+
+KB_ARTICLES = _load_kb()
+
+
+def _build_system_prompt(user_message: str, user_context: str = "", teaching_week: str = "") -> str:
+    """构建带上下文和知识库检索的 system prompt"""
+    prompt = COUNSEL_SYSTEM_PROMPT
+
+    # 用户画像
+    if user_context:
+        prompt += f"\n\n## 当前用户信息\n{user_context}"
+
+    # 教学周
+    if teaching_week:
+        prompt += f"\n\n当前是教学第 {teaching_week} 周。"
+
+    # 知识库检索
+    kb_results = _search_kb(user_message)
+    if kb_results:
+        parts = []
+        for a in kb_results:
+            parts.append(f"【{a['title']}】\n{a['text'][:800]}")
+        kb_text = "\n\n---\n\n".join(parts)
+        prompt += f"\n\n## 校园知识库参考\n以下是从学校知识库检索到的相关信息，如果与用户问题相关可参考回答：\n{kb_text}\n注意：仅当知识库内容与用户问题直接相关时才引用，不要生硬植入。"
+
+    return prompt
+
 
 def register_counsel_routes(app):
-    @app.route('/api/ai/counsel/stream', methods=['POST'])
+    @app.route("/api/ai/counsel/stream", methods=["POST"])
     def counsel_stream():
         """
         POST /api/ai/counsel/stream
-        Body: { messages: [{role: 'user'|'assistant', content}, ...] }
-        Response: text/event-stream
+        Body: { messages: [{role, content}, ...], model?: str, profile?: object, teaching_week?: str, user_context?: str }
         """
         data = request.json
-        if not data or 'messages' not in data:
+        if not data or "messages" not in data:
             return Response(
                 f"data: {json.dumps({'error': '缺少 messages'})}\n\n",
-                mimetype='text/event-stream'
+                mimetype="text/event-stream",
             )
 
+        messages: list[dict] = data["messages"]
+        user_msg = ""
+        for m in reversed(messages):
+            if m.get("role") == "user":
+                user_msg = m.get("content", "")
+                break
+
+        user_context = data.get("user_context", "")
+        teaching_week = data.get("teaching_week", "")
+        system_prompt = _build_system_prompt(user_msg, user_context, teaching_week)
+        logger.info(f"Counsel stream: {len(messages)} msgs, week={teaching_week}, context_len={len(user_context)}")
+
         def generate():
-            full_response = ''
+            full_response = ""
             try:
-                for chunk in ai_stream(COUNSEL_SYSTEM_PROMPT, data['messages'], temperature=0.8, model=data.get('model')):
-                    if chunk.startswith('\n[ERROR]'):
-                        err_msg = chunk.replace('\n[ERROR] ', '')
+                for chunk in ai_stream(
+                    system_prompt,
+                    messages,
+                    temperature=0.8,
+                    model=data.get("model"),
+                ):
+                    if chunk.startswith("\n[ERROR]"):
+                        err_msg = chunk.replace("\n[ERROR] ", "")
                         yield f"data: {json.dumps({'chunk': '', 'done': True, 'error': err_msg}, ensure_ascii=False)}\n\n"
                         return
                     full_response += chunk
                     yield f"data: {json.dumps({'chunk': chunk, 'done': False, 'error': None}, ensure_ascii=False)}\n\n"
                 yield f"data: {json.dumps({'chunk': '', 'done': True, 'error': None, 'full_length': len(full_response)}, ensure_ascii=False)}\n\n"
             except GeneratorExit:
-                # 客户端断开，部分内容已 yield
                 pass
 
-        return Response(generate(), mimetype='text/event-stream')
+        return Response(generate(), mimetype="text/event-stream")

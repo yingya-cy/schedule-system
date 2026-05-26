@@ -96,7 +96,7 @@ router.post('/schedule-plan', authenticate, async (req, res) => {
       return;
     }
 
-    const useDify = process.env.AI_BACKEND === 'dify';
+    const useDify = (process.env.AI_SCHEDULE_BACKEND || process.env.AI_BACKEND) === 'dify';
     let plan;
 
     if (useDify) {
