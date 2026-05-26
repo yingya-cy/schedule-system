@@ -207,6 +207,7 @@ router.post('/counsel/stream', authenticate, async (req, res) => {
           profile: userProfile,
           user_context: userContext,
           teaching_week: teachingWeek,
+          current_date: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
         }),
         signal: controller.signal,
       });

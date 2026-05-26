@@ -135,17 +135,22 @@ CAMPUS_SUMMARY = """
 本学期2026年3月2日开学。教学楼自习室7:30-23:00。考试周图书馆和自习室延长开放。
 """
 
-def _build_system_prompt(user_message: str, user_context: str = "", teaching_week: str = "") -> str:
+def _build_system_prompt(user_message: str, user_context: str = "", teaching_week: str = "", current_date: str = "") -> str:
     """构建带上下文和知识库检索的 system prompt"""
     prompt = COUNSEL_SYSTEM_PROMPT + CAMPUS_SUMMARY
+
+    # 当前日期和教学周
+    date_info = []
+    if current_date:
+        date_info.append(f"今天是{current_date}")
+    if teaching_week:
+        date_info.append(f"教学第{teaching_week}周")
+    if date_info:
+        prompt += "\n\n" + "，".join(date_info) + "。"
 
     # 用户画像
     if user_context:
         prompt += f"\n\n## 当前用户信息\n{user_context}"
-
-    # 教学周
-    if teaching_week:
-        prompt += f"\n\n当前是教学第 {teaching_week} 周。"
 
     # 知识库检索
     kb_results = _search_kb(user_message)
@@ -182,7 +187,8 @@ def register_counsel_routes(app):
 
         user_context = data.get("user_context", "")
         teaching_week = data.get("teaching_week", "")
-        system_prompt = _build_system_prompt(user_msg, user_context, teaching_week)
+        current_date = data.get("current_date", "")
+        system_prompt = _build_system_prompt(user_msg, user_context, teaching_week, current_date)
         logger.info(f"Counsel stream: {len(messages)} msgs, week={teaching_week}, context_len={len(user_context)}")
 
         def generate():
