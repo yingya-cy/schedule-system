@@ -92,7 +92,12 @@ def _search_kb(query: str, top_k: int = 3) -> list[dict]:
     """关键词匹配检索，零依赖"""
     if not KB_ARTICLES:
         return []
-    keywords = set(re.findall(r"[一-鿿]{2,4}", query))
+    keywords = set()
+    for wlen in (2, 3, 4):
+        for i in range(len(query) - wlen + 1):
+            sub = query[i:i + wlen]
+            if all("一" <= c <= "鿿" for c in sub):
+                keywords.add(sub)
     scored = []
     for a in KB_ARTICLES:
         title = a["title"]
