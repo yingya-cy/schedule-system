@@ -4,7 +4,66 @@
 构建完整的学术管理平台，包含课表管理、比赛评分、登录认证、网盘系统、即时通讯等功能模块。
 
 ## Current Phase
-Phase 19: 迭代优化 — 文件预览、移动端适配、Bug 修复（进行中）→ Phase 20: Dify 智能体集成（已完成）
+**Phase 21: AI 智能体比赛冲刺（2026-05-10 ~ 至今）**
+
+### 已完成（2026-05-25 ~ 05-26）
+
+**小暖 AI 对话增强：**
+- [x] 修复流式输出闪烁黑块 — 旧消息不再跟着闪
+- [x] 打字指示器 — streaming 时显示弹跳圆点
+- [x] 打断对话 — 停止按钮中断 SSE 流
+- [x] 数据飞轮 — 对话后 AI 提取用户画像，存 localStorage
+- [x] AI 自动标题 — 首次对话后生成 10 字内标题
+- [x] AI 追问建议 — 回复后显示 3 个候补问题按钮
+- [x] 页面高度适配 — 移动端/桌面端不同 calc 值
+
+**UI/UX：**
+- [x] 深色模式 — 设置弹窗切换，CSS 变量覆盖
+- [x] 帮助弹窗 — 全国心理热线 + 四校区心理咨询中心
+- [x] 清理装饰性按钮 — 删搜索框/通知铃/新建日程
+- [x] 导航栏重排 — AI咨询 → 个人中心 → 用户管理
+
+**知识库：**
+- [x] 官网自动爬虫 `scripts/crawl_school.py` — 11 个栏目、4 个站点
+- [x] KB 全量重建 `scripts/rebuild_kb.py` — 565 篇、6 分类
+- [x] Flask 小暖知识库检索 — 关键词匹配 + 校区信息摘要
+- [x] 教学周/日期注入 — `teaching_week` + `current_date`
+- [x] System Prompt 升级 — 心理陪伴 + 校园导航双角色
+- [x] Dify 工作流同步 — `user_context` + `teaching_week` + `current_date`
+
+**后端：**
+- [x] `callDeepSeek()` 共享辅助函数 — 减少重复代码
+- [x] auto-title / followups / profile-summary 三个新路由
+- [x] auto-title 加 user_id 安全验证
+- [x] Express → Flask 传 profile/context/week/date
+- [x] 大小写修复 — `ScheduleRepository` → `scheduleRepository`
+
+**部署：**
+- [x] 服务器 `47.120.29.188` 已部署最新代码
+- [x] ai-service 挂载 dify-kb 卷
+- [x] docker-compose.yml 入 git 管理
+- [x] nginx 缓存头配置
+- [x] git push server 部署流程走通
+
+### 待做
+
+| 功能 | 优先级 |
+|------|--------|
+| 语音输入（MediaRecorder + Whisper） | 低 |
+| 分享对话卡片 | 低 |
+| Dify 直连 Express（减少延迟） | 低（depends on backend AI env vars） |
+| 归档/汇报整理 | 中 |
+
+### 架构概览
+
+```
+浏览器 → nginx:80 → Express:3001 → Dify:5001（本地）或 Flask:5002（服务器）
+                          ↓
+                       MySQL:3306
+                          
+Flask:5002 → DeepSeek API + 本地知识库（565篇）
+Dify:5001 → 工作流（知识库Rerank + Tavily搜索 + 对话记忆）
+```
 
 ## Phases
 
