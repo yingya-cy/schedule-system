@@ -82,7 +82,7 @@ def _search_kb(query: str, top_k: int = 3) -> list[dict]:
         for kw in keywords:
             if kw in text:
                 score += 3
-        if score > 6:
+        if score >= 4 or (len(query) <= 3 and score >= 2):
             scored.append((score, a))
     scored.sort(key=lambda x: -x[0])
     return [a for _, a in scored[:top_k]]
