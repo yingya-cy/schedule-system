@@ -223,3 +223,16 @@ fi
 - `server.ts` / AI Python 文件必须 SCP 后 rebuild（COPY 在 build 时生效）
 - 新增表/字段用 `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ADD COLUMN`
 - Node 18 兼容：`new File(...)` → `new Blob(...)`
+
+**2026-05-27：微信/官网 KB 分离**
+- 微信数据源：`sync_kb.py` → 更新 `wechat-full-text.json`（不碰 dify-kb）
+- 官网数据源：`crawl_school.py` → `save_official.py` → 更新 `official-articles.json`
+- 合并输出：`rebuild_kb.py` → 读取两个 JSON + 比赛材料 KB → 写入 `dify-kb/`
+- 流程：每次 sync 或 crawl 后，必须跑 `python rebuild_kb.py` 重新合并
+- 教训：两个脚本直接写同一个目录，互相覆盖，丢了 168 篇官网数据
+
+**2026-05-27：SQL 排序优先级导致返回脏数据**
+- `ORDER BY CASE WHEN plan_data IS NOT NULL THEN 0 ELSE 1 END, created_at DESC` — 这种"优先级排序"会把旧脏数据排到最新数据前面
+- fix bug 时如果线上**已经有被污染的数据**，只改代码不清理脏数据，修了等于没修
+- 前端加几行 `console.log` 是最快定位手段——2 分钟就知道是 API 返回了错误数据，而不是前端自己过滤的
+- 原则：排序就按 `created_at DESC`，别搞 CASE WHEN 优先级；修复数据 bug 要同步清理已污染的存量数据

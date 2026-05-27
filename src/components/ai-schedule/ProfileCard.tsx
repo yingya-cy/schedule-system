@@ -53,19 +53,19 @@ export default function ProfileCard({ onChange }: ProfileCardProps) {
                 value={draft.grade}
                 onChange={(e) => setDraft({ ...draft, grade: e.target.value })}
                 placeholder="年级 (如 2024级)"
-                className="px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-sm focus-ring w-36"
+                className="px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-sm focus-ring w-full sm:w-36"
               />
               <input
                 value={draft.major}
                 onChange={(e) => setDraft({ ...draft, major: e.target.value })}
                 placeholder="专业 (如 计算机科学)"
-                className="px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-sm focus-ring w-36"
+                className="px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-sm focus-ring w-full sm:w-36"
               />
               <input
                 value={draft.college}
                 onChange={(e) => setDraft({ ...draft, college: e.target.value })}
                 placeholder="学院 (如 信息学院)"
-                className="px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-sm focus-ring w-36"
+                className="px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-sm focus-ring w-full sm:w-36"
               />
             </div>
             <textarea

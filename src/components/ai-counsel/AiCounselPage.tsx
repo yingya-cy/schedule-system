@@ -3,6 +3,7 @@ import { useAiCounselStore } from '../../stores/aiCounselStore';
 import { aiCounselApi } from '../../services/aiCounselApi';
 import type { CounselMessage } from '../../services/aiCounselApi';
 import { marked } from 'marked';
+import { Menu, X } from 'lucide-react';
 
 const HOTLINE = '全国心理援助热线 400-161-9995';
 const CRISIS_KEYWORDS = ['自杀', '自伤', '自残', '想死', '不想活', '结束生命', '伤害自己', '伤害他人'];
@@ -292,7 +293,7 @@ export default function AiCounselPage() {
         .markdown-content table { border-collapse: collapse; margin: 0.25em 0; font-size: 0.9em; }
         .markdown-content th, .markdown-content td { border: 1px solid rgb(var(--outline-variant)/.4); padding: 0.25em 0.5em; text-align: left; }
       `}</style>
-    <div className="flex flex-col overflow-hidden h-[calc(100dvh-6rem)] lg:h-[calc(100dvh-8rem)]">
+    <div className="flex flex-col overflow-hidden h-[calc(100dvh-6.5rem)] lg:h-[calc(100dvh-8rem)]">
       <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
       <div className={`${showSidebar ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-64 border-r border-outline-variant/40 shrink-0`}>
@@ -334,19 +335,21 @@ export default function AiCounselPage() {
       {/* Chat area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-outline-variant/40 shrink-0">
-          <button onClick={() => setShowSidebar(!showSidebar)} className="lg:hidden text-sm text-primary">
-            {showSidebar ? '关闭' : '历史'}
+        <div className="flex items-center gap-2.5 px-3 lg:px-4 py-2.5 lg:py-3 border-b border-outline-variant/40 shrink-0">
+          <button onClick={() => setShowSidebar(!showSidebar)} className="lg:hidden p-1.5 -ml-1 hover:bg-surface-container-low rounded-lg transition-colors text-on-surface-variant touch-target">
+            {showSidebar ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center text-secondary font-bold text-sm shrink-0">暖</div>
+          <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-full bg-secondary/20 flex items-center justify-center text-secondary font-bold text-xs lg:text-sm shrink-0">暖</div>
           <span className="font-semibold text-on-surface text-sm">小暖</span>
-          <span className={`ml-auto text-xs ${streaming ? 'text-warning animate-pulse' : 'text-success'}`}>
+          <span className={`ml-auto text-[11px] lg:text-xs ${streaming ? 'text-warning animate-pulse' : 'text-success'}`}>
             {streaming ? '回复中...' : '在线'}
           </span>
         </div>
 
+        {/* Body: messages + input share one background, seamless like Doubao/Kimi */}
+        <div className="flex-1 flex flex-col min-h-0 bg-surface-container-low/30">
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-3 bg-surface-container-low/30">
+        <div className="flex-1 overflow-y-auto scrollbar-thin px-3 lg:px-4 py-3 space-y-2.5">
           {messagesLoading ? (
             <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="skeleton h-12 rounded-lg w-3/4" />)}</div>
           ) : messages.length === 0 ? (
@@ -361,7 +364,7 @@ export default function AiCounselPage() {
           ) : (
             messages.map((m, i) => (
               <div key={m.id || `pending-${i}`} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${m.role === 'user'
+                <div className={`max-w-[88%] sm:max-w-[80%] px-3.5 lg:px-4 py-2 rounded-2xl text-sm ${m.role === 'user'
                   ? 'bg-primary-container text-on-surface rounded-br-md'
                   : 'bg-secondary/10 text-on-surface rounded-bl-md'}`}>
                   {m.role === 'user' ? (
@@ -392,7 +395,7 @@ export default function AiCounselPage() {
             <div className="flex flex-wrap gap-2 px-4 pb-3 pt-1">
               {followups.map((q, i) => (
                 <button key={i} onClick={() => { setInputText(q); setFollowups([]); }}
-                  className="text-xs px-3 py-1.5 rounded-full border border-outline-variant/60 text-on-surface-variant hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-colors">
+                  className="text-xs px-3 py-2 rounded-full border border-outline-variant/60 text-on-surface-variant hover:bg-primary/5 hover:border-primary/30 hover:text-primary transition-colors touch-target inline-flex items-center">
                   {q}
                 </button>
               ))}
@@ -401,22 +404,22 @@ export default function AiCounselPage() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Input */}
-        <div className="p-3 border-t border-outline-variant/40 bg-surface shrink-0">
-          <p className="text-[10px] text-outline text-center mb-1">{HOTLINE}</p>
+        {/* Input — seamless like Doubao/Kimi: no border, no separate bg */}
+        <div className="shrink-0 px-3 lg:px-4 pt-2 pb-3 lg:pb-4 safe-area-inset">
           <div className="flex items-end gap-2">
             <textarea value={inputText} onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown} placeholder="说点什么吧..."
-              className="flex-1 px-3 py-2 rounded-xl border border-outline-variant bg-surface-container-low text-sm resize-none focus-ring h-10 max-h-32"
+              className="flex-1 px-4 py-2.5 rounded-2xl border border-outline-variant/40 bg-surface-container-low/80 shadow-sm text-sm resize-none focus-ring min-h-[2.75rem] max-h-32 placeholder:text-on-surface-variant/50"
               rows={1} maxLength={2000} />
             {streaming ? (
               <button onClick={() => controllerRef.current?.abort()}
-                className="bg-error text-white px-4 py-2 text-sm rounded-xl shrink-0 hover:bg-error/80 transition-colors">停止</button>
+                className="bg-error text-white px-4 py-2.5 text-sm rounded-2xl shrink-0 hover:bg-error/80 transition-colors touch-target">停止</button>
             ) : (
               <button onClick={handleSend} disabled={!inputText.trim()}
-                className="btn-primary px-4 py-2 text-sm shrink-0">发送</button>
+                className="btn-primary px-5 py-2.5 text-sm rounded-2xl shrink-0 touch-target disabled:opacity-40 disabled:shadow-none transition-opacity">发送</button>
             )}
           </div>
+        </div>
         </div>
       </div>
       </div>

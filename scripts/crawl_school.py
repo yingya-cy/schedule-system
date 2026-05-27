@@ -24,6 +24,7 @@ from bs4 import BeautifulSoup
 # ── 配置 ──
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "dify-kb")
 STATE_FILE = os.path.join(os.path.dirname(__file__), "crawl_state.json")
+OFFICIAL_JSON = os.path.join(os.path.dirname(__file__), "..", "..", "比赛材料", "知识库数据", "official-articles.json")
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
 # 爬取源：列表页 + 所属分类

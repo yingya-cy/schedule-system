@@ -190,37 +190,33 @@ def download_and_clean(articles):
 # ── 步骤 3：分类 + 分块 + 写文件 ──
 
 def chunk_and_save(all_articles):
-    """按类别分块，写入 dify-kb/ 目录"""
-    print("[3/4] Chunking and saving...")
+    """更新 wechat-full-text.json（数据源），不再直接写入 dify-kb"""
+    print("[3/4] Saving to wechat-full-text.json...")
 
-    os.makedirs(OUT_DIR, exist_ok=True)
-    chunks_by_cat = defaultdict(list)
+    # Load existing
+    existing = []
+    if os.path.exists(FULL_TEXT_FILE):
+        try:
+            existing = json.load(open(FULL_TEXT_FILE, "r", encoding="utf-8"))
+        except Exception:
+            pass
 
+    # Merge: deduplicate by title, keep newest
+    existing_titles = {a["title"] for a in existing}
+    new_count = 0
     for a in all_articles:
-        title = a.get("title", "")
-        text = a.get("text", "")
-        if len(text) < 50:
+        if len(a.get("text", "")) < 50:
             continue
-        cat = classify_article(title, text)
-        chunks_by_cat[cat].append(a)
+        if a["title"] in existing_titles:
+            continue
+        existing.append({"title": a["title"], "account": a.get("account", ""), "text": a["text"]})
+        existing_titles.add(a["title"])
+        new_count += 1
 
-    total_chunks = 0
-    for cat, articles in chunks_by_cat.items():
-        fname = os.path.join(OUT_DIR, f"{cat}.txt")
-        with open(fname, "w", encoding="utf-8") as f:
-            cat_name = cat.replace("01-", "").replace("02-", "").replace("03-", "")
-            cat_name = cat_name.replace("04-", "").replace("05-", "").replace("06-", "")
-            f.write(f"# {cat_name}\n\n")
-            for a in articles:
-                f.write(f"### {a['title']}\n")
-                f.write(f"来源: {a['account']}\n")
-                f.write(f"{a['text']}\n\n---\n\n")
-                total_chunks += 1
-        size_kb = os.path.getsize(fname) // 1024
-        print(f"  {cat}.txt: {len(articles)} articles, {size_kb} KB")
-
-    print(f"  Total: {total_chunks} chunks across {len(chunks_by_cat)} categories")
-    return total_chunks
+    json.dump(existing, open(FULL_TEXT_FILE, "w", encoding="utf-8"), ensure_ascii=False)
+    print(f"  Updated wechat-full-text.json: {len(existing)} total ({new_count} new)")
+    print(f"  Run rebuild_kb.py to regenerate dify-kb/ with both WeChat + official sources")
+    return new_count
 
 
 # ── 步骤 4：触发 Dify 重新索引 ──

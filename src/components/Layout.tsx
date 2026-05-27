@@ -36,7 +36,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const user = useAuthStore((s) => s.user);
@@ -117,9 +117,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 180, damping: 24 }}
         className={cn(
-          "fixed left-0 top-0 h-full w-64 border-r border-outline-variant/40 bg-surface/90 backdrop-blur-md flex flex-col p-4 gap-2",
+          "fixed left-0 top-0 h-full w-64 border-r border-outline-variant/40 bg-surface/90 backdrop-blur-md flex flex-col p-4 gap-2 pb-20 z-50",
           "lg:translate-x-0",
-          isMobile ? "-translate-x-full" : mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex items-center gap-3 px-3 mb-8 mt-2">
@@ -137,7 +137,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1">
+        <nav className="flex-1 space-y-1 overflow-y-auto scrollbar-thin">
           {visibleNavItems.map((item) => (
             <button
               key={item.id}
@@ -246,7 +246,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* View Container */}
-        <main className="p-4 lg:p-8 min-h-[calc(100vh-64px)] w-full">
+        <main className="p-4 lg:p-8 min-h-[calc(100dvh-64px)] w-full">
           <motion.div
             key={currentPath}
             initial={{ opacity: 0, y: 10 }}
@@ -261,22 +261,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Tab Bar */}
       {isMobile && (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface border-t border-surface-container-high safe-area-inset flex lg:hidden">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-sm border-t border-surface-container-high safe-area-inset flex lg:hidden">
           {visibleNavItems.map((item) => (
             <button
               key={item.id}
               onClick={() => handleNavClick(item.id)}
+              title={item.label}
               className={cn(
-                "flex-1 flex flex-col items-center justify-center py-3 gap-1 touch-target transition-colors",
+                "flex-1 flex items-center justify-center py-3 touch-target transition-colors",
                 currentView === `/${item.id}`
                   ? "text-primary"
                   : "text-on-surface-variant hover:text-on-surface"
               )}
             >
-              <span className={currentView === `/${item.id}` ? "text-primary" : "text-outline group-hover:text-primary"}>
-                {getIcon(item.icon)}
-              </span>
-              <span className="text-xs font-medium font-headline">{item.label}</span>
+              {getIcon(item.icon)}
             </button>
           ))}
         </nav>

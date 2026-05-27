@@ -12,7 +12,7 @@ import ProfileCard from './ProfileCard';
 import PlanHistoryList from './PlanHistoryList';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { X, ChevronLeft, Clock, Heart } from 'lucide-react';
+import { X, ChevronLeft, Clock, Heart, Settings } from 'lucide-react';
 
 const CUSTOM_PROMPT_KEY = 'ai_schedule_custom_prompt';
 const STORED_COURSES_KEY = 'ai_schedule_courses';
@@ -58,6 +58,7 @@ export default function PersonalCenterPage() {
   const [drawerTitle, setDrawerTitle] = useState('');
   const [drawerPlan, setDrawerPlan] = useState<SchedulePlan['plan_data'] | null>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getCurrentWeekCourses = () => courses.filter((c) => c.weeks.includes(currentWeek));
@@ -378,6 +379,7 @@ export default function PersonalCenterPage() {
 
           {/* ===== 个人课表 Tab ===== */}
           {activeTab === 'schedule' && (
+            <>
             <div className="flex gap-4 min-h-0">
               {/* Schedule editor */}
               <div className="flex-1 min-w-0">
@@ -405,6 +407,13 @@ export default function PersonalCenterPage() {
                       onSave={handleSave} isSaving={saving}
                       onCancel={() => { setCourses([]); clearGenerated(); }} />
 
+                    <button
+                      onClick={() => setMobilePanelOpen(true)}
+                      className="lg:hidden mt-3 flex items-center gap-2 px-3 py-2 rounded-lg border border-outline-variant/30 bg-surface-container-low/40 text-xs text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                    >
+                      <Settings size={14} /> 更多设置
+                    </button>
+
                     {isHeavyDay && (
                       <button
                         onClick={handleCounselLink}
@@ -429,8 +438,8 @@ export default function PersonalCenterPage() {
                 )}
               </div>
 
-              {/* Right panel — sits to the right of schedule editor, NOT touching top bar */}
-              <div className="w-60 xl:w-72 shrink-0 space-y-3">
+              {/* Right panel — desktop: side panel; mobile: hidden (shown in drawer) */}
+              <div className="hidden lg:block w-60 xl:w-72 shrink-0 space-y-3">
                 <div>
                   <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">课表上传</h3>
                   <div
@@ -460,6 +469,66 @@ export default function PersonalCenterPage() {
                 </div>
               </div>
             </div>
+
+            {/* Mobile settings drawer */}
+            <AnimatePresence>
+              {mobilePanelOpen && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="fixed inset-0 bg-black/20 z-30 lg:hidden"
+                    onClick={() => setMobilePanelOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ x: '100%' }}
+                    animate={{ x: 0 }}
+                    exit={{ x: '100%' }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                    className="fixed right-0 top-0 bottom-0 w-72 max-w-[85vw] bg-surface-container-lowest border-l border-outline-variant/30 z-40 flex flex-col shadow-2xl lg:hidden"
+                  >
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant/20 shrink-0">
+                      <h3 className="text-sm font-semibold text-on-surface">更多设置</h3>
+                      <button onClick={() => setMobilePanelOpen(false)} className="p-1 hover:bg-surface-container-low rounded-lg transition-colors shrink-0">
+                        <X size={18} className="text-on-surface-variant" />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-4">
+                      <div>
+                        <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">课表上传</h3>
+                        <div
+                          onClick={() => { fileInputRef.current?.click(); setMobilePanelOpen(false); }}
+                          className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors text-xs ${uploading ? 'border-primary bg-primary/5' : 'border-outline-variant hover:border-primary hover:bg-primary/5'}`}
+                        >
+                          {uploading ? '识别中...' : courses.length > 0 ? '重新上传课表' : '选择课表图片或 PDF'}
+                        </div>
+                        <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleUpload} className="hidden" />
+                        {uploadError && <div className="mt-2 p-2 bg-error/10 text-error rounded text-xs">{uploadError}</div>}
+                      </div>
+
+                      <div>
+                        <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">待办事项</h3>
+                        <CommitmentForm items={commitments} onChange={setCommitments} />
+                      </div>
+
+                      <div>
+                        <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">自定义偏好</h3>
+                        <textarea
+                          value={customPrompt}
+                          onChange={(e) => setCustomPrompt(e.target.value)}
+                          placeholder="如：我是夜猫子，晚上效率高"
+                          rows={2}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface-container-low text-xs focus-ring resize-none"
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+            </>
           )}
         </div>
 

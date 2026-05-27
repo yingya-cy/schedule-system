@@ -12,6 +12,7 @@ from collections import defaultdict
 
 KB_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "dify-kb")
 WECHAT_JSON = os.path.join(os.path.dirname(__file__), "..", "..", "比赛材料", "知识库数据", "wechat-full-text.json")
+OFFICIAL_JSON = os.path.join(os.path.dirname(__file__), "..", "..", "比赛材料", "知识库数据", "official-articles.json")
 COMPETITION_KB = os.path.join(os.path.dirname(__file__), "..", "..", "比赛材料", "知识库数据", "dify-kb")
 
 # 微信文章噪音清洗

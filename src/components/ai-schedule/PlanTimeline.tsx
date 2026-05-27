@@ -71,7 +71,7 @@ export default function PlanTimeline({ plan, compact }: { plan: PlanData; compac
   const today = new Date().toISOString().slice(0, 10);
   const gridCols = compact
     ? 'grid-cols-1 sm:grid-cols-2'
-    : 'grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7';
+    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7';
 
   return (
     <div className="space-y-4">
