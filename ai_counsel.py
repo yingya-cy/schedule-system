@@ -1,12 +1,15 @@
 """
-AI 心理咨询 — SSE 流式对话端点 + 本地知识库检索
+AI 心理咨询 — SSE 流式对话端点 + 本地知识库检索 + 联网搜索
 """
 import json
 import os
 import re
 import logging
+import urllib.request
 from flask import request, Response, jsonify
 from ai_endpoints import ai_stream
+
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +30,7 @@ COUNSEL_SYSTEM_PROMPT = """你是"小暖"，广东技术师范大学的校园智
 - 优先参考提供的校园知识库信息
 - 如果知识库没有答案，诚实说不太确定，建议查学校官网或问辅导员
 - 回答简洁具体，包含地点、时间、联系方式等关键信息
+- **重要**：推荐活动/通知时，必须比对当前日期。已过期的活动标注"已结束"，不要推荐为"今天/明天"。知识库文章可能发布于数天前，不要将文章中的"今天"直接当作你回答时的"今天"
 
 ## 排版格式
 - 列活动/赛事时，每项一行，格式：**活动名称**，截止日期，关键信息
@@ -92,6 +96,27 @@ def _load_kb():
             articles.append({"title": title, "text": sec[:2000]})
     logger.info(f"Loaded {len(articles)} KB articles from {kb_dir}")
     return articles
+
+
+def _tavily_search(query: str) -> str:
+    """联网搜索，补充知识库不覆盖的实时信息"""
+    if not TAVILY_API_KEY:
+        return ""
+    try:
+        data = json.dumps({"query": query, "search_depth": "basic", "max_results": 3}).encode()
+        req = urllib.request.Request("https://api.tavily.com/search", data=data, headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {TAVILY_API_KEY}",
+        })
+        resp = urllib.request.urlopen(req, timeout=10)
+        result = json.loads(resp.read())
+        parts = []
+        for r in result.get("results", [])[:3]:
+            parts.append(f"【{r.get('title', '网页')}】\n{r.get('content', '')[:500]}")
+        return "\n\n---\n\n".join(parts) if parts else ""
+    except Exception as e:
+        logger.warning(f"Tavily search failed: {e}")
+        return ""
 
 
 def _search_kb(query: str, top_k: int = 3) -> list[dict]:
@@ -166,6 +191,11 @@ def _build_system_prompt(user_message: str, user_context: str = "", teaching_wee
             parts.append(f"【{a['title']}】\n{a['text'][:800]}")
         kb_text = "\n\n---\n\n".join(parts)
         prompt += f"\n\n## 校园知识库参考\n以下是从学校知识库检索到的相关信息，如果与用户问题相关可参考回答：\n{kb_text}\n注意：仅当知识库内容与用户问题直接相关时才引用，不要生硬植入。"
+
+    # 联网搜索
+    web_results = _tavily_search(user_message)
+    if web_results:
+        prompt += f"\n\n## 联网搜索结果\n以下为实时搜索结果，可用于补充知识库未覆盖的最新信息：\n{web_results}"
 
     return prompt
 

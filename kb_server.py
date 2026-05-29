@@ -15,6 +15,9 @@ KB_PATH = "/kb-data"
 EMBEDDING_API = os.environ.get("EMBEDDING_API", "https://api.siliconflow.cn/v1/embeddings")
 EMBEDDING_KEY = os.environ.get("EMBEDDING_KEY", "")
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-m3")
+RERANK_API = os.environ.get("RERANK_API", "https://api.siliconflow.cn/v1/rerank")
+RERANK_KEY = os.environ.get("RERANK_KEY", EMBEDDING_KEY)
+RERANK_MODEL = os.environ.get("RERANK_MODEL", "BAAI/bge-reranker-v2-m3")
 CACHE_FILE = "/tmp/kb_embeddings.json"
 
 
@@ -87,11 +90,33 @@ def build_index():
     return embeddings
 
 
+def rerank(query: str, candidates: list[dict], top_k: int = 3) -> list[dict]:
+    """Rerank 精排"""
+    if not candidates or not RERANK_KEY:
+        return candidates[:top_k]
+    try:
+        docs = [a["search_text"] for a in candidates]
+        data = json.dumps({"model": RERANK_MODEL, "query": query, "documents": docs}).encode()
+        req = urllib.request.Request(RERANK_API, data=data, headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {RERANK_KEY}",
+        })
+        resp = urllib.request.urlopen(req, timeout=15)
+        result = json.loads(resp.read())
+        ranked = result.get("results", [])
+        reranked = [candidates[r["index"]] for r in sorted(ranked, key=lambda x: x["relevance_score"], reverse=True)]
+        logger.info(f"Rerank: {len(candidates)} → {len(reranked[:top_k])}")
+        return reranked[:top_k]
+    except Exception as e:
+        logger.warning(f"Rerank failed, using embedding scores: {e}")
+        return candidates[:top_k]
+
+
 def search_embedding(query: str, top_k: int = 5) -> list[dict]:
-    """语义检索"""
+    """语义检索 + Rerank 精排"""
     q_emb = get_embedding(query)
     if not q_emb:
-        return search_keyword(query, top_k)  # fallback
+        return search_keyword(query, top_k)
 
     scores = []
     for i, a in enumerate(KB_ARTICLES):
@@ -99,7 +124,8 @@ def search_embedding(query: str, top_k: int = 5) -> list[dict]:
         if emb:
             scores.append((cosine(q_emb, emb), a))
     scores.sort(key=lambda x: -x[0])
-    return [a for s, a in scores[:top_k] if s > 0.3]
+    candidates = [a for s, a in scores[:20] if s > 0.3]
+    return rerank(query, candidates, top_k) if candidates else []
 
 
 def search_keyword(query: str, top_k: int = 5) -> list[dict]:

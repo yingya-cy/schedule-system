@@ -1,0 +1,73 @@
+# 校园生活
+
+
+### 东校区基本信息
+address: 广州市天河区中山大道西293号
+postcode: 510665
+transport: 门口BRT学院站，附近地铁11号线华景路站、21号线天河公园站
+features: 主校区，交通便利，位于天河区中心，实习兼职方便。但部分宿舍楼较旧。
+departments: 计算机科学学院, 电子与信息学院, 研究生院等
+dormitory: 4-6人间不等，智能热水系统，部分楼栋较旧
+canteen: 春晖园（推荐广式烧腊饭、潮汕汤粉），人均8-15元
+medical: 校医务室
+
+### 西校区基本信息
+address: 广州市天河区龙口西路576号
+postcode: 510630
+dormitory: 独立卫浴，热水限时段供应（早/午/晚三段）
+counseling_room: 综合楼305
+
+### 白云校区基本信息
+address: 广州市白云区江高镇环镇西路155号
+postcode: 510450
+transport: 到地铁8号线滘心站约30分钟便民车，到市中心约1小时。节假日高峰堵车严重。
+features: 面积最大的校区，大部分学生大二起在此就读。位置偏远，但校园环境较好。
+dormitory: A区: 4人间（A13栋为6人间），干湿分离，热水17:00-23:00插卡使用; B区: 有电梯，楼下三饭，热水17:00-23:00; 小塘公寓: 4人间上床下桌，有电梯，24小时电热水器
+canteen: 三大食堂+后街美食广场，有KFC、麦当劳、瑞幸、茶百道、蜜雪冰城
+medical: 综合楼一楼，8:30-11:30 / 13:30-16:30
+counseling_room: 二教附属楼102
+
+### 北校区基本信息
+address: 广州市越秀区广园西路183号
+postcode: 510400
+
+### 河源校区基本信息
+address: 河源市东源县东环路（仙塘镇）
+postcode: 517500
+area: 1081亩
+features: 2020年9月启用，最新校区。多数学院'1+3'模式（大一在河源，大二起回广州）。位置偏僻，但宿舍最新最好。
+dormitory: 4人间、上床下桌、独立卫浴、电梯楼、空调全覆盖。热水通过小程序'趣智校园'使用。被学生称为'爱丽丝顿商学院般的宿舍'。
+counseling_room: 厚德楼307
+express_address: 广东省河源市东源县东江教育城广东技术师范大学
+
+### 校园常用服务
+one_stop: name: 一网通办; access: 学校统一门户 + 企业微信工作台; services: 近50项（教职工请假、学生请假、留校申请、助学金申报、在线报修等）; note: 教工入职/离职、学生入学/离校等事务原则上全部线上申请审批
+payment: platform: https://xyzfpt.gpnu.edu.cn/; wechat: 广东技术师范大学财务处（gpnu_cwc）; access_alt: 企业微信 → 工作台 → 财务平台 → 统一支付
+dormitory_repair: 企业微信 → '微公寓' → 网上报修
+water_delivery: 微信公众号'真如校园'预约送水
+funding_hotline: 020-38256670（工作日8:30-11:30, 15:00-17:00）
+security_office: phone: 020-38256652; note: 户口迁移等
+student_archive: 020-38265480
+express_addresses: 白云校区: 广州市白云区江高镇环镇西路155号 + 宿舍区（A区/B区/小塘公寓）; 东校区: 广州市天河区中山大道西293号; 西校区: 广州市天河区龙口西路576号; 河源校区: 广东省河源市东源县东江教育城广东技术师范大学
+
+### 各校区快递地址
+
+### 白云校区宿舍详情
+
+### 白云校区食堂详情
+overview: 白云校区三大食堂+后街+大咖广场。人均8-15元
+
+### 学生生活贴士
+canteen_price: 人均8-15元
+campus_network: note: 白云校区校园网在宿舍可能卡顿，打游戏看视频体验不佳（贴吧高频吐槽）; solution: 可自行办理宽带
+self_study: library: 图书馆各校区均有，考试周延长至23:00; classrooms: 教学楼A/B/C栋空闲教室均可自习，无需预约。考试周部分教室延长到23:00; note: 白云校区教学楼A栋2-3楼为主要自习区域
+peak_hours: canteen: 11:40-12:20 午餐高峰，17:30-18:10 晚餐高峰; library: 考试周座位紧张，建议8:00前到
+student_tips: 选课: 教师水平参差不齐，建议主动选口碑好的老师，利用MOOC自学补充; 竞赛: 多参与实验室项目和竞赛（ACM、电子设计等），提升就业竞争力; exam_planning: 考研/考编尽早规划，师范类专业尤其要利用好学校资源
+frequent_moves: note: 多数同学经历1+3模式（河源1年 + 广州3年），大二搬校区是常见体验。贴吧：'同个学校也能体验异地恋'; pattern: 大一河源 → 大二起白云/东校区
+
+### 教务相关信息
+website: https://jwc.gpnu.edu.cn/
+system: https://jwglxt.gpnu.edu.cn/sso/lyiotlogin（正方教务系统）
+contacts: {'教学建设科': {'location': '东校区行政楼206室', 'email': 'gsjyk@gpnu.edu.cn'}, '学籍与信息科': {'phone': '020-38256437 / 38257900', 'email': 'jwcxjk@gpnu.edu.cn'}, '公共选修课': {'phone': '020-38256437 / 38256866', 'contact': '龙老师、崔老师'}, '研究生培养办': {'phone': '020-38257203', 'contact': '涂老师、娄老师、梁老师、洪老师'}}
+pub_elective_courses: 共179门课，32学时2学分。线下课第3周起开课，网络课第6周起
+timeline: {'2025-2026-1': {'courses_published': '2025年7月19日', 'semester_start': '2025年9月8日', 'weeks_1_18': '授课周', 'weeks_19_20': '考试周', 'new_student_registration': '2025年9月11-12日'}}
