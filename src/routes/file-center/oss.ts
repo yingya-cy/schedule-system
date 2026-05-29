@@ -125,8 +125,8 @@ router.post('/oss/download-url', async (req, res) => {
   }
 });
 
-// GET /api/file-center/oss/download - server proxy with original filename
-router.get('/oss/download', async (req, res) => {
+// GET /api/file-center/oss/download-url — return OSS presigned URL (for frontend <a> tag direct download)
+router.get('/oss/download-url', async (req, res) => {
   try {
     const key = req.query.key as string;
     const filename = req.query.filename as string;
@@ -134,17 +134,14 @@ router.get('/oss/download', async (req, res) => {
       res.status(400).json({ success: false, error: 'key 为必填项' });
       return;
     }
-    const { body, contentType } = await getObjectContent(key);
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename || key.split('/').pop() || 'download')}"`);
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.end(body);
+    const url = await generatePresignedDownloadUrl(key, 3600, filename);
+    res.json({ success: true, data: { url } });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
-// GET /api/file-center/oss/preview - proxied with inline Content-Disposition
+// GET /api/file-center/oss/preview - redirect to OSS presigned URL for simple files, server convert for docx
 router.get('/oss/preview', async (req, res) => {
   try {
     const key = req.query.key as string;
@@ -152,11 +149,18 @@ router.get('/oss/preview', async (req, res) => {
       res.status(400).json({ success: false, error: 'key 为必填项' });
       return;
     }
+    const isDocx = key.toLowerCase().endsWith('.docx');
+    const isDoc = key.toLowerCase().endsWith('.doc') && !isDocx;
+
+    if (!isDocx && !isDoc) {
+      // Simple files: redirect browser directly to OSS
+      const url = await generatePresignedDownloadUrl(key, 3600);
+      res.redirect(302, url);
+      return;
+    }
+
+    // doc/docx: server-side conversion
     const { body, contentType } = await getObjectContent(key);
-    const isDocx = contentType.includes('wordprocessingml')
-      || (key.toLowerCase().endsWith('.docx') && !key.toLowerCase().endsWith('.doc'));
-    const isDoc = contentType === 'application/msword'
-      || (key.toLowerCase().endsWith('.doc') && !key.toLowerCase().endsWith('.docx'));
 
     if (isDoc) {
       try {

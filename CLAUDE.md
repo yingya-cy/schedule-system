@@ -236,3 +236,11 @@ fi
 - fix bug 时如果线上**已经有被污染的数据**，只改代码不清理脏数据，修了等于没修
 - 前端加几行 `console.log` 是最快定位手段——2 分钟就知道是 API 返回了错误数据，而不是前端自己过滤的
 - 原则：排序就按 `created_at DESC`，别搞 CASE WHEN 优先级；修复数据 bug 要同步清理已污染的存量数据
+
+**2026-05-29：OSS 下载性能优化与踩坑**
+- `oss.get(key)` 把整个文件加载到服务器内存再发给浏览器——大文件吃内存、多文件堵住 Express、浏览器不显示下载进度
+- **正确做法**：服务端生成 OSS 预签名 URL → 前端拿到 URL 后 `<a>` 标签直连阿里云下载。服务器零内存消耗，浏览器原生进度条
+- 预签名 URL 要加 `response-content-disposition` 参数控制下载文件名，否则浏览器用 OSS key 的最后一段（带 fileId 前缀）做文件名
+- **ali-oss SDK 签名参数必须用 `{ queries: { key: value } }` 嵌套格式**，直接传扁平对象签名不会包含它→SignatureDoesNotMatch
+- 中文文件名用 RFC 5987 编码：`filename*=UTF-8''${encodeURIComponent(filename)}`
+- 下载流程四步演变：`fetch+blob`（吃内存）→ `window.open`（弹窗被拦）→ `iframe`（下载不触发）→ `<a>` 标签直连 OSS URL（最终方案）

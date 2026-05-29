@@ -57,13 +57,20 @@ export async function generatePresignedUploadUrl(
  */
 export async function generatePresignedDownloadUrl(
   objectKey: string,
-  expiresSeconds = 3600
+  expiresSeconds = 3600,
+  filename?: string
 ): Promise<string> {
   if (!isOssConfigured()) {
     throw new Error('OSS 未配置：请在 .env 中设置有效的 OSS_ACCESS_KEY_ID 和 OSS_ACCESS_KEY_SECRET');
   }
   const oss = getClient();
-  return oss.signatureUrlV4('GET', expiresSeconds, {}, objectKey);
+  const queries: Record<string, string> = {};
+  if (filename) {
+    // RFC 5987 编码支持中文文件名
+    const encoded = encodeURIComponent(filename);
+    queries['response-content-disposition'] = `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`;
+  }
+  return oss.signatureUrlV4('GET', expiresSeconds, { queries }, objectKey);
 }
 
 /**

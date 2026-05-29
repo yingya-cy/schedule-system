@@ -341,17 +341,13 @@ export default function FileCenterView() {
   async function handleDownload(file: FileCenterFileItem) {
     if (!file.oss_object_key) return;
     try {
-      const res = await fetch(`/api/file-center/oss/download?key=${encodeURIComponent(file.oss_object_key)}&filename=${encodeURIComponent(file.original_filename)}`, { headers });
+      const res = await fetch(`/api/file-center/oss/download-url?key=${encodeURIComponent(file.oss_object_key)}&filename=${encodeURIComponent(file.original_filename)}`, { headers });
       if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const { data } = await res.json();
+      if (!data?.url) return;
       const a = document.createElement('a');
-      a.href = url;
-      a.download = file.original_filename;
-      document.body.appendChild(a);
+      a.href = data.url;
       a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
     } catch { /* ignore */ }
   }
 
@@ -432,15 +428,16 @@ export default function FileCenterView() {
     const files = items.files.filter(f => selectedFileIds.has(f.id) && f.oss_object_key);
     for (const f of files) {
       try {
-        const res = await fetch(`/api/file-center/oss/download?key=${encodeURIComponent(f.oss_object_key!)}&filename=${encodeURIComponent(f.original_filename)}`, { headers });
+        const res = await fetch(`/api/file-center/oss/download-url?key=${encodeURIComponent(f.oss_object_key!)}&filename=${encodeURIComponent(f.original_filename)}`, { headers });
         if (!res.ok) continue;
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
+        const { data } = await res.json();
+        if (!data?.url) continue;
         const a = document.createElement('a');
-        a.href = url; a.download = f.original_filename;
-        document.body.appendChild(a); a.click(); a.remove();
-        URL.revokeObjectURL(url);
-      } catch { /* skip failed files */ }
+        a.href = data.url;
+        a.click();
+        // 间隔避免浏览器拦截
+        await new Promise(r => setTimeout(r, 300));
+      } catch { /* skip */ }
     }
     clearSelection();
   }

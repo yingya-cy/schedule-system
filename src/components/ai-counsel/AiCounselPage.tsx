@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useAiCounselStore } from '../../stores/aiCounselStore';
 import { aiCounselApi } from '../../services/aiCounselApi';
 import type { CounselMessage } from '../../services/aiCounselApi';
@@ -266,6 +266,28 @@ export default function AiCounselPage() {
     }
   }, [inputText, streaming]);
 
+  // Measure available height so chat fills exactly to bottom tab bar
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [chatHeight, setChatHeight] = useState<number | null>(null);
+
+  const measureHeight = useCallback(() => {
+    if (containerRef.current?.parentElement) {
+      const parentRect = containerRef.current.parentElement.getBoundingClientRect();
+      const available = window.innerHeight - parentRect.top;
+      setChatHeight(Math.max(300, available));
+    }
+  }, []);
+
+  useEffect(() => {
+    measureHeight();
+    window.addEventListener('resize', measureHeight);
+    window.addEventListener('orientationchange', measureHeight);
+    return () => {
+      window.removeEventListener('resize', measureHeight);
+      window.removeEventListener('orientationchange', measureHeight);
+    };
+  }, [measureHeight]);
+
   return (
     <>
       <style>{`
@@ -293,7 +315,7 @@ export default function AiCounselPage() {
         .markdown-content table { border-collapse: collapse; margin: 0.25em 0; font-size: 0.9em; }
         .markdown-content th, .markdown-content td { border: 1px solid rgb(var(--outline-variant)/.4); padding: 0.25em 0.5em; text-align: left; }
       `}</style>
-    <div className="flex flex-col overflow-hidden h-[calc(100dvh-6.5rem)] lg:h-[calc(100dvh-8rem)]">
+    <div ref={containerRef} className="flex flex-col overflow-hidden" style={chatHeight ? { height: chatHeight } : undefined}>
       <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
       <div className={`${showSidebar ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-64 border-r border-outline-variant/40 shrink-0`}>

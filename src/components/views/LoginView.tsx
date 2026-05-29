@@ -80,8 +80,8 @@ export default function LoginView() {
               <LayoutDashboard size={30} className="text-white" />
             </motion.div>
           </div>
-          <h1 className="text-2xl font-extrabold text-primary font-headline">学术空间</h1>
-          <p className="text-sm text-outline mt-2">Academic Ether</p>
+          <h1 className="text-2xl font-extrabold text-primary font-headline">校园智联</h1>
+          <p className="text-sm text-outline mt-2">Campus Connect</p>
         </div>
 
         {/* Login Card */}

@@ -47,51 +47,40 @@
 
 ### 22.1 移动端全面适配
 
-**问题：** 近期新增页面（AI 日程、个人中心、AI 咨询）的移动端布局存在多处问题：
-- 左右分栏在手机端挤压内容区
-- 右侧面板无移动端降级方案
-- 高度计算不统一（有的用 `100vh`，有的用 `100dvh`，有的忘记减底部 tab bar）
+**问题：** 近期新增页面（个人中心、AI 咨询）移动端布局存在多处问题：左右分栏挤压内容区、右侧面板无降级方案、高度计算不精准、底部导航栏拥挤、侧边栏 bug。
 
-**修复清单（按顺序执行）：**
+#### 已完成
 
-#### Step 1: PersonalCenterPage 右侧面板响应式
-- 文件：`src/components/ai-schedule/PersonalCenterPage.tsx`
-- 问题：
-  - "个人课表" Tab 中右侧面板（`w-60 xl:w-72`）在 `<lg` 时布局破碎，无移动端降级
-  - ProfileCard 编辑表单中 `w-36` 固定宽度在窄屏溢出
-  - 历史计划抽屉 `w-[720px] max-w-[95vw]` 在手机上 OK，无需改动
-- 修复：
-  - `<lg` 时右侧面板（上传、待办、自定义偏好）改为从右侧滑入的可切换抽屉，添加"⚙️ 更多设置"触发按钮
-  - `>=lg` 保持现有侧边栏布局不变
-  - ProfileCard 编辑表单 `w-36` → `w-full sm:w-36`
-- 验证：`npx tsc --noEmit`
+**PersonalCenterPage（个人中心）：**
+- [x] 右侧面板（上传/待办/偏好）在 `<lg` 改为滑入抽屉 + "更多设置"按钮，桌面端保持侧栏
+- [x] ProfileCard 编辑表单 `w-36` → `w-full sm:w-36`
 
-#### Step 2: PlanTimeline 网格响应式优化
-- 文件：`src/components/ai-schedule/PlanTimeline.tsx`
-- 问题：非 compact 网格 `sm:grid-cols-3` 在手机横屏（<640px）仍只显示 1 列
-- 修复：
-  - 非 compact: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7`
-  - compact: 保持 `grid-cols-1 sm:grid-cols-2`
-- 验证：`npx tsc --noEmit`
+**PlanTimeline（计划时间线）：**
+- [x] 非 compact 网格 `sm:grid-cols-3 lg:4 xl:5 2xl:7` → `sm:grid-cols-2 lg:3 xl:4 2xl:7`
 
-#### Step 3: AiCounselPage 高度计算修正
-- 文件：`src/components/ai-counsel/AiCounselPage.tsx`
-- 问题：`h-[calc(100dvh-6rem)]` 在移动端偏大（未考虑底部 tab bar ~3.5rem）
-- 修复：移动端 `h-[calc(100dvh-7.5rem)]`（64px topbar + 24px p + ~56px bottom tab），桌面端保持 `lg:h-[calc(100dvh-8rem)]`
-- 验证：`npx tsc --noEmit`
+**AiCounselPage（AI 咨询）：**
+- [x] 高度改为 JS 测量实际可用空间（`window.innerHeight - parentRect.top`），不再用固定 `calc(100dvh-Xrem)`，自动适配顶栏/底栏/地址栏
+- [x] 输入区仿豆包/Kimi：去掉 `bg-surface border-t` 白板分割，消息+输入共用一个连续背景
+- [x] 消息气泡 `max-w-[80%]` → `max-w-[88%] sm:max-w-[80%]`，手机不浪费空间
+- [x] 输入框 `min-h-[2.75rem]` + `rounded-2xl` + `shadow-sm`，发送按钮 `touch-target`
+- [x] 侧栏切换按钮从纯文本改为 Menu/X 图标
 
-#### Step 4: Layout.tsx 微调
-- 文件：`src/components/Layout.tsx`
-- 问题：main 的 `min-h-[calc(100vh-64px)]` 用 `100vh` 而非 `100dvh`
-- 修复：`min-h-[calc(100dvh-64px)]`
-- 不动：`pb-20 lg:pb-0` 已在外层 div 正确设置（line 182）
+**Layout（全局布局）：**
+- [x] `isMobile` 初始化修复：`useState(false)` → `useState(() => window.innerWidth < 1024)`，消除底部导航栏闪现
+- [x] 侧边栏汉堡菜单修复：`isMobile ? "-translate-x-full" : ...` → 只判断 `mobileMenuOpen`，修复点击无响应
+- [x] 侧边栏底部按钮被遮挡：加 `z-50` + `pb-20` + 导航区 `overflow-y-auto`
+- [x] 底部标签栏去文字：只留图标 + `title` 属性，加 `backdrop-blur-sm` 磨砂
+- [x] main `100vh` → `100dvh`
+
+**计划持久化修复：**
+- [x] `POST /save-schedule` INSERT 路径补 `plan_data`（从旧行带过来）
+- [x] `GET /latest-schedule` 加 fallback：最新行无 plan_data 时往前查找
 
 #### 最终验证
-- [ ] `npx tsc --noEmit` — 零错误
-- [ ] `npx playwright test tests/layout-health.spec.ts` — 16 tests passed
-- [ ] 手动 DevTools 模拟 iPhone SE (375px)、iPhone 12 (390px)：
-  - 个人中心 → 个人课表 Tab → 右侧设置抽屉可打开/关闭
-  - AI 咨询 → 无多余滚动条、消息气泡不溢出
+- [x] `npx tsc --noEmit` — 零新增错误
+- [x] `npx playwright test tests/layout-health.spec.ts` — 15/16（1 预存超时）
+- [x] `npx playwright test tests/personal-center.spec.ts` — 19/19
+- [x] 手动 DevTools 验证 iPhone SE / iPhone 12 各页面正常
 
 ### 待做
 

@@ -1,0 +1,82 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="系统架构图">
+    <mxGraphModel dx="900" dy="700" grid="1" gridSize="10" guides="1">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Title -->
+        <mxCell id="title" value="&lt;b style='font-size:16px'&gt;校园智联 — 系统架构图&lt;/b&gt;" style="text;html=1;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="300" y="10" width="300" height="30"/>
+        </mxCell>
+
+        <!-- 浏览器 -->
+        <mxCell id="browser" value="&lt;b&gt;浏览器&lt;/b&gt;&lt;br&gt;React SPA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="130" y="50" width="160" height="50"/>
+        </mxCell>
+
+        <!-- Nginx -->
+        <mxCell id="nginx" value="&lt;b&gt;Nginx :80&lt;/b&gt;&lt;br&gt;反向代理 + 静态文件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="130" y="130" width="180" height="50"/>
+        </mxCell>
+
+        <!-- Express -->
+        <mxCell id="express" value="&lt;b&gt;Express.js :3001&lt;/b&gt;&lt;br&gt;API 网关 · JWT 认证 · 限流 · 路由分发" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="100" y="210" width="240" height="55"/>
+        </mxCell>
+
+        <!-- Dify -->
+        <mxCell id="dify" value="&lt;b&gt;Dify 智能体编排&lt;/b&gt;&lt;br&gt;知识库检索 + Rerank 精排&lt;br&gt;对话记忆 + 用户画像注入 + Tavily 搜索" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="310" width="260" height="60"/>
+        </mxCell>
+
+        <!-- Flask -->
+        <mxCell id="flask" value="&lt;b&gt;Flask AI 服务 :5002&lt;/b&gt;&lt;br&gt;课表 OCR · KB 本地检索 · 日程规划 · 心理陪伴 SSE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="360" y="310" width="280" height="60"/>
+        </mxCell>
+
+        <!-- MySQL -->
+        <mxCell id="mysql" value="&lt;b&gt;MySQL 8.0&lt;/b&gt;&lt;br&gt;业务数据 · 连接池 20" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="680" y="220" width="130" height="60"/>
+        </mxCell>
+
+        <!-- OSS -->
+        <mxCell id="oss" value="&lt;b&gt;阿里云 OSS&lt;/b&gt;&lt;br&gt;文件存储 · V4 直传" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="680" y="310" width="130" height="60"/>
+        </mxCell>
+
+        <!-- DeepSeek -->
+        <mxCell id="llm" value="&lt;b&gt;DeepSeek V4&lt;/b&gt;&lt;br&gt;火山引擎 ARK API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="200" y="420" width="240" height="50"/>
+        </mxCell>
+
+        <!-- KB 采集管线 -->
+        <mxCell id="wx" value="微信公众号&lt;br&gt;44 个账号" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="420" width="100" height="50"/>
+        </mxCell>
+        <mxCell id="web" value="学校官网&lt;br&gt;4 站点 11 栏目" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="620" y="420" width="100" height="50"/>
+        </mxCell>
+        <mxCell id="crawler" value="Python 爬虫&lt;br&gt;清洗 · 分类 · 去重" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="550" y="500" width="120" height="50"/>
+        </mxCell>
+        <mxCell id="kb" value="&lt;b&gt;校园知识库&lt;/b&gt;&lt;br&gt;565 篇 · 6 分类" style="shape=document;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="530" y="580" width="120" height="60"/>
+        </mxCell>
+
+        <!-- Edges -->
+        <mxCell style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="browser" target="nginx"/>
+        <mxCell style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="nginx" target="express"/>
+        <mxCell style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.2;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="express" target="dify"/>
+        <mxCell style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.8;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="express" target="flask"/>
+        <mxCell style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="express" target="mysql"/>
+        <mxCell style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;entryX=0.25;entryY=0;" edge="1" parent="1" source="dify" target="llm"/>
+        <mxCell style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;entryX=0.75;entryY=0;" edge="1" parent="1" source="flask" target="llm"/>
+        <mxCell style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;entryX=0.25;entryY=0;" edge="1" parent="1" source="wx" target="crawler"/>
+        <mxCell style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;entryX=0.75;entryY=0;" edge="1" parent="1" source="web" target="crawler"/>
+        <mxCell style="edgeStyle=orthogonalEdgeStyle;rounded=0;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="crawler" target="kb"/>
+        <mxCell style="edgeStyle=orthogonalEdgeStyle;rounded=0;dashed=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="kb" target="dify"/>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -407,7 +407,17 @@ router.get('/latest-schedule', authenticate, async (req, res) => {
     };
 
     const input = latestPlan ? parseJson(latestPlan.input_data) : {};
-    const plan = latestPlan?.plan_data ? parseJson(latestPlan.plan_data) : null;
+    let plan = latestPlan?.plan_data ? parseJson(latestPlan.plan_data) : null;
+
+    // Fallback: if latest row has no plan_data, find the most recent one that does
+    if (!plan) {
+      const [planRows] = await pool.query(
+        'SELECT plan_data FROM ai_schedule_plans WHERE user_id = ? AND plan_data IS NOT NULL ORDER BY created_at DESC LIMIT 1',
+        [req.user!.userId]
+      );
+      const planRow = (planRows as RowDataPacket[])[0];
+      if (planRow?.plan_data) plan = parseJson(planRow.plan_data);
+    }
 
     // Normalize stored courses to EditableCourse format (handle both name and course_name)
     const rawCourses = ((input as Record<string, unknown>).courses || []) as Record<string, unknown>[];
@@ -464,9 +474,15 @@ router.post('/save-schedule', authenticate, async (req, res) => {
       );
       planId = (rows as RowDataPacket[])[0].id;
     } else {
+      // Preserve plan_data from an earlier row so the plan survives save + refresh
+      const [planRows] = await pool.query(
+        'SELECT plan_data FROM ai_schedule_plans WHERE user_id = ? AND plan_data IS NOT NULL ORDER BY created_at DESC LIMIT 1',
+        [userId]
+      );
+      const existingPlan = (planRows as RowDataPacket[])[0]?.plan_data || null;
       const [result] = await pool.query(
-        'INSERT INTO ai_schedule_plans (user_id, input_data) VALUES (?, ?)',
-        [userId, inputJson]
+        'INSERT INTO ai_schedule_plans (user_id, input_data, plan_data) VALUES (?, ?, ?)',
+        [userId, inputJson, existingPlan]
       );
       planId = (result as ResultSetHeader).insertId;
     }

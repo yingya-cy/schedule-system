@@ -130,6 +130,25 @@ router.post('/counsel/stream', authenticate, async (req, res) => {
     })();
 
     if (useDify) {
+      // 调本地 kb-search 获取知识库上下文
+      let kbContext = '';
+      try {
+        const kbRes = await fetch('http://localhost:5099/api/kb/search/retrieval', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            knowledge_id: 'gpnu-kb',
+            query: lastMsg.content,
+            retrieval_setting: { top_k: 3, score_threshold: 0.3 },
+          }),
+          signal: AbortSignal.timeout(5000),
+        });
+        if (kbRes.ok) {
+          const kbJson = await kbRes.json();
+          const records = (kbJson.records || []) as Array<{ content: string; title: string }>;
+          kbContext = records.map(r => `【${r.title}】\n${r.content.slice(0, 800)}`).join('\n\n---\n\n');
+        }
+      } catch { /* KB 不可用就跳过 */ }
 
       // Call Dify chat streaming
       const difyBody: Record<string, unknown> = {
@@ -143,6 +162,7 @@ router.post('/counsel/stream', authenticate, async (req, res) => {
           user_context: userContext,
           current_date: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
           teaching_week: teachingWeek,
+          kb_context: kbContext,
         },
         query: lastMsg.content,
         response_mode: 'streaming',

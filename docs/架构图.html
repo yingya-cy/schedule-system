@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:'base',themeVariables:{fontSize:'16px'}});</script>
+<style>body{background:white;margin:20px;}</style>
+</head>
+<body>
+<div class="mermaid">
+graph TB
+    Browser["🖥 浏览器 React SPA"]
+    Nginx["Nginx :80 反向代理"]
+    Express["Express.js :3001 API网关<br/>JWT认证 限流 路由分发"]
+
+    subgraph AI["AI 服务层"]
+        Dify["Dify 智能体编排<br/>知识库检索+Rerank精排<br/>对话记忆+画像注入"]
+        Flask["Flask 微服务<br/>课表OCR+KB检索<br/>日程规划+心理陪伴"]
+    end
+
+    DB[("MySQL 8.0<br/>业务数据")]
+    OSS[("阿里云 OSS<br/>文件存储")]
+    LLM["DeepSeek V4<br/>火山引擎 ARK"]
+
+    subgraph Pipeline["知识库采集管线"]
+        WX["微信公众号<br/>44个账号"]
+        Web["学校官网<br/>4站点11栏目"]
+        Crawler["Python 自动爬虫<br/>增量更新+去重"]
+    end
+
+    Browser --> Nginx --> Express
+    Express --> Dify
+    Express --> Flask
+    Express --> DB
+    Express --> OSS
+    Dify --> LLM
+    Flask --> LLM
+    WX --> Crawler
+    Web --> Crawler
+    Crawler --> Dify
+    Crawler --> Flask
+</div>
+</body>
+</html>

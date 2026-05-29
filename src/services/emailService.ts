@@ -19,7 +19,7 @@ export async function sendVerificationEmail(to: string, username: string, token:
 
   const html = `
     <div style="max-width:480px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
-      <h2 style="color:#6366f1">学术空间 · 邮箱验证</h2>
+      <h2 style="color:#6366f1">校园智联 · 邮箱验证</h2>
       <p>你好，<strong>${username}</strong></p>
       <p>请点击下方按钮验证邮箱以激活账号：</p>
       <a href="${verifyUrl}" style="display:inline-block;background:#6366f1;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">验证邮箱</a>
@@ -30,7 +30,7 @@ export async function sendVerificationEmail(to: string, username: string, token:
   return transporter.sendMail({
     from: process.env.EMAIL_FROM || process.env.SMTP_USER,
     to,
-    subject: '学术空间 - 邮箱验证',
+    subject: '校园智联 - 邮箱验证',
     html,
   });
 }

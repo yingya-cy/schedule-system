@@ -5,7 +5,7 @@ import json
 import os
 import re
 import logging
-from flask import request, Response
+from flask import request, Response, jsonify
 from ai_endpoints import ai_stream
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ COUNSEL_SYSTEM_PROMPT = """你是"小暖"，广东技术师范大学的校园智
 
 KB_PATH = os.environ.get(
     "KB_PATH",
-    os.path.join(os.path.dirname(__file__), "..", "..", "dify-kb"),
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dify-kb"),
 )
 KB_ARTICLES: list[dict] = []
 
@@ -171,6 +171,45 @@ def _build_system_prompt(user_message: str, user_context: str = "", teaching_wee
 
 
 def register_counsel_routes(app):
+    @app.route("/api/kb/search", methods=["POST"])
+    def kb_search():
+        """
+        Dify API Extension — 外部知识库
+        协议：{"point": "ping|app.external_data_tool.query", "params": {...}}
+        """
+        data = request.get_json(silent=True) or {}
+
+        # ping 免鉴权
+        if data.get("point") == "ping":
+            return jsonify({"result": "pong"})
+
+        # API Key 鉴权
+        expected_key = os.environ.get("KB_API_KEY", "gpnu-kb-2026")
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            auth = auth[7:]
+        if auth != expected_key:
+            return jsonify({"result": "unauthorized"}), 401
+
+        # 提取查询文本（支持多种格式）
+        query = data.get("query", "") or data.get("params", {}).get("query", "")
+        if not query:
+            return jsonify({"result": ""})
+
+        top_k = data.get("retrieval_setting", {}).get("top_k", 5)
+        results = _search_kb(query, top_k=min(top_k, 10))
+        if not results:
+            return jsonify({"result": "未找到相关信息"})
+
+        # 拼接结果文本（API Extension 格式：{"result": "text"}）
+        parts = []
+        for r in results:
+            parts.append(f"【{r['title'] or '校园信息'}】\n{r['text'][:800]}")
+        text = "\n\n---\n\n".join(parts)
+
+        logger.info(f"KB search: {query!r} → {len(results)} results")
+        return jsonify({"result": text})
+
     @app.route("/api/ai/counsel/stream", methods=["POST"])
     def counsel_stream():
         """

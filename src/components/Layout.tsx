@@ -132,8 +132,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </motion.div>
           </div>
           <div>
-            <h1 className="text-lg font-extrabold text-primary font-headline leading-none">学术空间</h1>
-            <p className="text-[10px] text-outline uppercase tracking-widest mt-1">Academic Ether</p>
+            <h1 className="text-lg font-extrabold text-primary font-headline leading-none">校园智联</h1>
+            <p className="text-[10px] text-outline uppercase tracking-widest mt-1">Campus Connect</p>
           </div>
         </div>
 
