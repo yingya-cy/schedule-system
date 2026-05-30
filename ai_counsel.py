@@ -119,8 +119,101 @@ def _tavily_search(query: str) -> str:
         return ""
 
 
-def _search_kb(query: str, top_k: int = 3) -> list[dict]:
-    """关键词匹配检索，零依赖"""
+# ── 向量检索（bge-m3 + Rerank）──
+
+EMBEDDING_KEY = os.environ.get("EMBEDDING_KEY", os.environ.get("AI_API_KEY", ""))
+EMBEDDING_MODEL = "BAAI/bge-m3"
+RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
+EMBEDDINGS: list = []
+EMB_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "embeddings_cache.json")
+
+
+def _get_embedding(text: str) -> list | None:
+    if not EMBEDDING_KEY:
+        return None
+    try:
+        data = json.dumps({"model": EMBEDDING_MODEL, "input": text}).encode()
+        req = urllib.request.Request("https://api.siliconflow.cn/v1/embeddings", data=data, headers={
+            "Content-Type": "application/json", "Authorization": f"Bearer {EMBEDDING_KEY}",
+        })
+        resp = urllib.request.urlopen(req, timeout=15)
+        return json.loads(resp.read())["data"][0]["embedding"]
+    except Exception as e:
+        logger.warning(f"Embedding failed: {e}")
+        return None
+
+
+def _cosine(a: list, b: list) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(y * y for y in b) ** 0.5
+    return dot / (na * nb) if na and nb else 0.0
+
+
+def _rerank(query: str, candidates: list[dict], top_k: int = 3) -> list[dict]:
+    if not candidates or not EMBEDDING_KEY:
+        return candidates[:top_k]
+    try:
+        docs = [a.get("search_text", a["text"][:800]) for a in candidates]
+        data = json.dumps({"model": RERANK_MODEL, "query": query, "documents": docs}).encode()
+        req = urllib.request.Request("https://api.siliconflow.cn/v1/rerank", data=data, headers={
+            "Content-Type": "application/json", "Authorization": f"Bearer {EMBEDDING_KEY}",
+        })
+        resp = urllib.request.urlopen(req, timeout=15)
+        result = json.loads(resp.read())
+        ranked = sorted(result.get("results", []), key=lambda x: x["relevance_score"], reverse=True)
+        return [candidates[r["index"]] for r in ranked[:top_k]]
+    except Exception as e:
+        logger.warning(f"Rerank failed: {e}")
+        return candidates[:top_k]
+
+
+def _build_embedding_index():
+    global EMBEDDINGS
+    if not EMBEDDING_KEY:
+        logger.warning("Embedding build skipped: no EMBEDDING_KEY")
+        return
+    if not KB_ARTICLES:
+        logger.warning("Embedding build skipped: no KB_ARTICLES")
+        return
+    if os.path.exists(EMB_CACHE_FILE):
+        try:
+            cached = json.load(open(EMB_CACHE_FILE))
+            if cached.get("count") == len(KB_ARTICLES):
+                EMBEDDINGS = cached["embeddings"]
+                logger.info(f"Loaded {len(EMBEDDINGS)} embeddings from cache (KB={len(KB_ARTICLES)})")
+                return
+        except Exception as e:
+            logger.warning(f"Failed to load embedding cache: {e}")
+    logger.info(f"Building embeddings for {len(KB_ARTICLES)} articles...")
+    import time as _time
+    for i, a in enumerate(KB_ARTICLES):
+        a["search_text"] = a["text"][:800]
+        emb = _get_embedding(a["search_text"])
+        EMBEDDINGS.append(emb)
+        if (i + 1) % 50 == 0:
+            logger.info(f"  {i+1}/{len(KB_ARTICLES)} done")
+        _time.sleep(0.05)
+    json.dump({"count": len(KB_ARTICLES), "embeddings": EMBEDDINGS}, open(EMB_CACHE_FILE, "w"))
+    logger.info(f"Built {len(EMBEDDINGS)} embeddings")
+
+
+def _search_vector(query: str, top_k: int = 3) -> list[dict]:
+    q_emb = _get_embedding(query)
+    if not q_emb:
+        return _search_keyword(query, top_k)
+    scores = []
+    for i, a in enumerate(KB_ARTICLES):
+        emb = EMBEDDINGS[i] if i < len(EMBEDDINGS) else None
+        if emb:
+            scores.append((_cosine(q_emb, emb), a))
+    scores.sort(key=lambda x: -x[0])
+    candidates = [a for s, a in scores[:20] if s > 0.3]
+    return _rerank(query, candidates, top_k) if candidates else []
+
+
+def _search_keyword(query: str, top_k: int = 3) -> list[dict]:
+    """关键词匹配检索（降级备用）"""
     if not KB_ARTICLES:
         return []
     keywords = set()
@@ -133,26 +226,24 @@ def _search_kb(query: str, top_k: int = 3) -> list[dict]:
     for a in KB_ARTICLES:
         title = a["title"]
         text = a["text"]
-        score = 0
-        # 标题命中加权
-        for kw in keywords:
-            if kw in title:
-                score += 10
-        # 正文命中
+        score = sum(10 for kw in keywords if kw in title)
         search_text = title + " " + text[:2000]
-        for kw in keywords:
-            if kw in search_text:
-                score += 1
-        # 单字重叠（短查询的兜底）
-        if len(query) <= 3:
-            score += len(set(query) & set(search_text[:500]))
+        score += sum(1 for kw in keywords if kw in search_text)
         if score > 0:
             scored.append((score, a))
     scored.sort(key=lambda x: -x[0])
     return [a for _, a in scored[:top_k]]
 
 
+def _search_kb(query: str, top_k: int = 3) -> list[dict]:
+    """统一检索入口：向量优先，关键词降级"""
+    if EMBEDDINGS:
+        return _search_vector(query, top_k)
+    return _search_keyword(query, top_k)
+
+
 KB_ARTICLES = _load_kb()
+_build_embedding_index()
 
 
 CAMPUS_SUMMARY = """
