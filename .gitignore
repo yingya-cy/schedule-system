@@ -85,6 +85,11 @@ coverage/
 # Runtime caches & state
 embeddings_cache.json
 scripts/crawl_state.json
+task_plan.md
+scripts/take_screenshots.py
+scripts/tw_debug.html
+docs/screenshots/
+docs/superpowers/
 
 # Claude plans
 .claude/plans/
