@@ -27,26 +27,20 @@ WECHAT_API = "http://localhost:1300"
 DIFY_API_URL = os.environ.get("DIFY_URL", "http://localhost:5001")
 DIFY_KB_API_KEY = os.environ.get("DIFY_KB_API_KEY", "")
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "dify-kb")
-FULL_TEXT_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "wechat-full-text.json")
-ALL_ARTICLES_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "wechat-all-articles.json")
+FULL_TEXT_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "比赛材料", "知识库数据", "wechat-full-text.json")
+ALL_ARTICLES_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "比赛材料", "知识库数据", "wechat-all-articles.json")
 
-# 已订阅的公众号 fakeid 列表
-SUBSCRIBED_FAKEIDS = [
-    "MjM5MzY1MTI4Ng==",  # 广师大招生就业办公室
-    "Mzk0NjY3MjUwMw==",  # 广师大心理健康教育与咨询中心
-    "MzA5MzUwNDczOA==",  # 广师大青年
-    "MzA5MjkwODM4OQ==",  # 广师大学生视界
-    "MzIwMzA3NzIyNg==",  # 早安广师大
-    "MzIwMTgzMzgxNA==",  # 广东技术师范大学教务处
-    "Mzg5MjUxMzA3MQ==",  # 广师大网安视界
-    "MzkzMzI1MTM3NQ==",  # 广师大自动化学院
-    "Mzg2OTAwNDQ2Mg==",  # 广师大机电青年
-    "MzU1NTg1MTM3Nw==",  # 广师大外国语学院
-    "MzIzODgwMDYzMg==",  # 广师大数科团学
-    "MzU0MjAxNjc5Mw==",  # 广师大教科团学
-    "MzU5MTg2NTA1Ng==",  # 广师大电信学院
-    "MzUxMTM5Mjc4OA==",  # 广师大科教
-]
+def _get_subscribed_fakeids():
+    """从 wechat-download-api 动态获取已订阅的 fakeid 列表"""
+    try:
+        url = f"{WECHAT_API}/api/rss/subscriptions"
+        resp = urllib.request.urlopen(url, timeout=10)
+        data = json.loads(resp.read().decode())
+        if data.get("success"):
+            return [s["fakeid"] for s in data.get("data", []) if s.get("fakeid")]
+    except Exception as e:
+        print(f"  Warning: failed to fetch subscriptions: {e}")
+    return []
 
 # 分类关键词
 CATEGORIES = {
@@ -116,8 +110,11 @@ def fetch_new_articles():
         with open(ALL_ARTICLES_FILE, "r", encoding="utf-8") as f:
             existing = {a["url"] for a in json.load(f) if a.get("url")}
 
+    fakeids = _get_subscribed_fakeids()
+    print(f"  Found {len(fakeids)} subscribed accounts")
+
     new_articles = []
-    for fid in SUBSCRIBED_FAKEIDS:
+    for fid in fakeids:
         url = f"{WECHAT_API}/api/public/articles?fakeid={fid}&count=10"
         try:
             resp = urllib.request.urlopen(url, timeout=15)

@@ -6,7 +6,7 @@
 ## Current Phase
 **Phase 21: AI 智能体比赛冲刺（2026-05-10 ~ 至今）**
 
-### 已完成（2026-05-25 ~ 05-26）
+### 已完成（2026-05-25 ~ 05-31）
 
 **小暖 AI 对话增强：**
 - [x] 修复流式输出闪烁黑块 — 旧消息不再跟着闪
@@ -82,24 +82,59 @@
 - [x] `npx playwright test tests/personal-center.spec.ts` — 19/19
 - [x] 手动 DevTools 验证 iPhone SE / iPhone 12 各页面正常
 
+**知识库深化（5/27-5/31）：**
+- [x] 考研考公完整指南（时间轴+科目攻略+选调教招，来自官网和第三方搜索）
+- [x] 转专业流程、奖助学金体系（来自学校官方通知）
+- [x] 各校区学院分布、河源四大全建制学院（低空技术与工程/数字创意/基础教育/数据科学）
+- [x] 校园服务信息（一卡通/报修/快递/食堂/VPN/常用电话）
+- [x] 河源临时图书馆位置（求新楼318/316）
+- [x] 校团委官网加入爬虫（35篇社会实践/组织建设/思想引领）
+- [x] KB 达到 650 篇，6 分类
+- [x] 微信/官网数据源分离存储（sync_kb.py → wechat-full-text.json，crawl_school.py → official-articles.json，rebuild_kb.py 合并）
+
+**架构演进（5/28-5/31）：**
+- [x] Flask 升级向量检索：bge-m3 Embedding + bge-reranker-v2-m3 Rerank 精排（召回20→精排3）
+- [x] Tavily 联网搜索集成到 Flask（`_tavily_search`）
+- [x] 自建 kb-search Docker 容器（bge-m3+Rerank，供 Dify 模式使用）
+- [x] Flask 模式完整独立：向量检索+Rerank+Tavily+校区摘要+数据飞轮，零外部依赖
+- [x] Express 注入 kb_context 到 Dify inputs（无需手动上传文件）
+- [x] 双模式架构定稿：Dify模式（工作流可视化）/ Flask模式（零依赖独立部署）
+- [x] 服务器部署完整工作流（TAVILY_KEY + EMBEDDING_KEY + 650篇KB）
+- [x] OSS 下载改为预签名URL直连（服务器零内存，浏览器原生进度条）
+- [x] OSS 文件名修复（response-content-disposition + RFC 5987编码）
+- [x] OSS 下载方案四步演变：fetch+blob → window.open → iframe → `<a>` 直连
+
+**设计文档（5/26-5/31）：**
+- [x] 六节全部完成，字数全合规
+- [x] 作品概述：背景分析→相关工作→特色描述→应用前景（590/600字）
+- [x] 作品设计：系统架构→大模型框架→核心模块→技术路线（840/1000字）
+- [x] 测试分析：测试方案→环境→设备→数据→结果→自动化（473/1000字）
+- [x] 创新性：原创性声明→4点创新→合规性声明（490/500字）
+- [x] 截图 5 张（小暖对话/个人中心/评分/课表中心/AI规划）
+- [x] 项目改名：学术空间 → 校园智联（Layout/Login/emailService 全部更新）
+
 ### 待做
 
 | 功能 | 优先级 |
 |------|--------|
+| 演示视频（≤5min，720P） | 高 |
+| PPT | 高 |
+| 导出 PDF 提交 | 高 |
 | 语音输入（MediaRecorder + Whisper） | 低 |
 | 分享对话卡片 | 低 |
-| Dify 直连 Express（减少延迟） | 低（depends on backend AI env vars） |
-| 归档/汇报整理 | 中 |
 
 ### 架构概览
 
 ```
-浏览器 → nginx:80 → Express:3001 → Dify:5001（本地）或 Flask:5002（服务器）
-                          ↓
-                       MySQL:3306
-                          
-Flask:5002 → DeepSeek API + 本地知识库（565篇）
-Dify:5001 → 工作流（知识库Rerank + Tavily搜索 + 对话记忆）
+浏览器 → Express :3001 → Flask :5002 → bge-m3 向量检索（召回20→Rerank精排3）
+                                    → Tavily 联网搜索
+                                    → DeepSeek V4 SSE 流式
+                                    → 数据飞轮（画像提取+更新）
+                         ↓
+                      MySQL :3306
+
+Flask:5002 完整自包含：向量检索+Rerank+联网搜索+校区摘要，零 Docker 零 Dify
+Dify:5001 可选：可视化工作流编排（本地开发用）
 ```
 
 ## Phases

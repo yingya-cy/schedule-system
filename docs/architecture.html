@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校园智联 — 系统架构图</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --blue: #3b82f6;
+    --blue-dim: #1e40af;
+    --emerald: #10b981;
+    --emerald-dim: #065f46;
+    --amber: #f59e0b;
+    --amber-dim: #92400e;
+    --violet: #8b5cf6;
+    --violet-dim: #5b21b6;
+    --rose: #f43f5e;
+    --rose-dim: #9f1239;
+    --cyan: #06b6d4;
+    --cyan-dim: #155e75;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    padding: 40px;
+    min-width: 1400px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 40px;
+  }
+
+  /* ── Layers ── */
+  .arch { max-width: 1500px; margin: 0 auto; }
+  .layer { margin-bottom: 28px; }
+  .layer-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    padding-left: 4px;
+  }
+  .layer-boxes { display: flex; gap: 16px; flex-wrap: wrap; }
+
+  .box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    flex: 1;
+    min-width: 200px;
+    position: relative;
+  }
+  .box-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .box-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .box-title { font-size: 15px; font-weight: 700; }
+  .box-subtitle { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .box-items { display: flex; flex-direction: column; gap: 6px; }
+  .item {
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    border-left: 2px solid transparent;
+  }
+  .item strong { font-weight: 600; }
+  .item .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    font-weight: 600;
+  }
+
+  /* Colors */
+  .c-blue   { border-left-color: var(--blue); }
+  .c-emerald{ border-left-color: var(--emerald); }
+  .c-amber  { border-left-color: var(--amber); }
+  .c-violet { border-left-color: var(--violet); }
+  .c-rose   { border-left-color: var(--rose); }
+  .c-cyan   { border-left-color: var(--cyan); }
+  .dot-blue   { background: var(--blue); }
+  .dot-emerald{ background: var(--emerald); }
+  .dot-amber  { background: var(--amber); }
+  .dot-violet { background: var(--violet); }
+  .dot-rose   { background: var(--rose); }
+  .dot-cyan   { background: var(--cyan); }
+  .tag-blue   { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .tag-emerald{ background: rgba(16,185,129,0.15); color: #34d399; }
+  .tag-amber  { background: rgba(245,158,11,0.15); color: #fbbf24; }
+  .tag-violet { background: rgba(139,92,246,0.15); color: #a78bfa; }
+  .tag-rose   { background: rgba(244,63,94,0.15); color: #fb7185; }
+
+  /* ── Arrows between layers ── */
+  .arrow-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 32px;
+    position: relative;
+  }
+  .arrow-row svg { display: block; }
+
+  /* ── Dual column for AI layer ── */
+  .dual { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .dual .box { min-width: auto; }
+
+  /* ── Pipeline strip ── */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .pipeline-node {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    white-space: nowrap;
+    color: var(--text);
+  }
+  .pipeline-arrow { color: var(--muted); font-size: 14px; }
+
+  /* ── Data layer grid ── */
+  .data-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .data-grid .box { padding: 14px 16px; }
+  .data-grid .box-title { font-size: 13px; }
+
+  /* ── Footer stats ── */
+  .stats {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    margin-top: 36px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .stat { text-align: center; }
+  .stat-num { font-size: 22px; font-weight: 700; color: var(--blue); }
+  .stat-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<h1>校园智联 · 系统架构图</h1>
+<p class="subtitle">Campus Connect — Multi-Agent Intelligent Campus Service Platform</p>
+
+<div class="arch">
+
+  <!-- ═══════════ LAYER 1: FRONTEND ═══════════ -->
+  <div class="layer">
+    <div class="layer-label">Presentation Layer · 表现层</div>
+    <div class="layer-boxes">
+      <div class="box">
+        <div class="box-header">
+          <div class="box-dot dot-blue"></div>
+          <div>
+            <div class="box-title">React 19 SPA</div>
+            <div class="box-subtitle">Vite · Tailwind CSS 4 · motion</div>
+          </div>
+        </div>
+        <div class="box-items">
+          <div class="item c-blue"><strong>18 个路由页面</strong> <span class="tag tag-blue">React Router v6</span></div>
+          <div class="item c-blue">Dashboard · 课表中心 · 课程目录 · 文件中心 · AI咨询 · 日程规划 · 评分系统 · 心理咨询 · 用户管理</div>
+          <div class="item c-blue"><strong>4 个 Zustand Store</strong> <span class="tag tag-blue">状态管理</span></div>
+          <div class="item c-blue">authStore · appStore · aiScheduleStore · aiCounselStore · psychologyStore</div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">
+          <div class="box-dot dot-blue"></div>
+          <div>
+            <div class="box-title">核心组件体系</div>
+            <div class="box-subtitle">115 文件 · 组件化架构</div>
+          </div>
+        </div>
+        <div class="box-items">
+          <div class="item c-blue"><strong>Layout</strong> — 侧边栏 · 深色模式 · 帮助弹窗 · 危机热线</div>
+          <div class="item c-blue"><strong>ScheduleEditor</strong> — 拖拽课表网格 · 周次选择 · 课程编辑</div>
+          <div class="item c-blue"><strong>AiCounselPage</strong> — SSE流式 · Markdown渲染 · 追问按钮 · 危机弹窗</div>
+          <div class="item c-blue"><strong>FileCenterView</strong> — 树形文件夹 · OSS直传 · 批量下载 · 预览</div>
+          <div class="item c-blue"><strong>ScoringDashboard</strong> — 模板编辑 · 评委打分 · 自动统分 · Excel导出</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ LAYER 2: API GATEWAY ═══════════ -->
+  <div class="arrow-row">
+    <svg width="40" height="28"><line x1="20" y1="0" x2="20" y2="20" stroke="#475569" stroke-width="2"/><polygon points="14,14 20,22 26,14" fill="#475569"/></svg>
+  </div>
+
+  <div class="layer">
+    <div class="layer-label">API Gateway Layer · 网关层</div>
+    <div class="layer-boxes">
+      <div class="box">
+        <div class="box-header">
+          <div class="box-dot dot-emerald"></div>
+          <div>
+            <div class="box-title">Express.js API 网关</div>
+            <div class="box-subtitle">端口 3001 · 15 个路由模块</div>
+          </div>
+        </div>
+        <div class="box-items">
+          <div class="item c-emerald"><strong>认证</strong> — JWT Bearer · bcrypt · 7天过期 · 评委12h短令牌</div>
+          <div class="item c-emerald"><strong>鉴权</strong> — authenticate · requireRole · judgeAuth · canModifyResource</div>
+          <div class="item c-emerald"><strong>安全</strong> — Helmet · CORS · Rate Limit (全局200/min · 登录20/15min)</div>
+          <div class="item c-emerald"><strong>中间件链</strong> — JSON 10MB · UTF-8 · 限流 · 认证 · 角色</div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header">
+          <div class="box-dot dot-emerald"></div>
+          <div>
+            <div class="box-title">路由模块 · 90+ API 端点</div>
+            <div class="box-subtitle">全部 TypeScript strict 模式</div>
+          </div>
+        </div>
+        <div class="box-items">
+          <div class="item c-emerald"><strong>/api/auth/*</strong> — 登录 · 注册 · 邮箱验证 · 用户管理 <span class="tag tag-emerald">11 端点</span></div>
+          <div class="item c-emerald"><strong>/api/schedules|query|export|dashboard/*</strong> — 课表CRUD · 空闲查询 · Excel导出 <span class="tag tag-emerald">18 端点</span></div>
+          <div class="item c-emerald"><strong>/api/scoring/*</strong> — 比赛 · 评委 · 打分 · 排名 · 模板 <span class="tag tag-emerald">28 端点</span></div>
+          <div class="item c-emerald"><strong>/api/file-center/*</strong> — 活动 · 文件夹 · 文件 · 推文 · OSS <span class="tag tag-emerald">16 端点</span></div>
+          <div class="item c-emerald"><strong>/api/psychology/*</strong> — 咨询师 · 预约 · 实时聊天 · WebSocket <span class="tag tag-emerald">14 端点</span></div>
+          <div class="item c-emerald"><strong>/api/ai/*</strong> — 心理咨询流 · 日程规划 · OCR代理 · KB检索 <span class="tag tag-emerald">12 端点</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ LAYER 3: AI SERVICE ═══════════ -->
+  <div class="arrow-row">
+    <svg width="40" height="28"><line x1="20" y1="0" x2="20" y2="20" stroke="#475569" stroke-width="2"/><polygon points="14,14 20,22 26,14" fill="#475569"/></svg>
+  </div>
+
+  <div class="layer">
+    <div class="layer-label">AI Service Layer · 智能服务层（双后端架构，环境变量一键切换）</div>
+    <div class="dual">
+      <!-- Flask Mode -->
+      <div class="box">
+        <div class="box-header">
+          <div class="box-dot dot-violet"></div>
+          <div>
+            <div class="box-title">🐍 Flask 独立模式（主模式）</div>
+            <div class="box-subtitle">AI_COUNSEL_BACKEND=flask · Gunicorn 3 workers · 端口 5002</div>
+          </div>
+        </div>
+        <div class="box-items">
+          <div class="item c-violet"><strong>ai_counsel.py</strong> — 心理咨询核心 <span class="tag tag-violet">380 行</span></div>
+          <div class="item c-violet">&nbsp;&nbsp;├ SSE 流式对话 · 双角色 Prompt（心理陪伴/校园导航）</div>
+          <div class="item c-violet">&nbsp;&nbsp;├ bge-m3 向量检索（召回20）→ Rerank 精排（top 3）</div>
+          <div class="item c-violet">&nbsp;&nbsp;├ Tavily 联网搜索（知识库外实时信息）</div>
+          <div class="item c-violet">&nbsp;&nbsp;├ 数据飞轮（对话后 → LLM提取画像 → 注入下次Prompt）</div>
+          <div class="item c-violet">&nbsp;&nbsp;└ 危机关键词检测 · 自然语言校区摘要</div>
+          <div class="item c-violet" style="margin-top:6px"><strong>ai_schedule.py</strong> — 周计划生成 <span class="tag tag-violet">154 行</span></div>
+          <div class="item c-violet"><strong>ai_endpoints.py</strong> — 通用文本/流式生成 <span class="tag tag-violet">143 行</span></div>
+          <div class="item c-violet"><strong>service.py</strong> — OCR 服务 (图片/PDF/批量) <span class="tag tag-violet">522 行</span></div>
+          <div class="item c-violet" style="margin-top:4px; background:rgba(139,92,246,0.08); border-radius:6px; padding:8px;">
+            <strong>零外部依赖</strong> · 无需 Docker · 无需 Dify · 仅需 AI API Key
+          </div>
+        </div>
+      </div>
+      <!-- Dify Mode -->
+      <div class="box">
+        <div class="box-header">
+          <div class="box-dot dot-amber"></div>
+          <div>
+            <div class="box-title">🔶 Dify 编排模式（备选）</div>
+            <div class="box-subtitle">AI_COUNSEL_BACKEND=dify · 可视化工作流 · 端口 5001</div>
+          </div>
+        </div>
+        <div class="box-items">
+          <div class="item c-amber"><strong>Dify 工作流编排</strong></div>
+          <div class="item c-amber">&nbsp;&nbsp;├ kb-search 容器（bge-m3 + Rerank）</div>
+          <div class="item c-amber">&nbsp;&nbsp;├ conversation_id 多轮对话记忆</div>
+          <div class="item c-amber">&nbsp;&nbsp;├ 用户画像自动注入</div>
+          <div class="item c-amber">&nbsp;&nbsp;└ Tavily 联网搜索节点</div>
+          <div class="item c-amber" style="margin-top:6px"><strong>kb_server.py</strong> — 独立 KB API <span class="tag tag-amber">184 行</span></div>
+          <div class="item c-amber">&nbsp;&nbsp;└ 标准 Dify External Knowledge API 格式</div>
+          <div class="item c-amber" style="margin-top:6px"><strong>Dify 容器栈</strong>（通过 Docker Compose）</div>
+          <div class="item c-amber">&nbsp;&nbsp;├ dify-api · dify-web · dify-worker · dify-sandbox</div>
+          <div class="item c-amber">&nbsp;&nbsp;├ postgres · redis · weaviate · nginx</div>
+          <div class="item c-amber">&nbsp;&nbsp;└ kb-search（自建 Flask 容器，端口 5099）</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ LAYER 4: AI MODELS ═══════════ -->
+  <div class="arrow-row">
+    <svg width="40" height="28"><line x1="20" y1="0" x2="20" y2="20" stroke="#475569" stroke-width="2"/><polygon points="14,14 20,22 26,14" fill="#475569"/></svg>
+  </div>
+
+  <div class="layer">
+    <div class="layer-label">AI Model Providers · 模型供应商</div>
+    <div class="layer-boxes">
+      <div class="box">
+        <div class="box-header"><div class="box-dot dot-cyan"></div><div class="box-title">DeepSeek V4</div></div>
+        <div class="box-items">
+          <div class="item c-cyan">火山引擎 ARK API（OpenAI 兼容）</div>
+          <div class="item c-cyan">对话生成 · OCR 视觉 · 周计划推理 · 标题/追问/画像</div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header"><div class="box-dot dot-cyan"></div><div class="box-title">豆包 Seed 2.0 Pro</div></div>
+        <div class="box-items">
+          <div class="item c-cyan">视觉模型备选 · 课表 OCR 图片识别</div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header"><div class="box-dot dot-cyan"></div><div class="box-title">bge-m3 + Reranker</div></div>
+        <div class="box-items">
+          <div class="item c-cyan">硅基流动 API · 向量嵌入 + 精排重排序</div>
+          <div class="item c-cyan">Embedding: BAAI/bge-m3 · Rerank: bge-reranker-v2-m3</div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header"><div class="box-dot dot-cyan"></div><div class="box-title">Tavily Search</div></div>
+        <div class="box-items">
+          <div class="item c-cyan">联网实时搜索 · 知识库外信息补充</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ LAYER 5: DATA ═══════════ -->
+  <div class="arrow-row">
+    <svg width="40" height="28"><line x1="20" y1="0" x2="20" y2="20" stroke="#475569" stroke-width="2"/><polygon points="14,14 20,22 26,14" fill="#475569"/></svg>
+  </div>
+
+  <div class="layer">
+    <div class="layer-label">Data & Storage Layer · 数据存储层</div>
+    <div class="data-grid">
+      <div class="box">
+        <div class="box-header"><div class="box-dot dot-rose"></div><div class="box-title">MySQL 8.0</div></div>
+        <div class="box-items">
+          <div class="item c-rose"><strong>26 张表</strong> · 连接池20</div>
+          <div class="item c-rose">课表: departments · schedules · courses · terms</div>
+          <div class="item c-rose">认证: users (bcrypt)</div>
+          <div class="item c-rose">评分: templates → dimensions → subdimensions → competitions → scores → results</div>
+          <div class="item c-rose">文件: activities · folders · items · tweets</div>
+          <div class="item c-rose">心理: counselors · slots · appointments · conversations · messages</div>
+          <div class="item c-rose">AI: ai_schedule_plans · ai_counsel_sessions · messages</div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header"><div class="box-dot dot-rose"></div><div class="box-title">阿里云 OSS V4</div></div>
+        <div class="box-items">
+          <div class="item c-rose">预签名 URL 直传（服务器零缓冲）</div>
+          <div class="item c-rose">Key: file-center/{活动}/{文件夹}/{fileId}_{文件名}</div>
+          <div class="item c-rose">下载: 302 重定向 → OSS CDN</div>
+          <div class="item c-rose">预览: docx 服务端转换 · 其他直连</div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header"><div class="box-dot dot-rose"></div><div class="box-title">本地文件系统</div></div>
+        <div class="box-items">
+          <div class="item c-rose">小文件 ≤5MB → LONGBLOB</div>
+          <div class="item c-rose">大文件 → uploads/ (SHA256 去重)</div>
+          <div class="item c-rose">课表文件: base64 → Buffer → DB</div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="box-header"><div class="box-dot dot-rose"></div><div class="box-title">Embeddings 缓存</div></div>
+        <div class="box-items">
+          <div class="item c-rose">embeddings_cache.json (9MB)</div>
+          <div class="item c-rose">600+ 篇文档 → bge-m3 向量</div>
+          <div class="item c-rose">启动时验证 count → 自动重建</div>
+          <div class="item c-rose">磁盘持久化 · 重启不丢失</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ LAYER 6: KNOWLEDGE PIPELINE ═══════════ -->
+  <div class="layer" style="margin-top:32px;">
+    <div class="layer-label">Knowledge Pipeline · 知识工程管线（离线）</div>
+    <div class="box">
+      <div class="pipeline">
+        <span class="pipeline-node" style="background:rgba(59,130,246,0.1)">47 微信公众号</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-node">wechat-download-api<span style="color:var(--muted)">:1300</span></span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-node" style="background:rgba(139,92,246,0.1)">sync_kb.py<span style="color:var(--muted)"><br/>全文下载+清洗+分类</span></span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-node">wechat-full-text.json<span style="color:var(--muted)"><br/>397+ 篇</span></span>
+      </div>
+      <div class="pipeline" style="margin-top:10px">
+        <span class="pipeline-node" style="background:rgba(16,185,129,0.1)">4 学校官网 · 11 栏目</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-node">crawl_school.py<span style="color:var(--muted)"><br/>requests+BS4 · 增量去重</span></span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-node">official-articles.json<span style="color:var(--muted)"><br/>168+ 篇</span></span>
+        <span class="pipeline-arrow" style="margin-left:16px">+</span>
+        <span class="pipeline-node" style="background:rgba(245,158,11,0.1)">结构化数据<span style="color:var(--muted)"><br/>42 篇手工补充</span></span>
+      </div>
+      <div class="pipeline" style="margin-top:10px">
+        <span class="pipeline-node" style="background:rgba(244,63,94,0.12); border-color:rgba(244,63,94,0.3);">↓ 三源合并 ↓</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-node" style="background:rgba(244,63,94,0.12); border-color:rgba(244,63,94,0.3);">rebuild_kb.py<span style="color:var(--muted)"><br/>去重 · 6分类 · 写回</span></span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-node" style="background:rgba(244,63,94,0.12); border-color:rgba(244,63,94,0.3); font-weight:700;">dify-kb/<span style="color:var(--muted)"><br/>6 个分类文件</span></span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-node" style="background:rgba(244,63,94,0.12); border-color:rgba(244,63,94,0.3);">bge-m3 向量化<span style="color:var(--muted)"><br/>Embedding Index</span></span>
+      </div>
+      <div style="margin-top:10px; font-size:11px; color:var(--muted); display:flex; gap:20px; flex-wrap:wrap;">
+        <span>🕐 每小时自动轮询（Windows Task Scheduler 每日 3:00 AM）</span>
+        <span>📊 6 分类：校园生活 · 教学教务 · 心理健康 · 就业资助 · 安全规范 · 综合活动</span>
+        <span>🔍 检索：语义向量（召回20）→ Rerank精排（top3）→ Tavily联网兜底</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ LAYER 7: DEPLOYMENT ═══════════ -->
+  <div class="layer" style="margin-top:32px;">
+    <div class="layer-label">Deployment · 部署架构</div>
+    <div class="box">
+      <div class="pipeline">
+        <span class="pipeline-node" style="background:rgba(59,130,246,0.08)">🖥 阿里云 ECS<span style="color:var(--muted)"><br/>2核 · 3.5GB · 40GB SSD</span></span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-node" style="background:rgba(16,185,129,0.08)">🐳 Docker Compose<span style="color:var(--muted)"><br/>4 容器</span></span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-node">Nginx<span style="color:var(--muted)"><br/>反向代理 · 静态资源</span></span>
+        <span class="pipeline-node">Express.js<span style="color:var(--muted)"><br/>API 网关 · :3001</span></span>
+        <span class="pipeline-node">Flask AI<span style="color:var(--muted)"><br/>Gunicorn · :5002</span></span>
+        <span class="pipeline-node">MySQL 8.0<span style="color:var(--muted)"><br/>:3306</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STATS ═══════════ -->
+  <div class="stats">
+    <div class="stat"><div class="stat-num">39,514</div><div class="stat-label">总代码行数</div></div>
+    <div class="stat"><div class="stat-num">90+</div><div class="stat-label">API 端点</div></div>
+    <div class="stat"><div class="stat-num">26</div><div class="stat-label">数据库表</div></div>
+    <div class="stat"><div class="stat-num">600+</div><div class="stat-label">知识库文章</div></div>
+    <div class="stat"><div class="stat-num">559</div><div class="stat-label">自动化测试</div></div>
+    <div class="stat"><div class="stat-num">47</div><div class="stat-label">公众号数据源</div></div>
+    <div class="stat"><div class="stat-num">4</div><div class="stat-label">Docker 容器</div></div>
+    <div class="stat"><div class="stat-num">2 模式</div><div class="stat-label">Flask / Dify 双后端</div></div>
+  </div>
+
+</div>
+
+</body>
+</html>

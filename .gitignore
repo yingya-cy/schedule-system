@@ -82,6 +82,10 @@ tests/screenshots/
 # Coverage
 coverage/
 
+# Runtime caches & state
+embeddings_cache.json
+scripts/crawl_state.json
+
 # Claude plans
 .claude/plans/
 docs/superpowers/
