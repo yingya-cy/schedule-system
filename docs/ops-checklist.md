@@ -43,7 +43,7 @@ jobs:
 
 ### 1.2 配置 GitHub Secrets
 在 GitHub → Settings → Secrets → Actions 添加：
-- `SERVER_HOST`: 47.120.29.188
+- `SERVER_HOST`: <server-ip>
 - `SERVER_SSH_KEY`: 服务器 SSH 私钥内容
 
 ---
@@ -52,7 +52,7 @@ jobs:
 ### 2.1 服务器上添加 cron 任务
 ```bash
 # SSH 到服务器
-ssh root@47.120.29.188
+<ssh-login>
 
 # 创建备份脚本
 cat > /root/backup-db.sh << 'EOF'
@@ -60,7 +60,7 @@ cat > /root/backup-db.sh << 'EOF'
 BACKUP_DIR=/root/db-backups
 mkdir -p $BACKUP_DIR
 FILENAME="backup-$(date +%Y%m%d-%H%M).sql.gz"
-docker exec schedule-mysql mysqldump -uroot -p753412 --all-databases | gzip > $BACKUP_DIR/$FILENAME
+docker exec schedule-mysql mysqldump -uroot -p<db-password> --all-databases | gzip > $BACKUP_DIR/$FILENAME
 # 保留最近 7 天
 find $BACKUP_DIR -name "*.sql.gz" -mtime +7 -delete
 echo "Backup done: $FILENAME"
@@ -120,7 +120,7 @@ npm install @sentry/node @sentry/react
 ### 4.1 申请免费 SSL（Let's Encrypt）
 ```bash
 # 有域名后执行
-ssh root@47.120.29.188
+<ssh-login>
 apt install certbot
 certbot certonly --standalone -d your-domain.com
 # 证书路径: /etc/letsencrypt/live/your-domain.com/
