@@ -82,21 +82,23 @@ export default function DashboardView() {
   }, [useCustomRange, customStartSection, customEndSection, selectedTimeSlotIndex]);
 
   const getFreePeopleForSlot = (day: number, sections: number[]) => {
-    const peopleMap = new Map<string, { name: string; department: string }>();
+    if (sections.length === 0) return [];
 
-    for (const section of sections) {
+    // Collect free_people for each section
+    const freeBySection = sections.map((section) => {
       const result = freeTimeData.find(
         r => r.day === day && r.section === section
       );
+      return result?.free_people ?? [];
+    });
 
-      if (result) {
-        for (const person of result.free_people) {
-          peopleMap.set(person.name, person);
-        }
-      }
-    }
+    // Intersection: only people who are free in ALL sections
+    const [first, ...rest] = freeBySection;
+    const intersected = first.filter((person) =>
+      rest.every((list) => list.some((p) => p.name === person.name))
+    );
 
-    return Array.from(peopleMap.values());
+    return intersected;
   };
 
   const currentPeople = getFreePeopleForSlot(selectedDay, getCurrentTimeSlot.sections);
