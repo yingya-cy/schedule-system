@@ -107,11 +107,7 @@ export default function PersonalCenterPage() {
     fetchPlans();
   }, []);
 
-  const getNextMonday = () => {
-    const d = new Date();
-    d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
-    return d.toISOString().slice(0, 10);
-  };
+  const getToday = () => new Date().toISOString().slice(0, 10);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -169,7 +165,7 @@ export default function PersonalCenterPage() {
       courses: currentWeekCourses.map((c) => ({ name: c.course_name, weekday: c.weekday, sections: c.sections, weeks: c.weeks, teacher: c.teacher || '', location: c.location || '' })),
       commitments: formattedCommitments,
       grade: profile.grade || undefined, major: profile.major || undefined,
-      next_monday: getNextMonday(), model: textModel,
+      next_monday: getToday(), model: textModel,
       current_week: currentWeek,
       custom_prompt: combinedPrompt || undefined,
     });
