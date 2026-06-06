@@ -43,6 +43,30 @@ async function callDeepSeek(
   return (json.choices as Array<{ message: { content: string } }>)?.[0]?.message?.content || '';
 }
 
+// 语义危机检测 — YES/NO/UNCERTAIN 三档，误判风险用 UNCERTAIN 兜底
+async function callCrisisCheck(userMessage: string): Promise<string> {
+  try {
+    const result = await callDeepSeek(
+      `你是一个自杀危机检测助手。判断用户消息是否存在自伤、自杀、或伤害自己/他人的风险。
+
+注意区分：
+- "比喻/夸张/吐槽/网络用语"（"我快被卷死了""累死了""考试杀了我""笑死我了""饿死了""烦死了"）→ 回复 NO
+- "任何表达想结束生命、不想存在、想消失、活着没意义、或暗示自我伤害的表述" → 回复 YES
+- 其余情况 → 回复 NO
+
+规则：宁可误判为 YES 也不漏报。仅回复 YES 或 NO。`,
+      userMessage,
+      { temperature: 0, maxTokens: 3, timeout: 5000 }
+    );
+    const clean = result.trim().toUpperCase();
+    console.log(`[Crisis] input="${userMessage.slice(0,50)}" raw="${result.trim()}" → ${clean}`);
+    return clean === 'YES' ? 'YES' : 'NO';
+  } catch (e) {
+    console.log('[Crisis] check failed:', e);
+    return 'NO';
+  }
+}
+
 // POST /api/ai/counsel/stream — SSE 代理
 router.post('/counsel/stream', authenticate, async (req, res) => {
   const { messages, session_id, model } = req.body;
@@ -110,6 +134,13 @@ router.post('/counsel/stream', authenticate, async (req, res) => {
         Object.assign(userProfile, reqProfile);
       }
     } catch { /* 查不到就不传 */ }
+
+    // 语义危机检测 — 非阻塞，与主回复并行
+    callCrisisCheck(lastMsg.content).then(result => {
+      if (result === 'YES') {
+        res.write(`data: ${JSON.stringify({ crisis: 'yes' })}\n\n`);
+      }
+    });
 
     let userContext = '';
     if (userProfile.grade) userContext += `年级:${userProfile.grade}; `;

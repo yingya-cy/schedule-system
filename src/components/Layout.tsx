@@ -117,7 +117,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 180, damping: 24 }}
         className={cn(
-          "fixed left-0 top-0 h-full w-64 border-r border-outline-variant/40 bg-surface/90 backdrop-blur-md flex flex-col p-4 gap-2 pb-20 z-50",
+          "fixed left-0 top-0 h-full w-64 border-r border-outline-variant/40 bg-surface/90 backdrop-blur-md flex flex-col p-4 gap-2 pb-4 z-50",
           "lg:translate-x-0",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
