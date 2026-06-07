@@ -48,6 +48,9 @@ services:
       - OSS_ACCESS_KEY_SECRET=${OSS_ACCESS_KEY_SECRET}
       - OSS_BUCKET=${OSS_BUCKET}
       - OSS_ENDPOINT=${OSS_ENDPOINT}
+      - AI_API_KEY=${AI_API_KEY}
+      - AI_BASE_URL=${AI_BASE_URL}
+      - AI_TEXT_MODEL=${AI_TEXT_MODEL}
     volumes:
       - uploads:/app/uploads
     depends_on:
