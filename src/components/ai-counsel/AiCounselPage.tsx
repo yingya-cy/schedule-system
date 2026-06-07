@@ -152,8 +152,11 @@ export default function AiCounselPage() {
       const questions = await aiCounselApi.getFollowups(
         msgs.slice(-4).map(m => ({ role: m.role, content: m.content }))
       );
+      console.log('[followups] API returned:', questions);
       if (questions.length > 0) setFollowups(questions);
-    } catch { /* 静默 */ }
+    } catch (e) {
+      console.log('[followups] error:', e);
+    }
   };
 
   const handleSend = async () => {
