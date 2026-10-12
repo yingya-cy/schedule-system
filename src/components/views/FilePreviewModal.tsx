@@ -43,7 +43,8 @@ export default function FilePreviewModal({ isOpen, file, onClose }: Props) {
     return new Promise((resolve, reject) => {
       if (window.pdfjsLib) { resolve(window.pdfjsLib); return; }
       // v3 UMD build for max compatibility (WeChat old Chrome, iOS WKWebView)
-      const CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
+      // CDN 用 fastly 节点：cdn.jsdelivr.net 在国内网络不可达
+      const CDN = 'https://fastly.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
       const script = document.createElement('script');
       script.src = CDN + 'build/pdf.min.js';
       script.onload = () => {

@@ -21,6 +21,13 @@ const AiSchedulePage = lazy(() => import('./components/ai-schedule/AiSchedulePag
 const AiCounselPage = lazy(() => import('./components/ai-counsel/AiCounselPage'));
 const PersonalCenterPage = lazy(() => import('./components/ai-schedule/PersonalCenterPage'));
 
+function SurveyRedirect() {
+  useEffect(() => {
+    window.location.replace('/survey/?from=app');
+  }, []);
+  return null;
+}
+
 function AppContent() {
   const refreshDepartments = useAppStore((s) => s.refreshDepartments);
   const refreshSchedules = useAppStore((s) => s.refreshSchedules);
@@ -49,6 +56,7 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<LoginView />} />
           <Route path="/register" element={<RegisterView />} />
+          <Route path="/survey/*" element={<SurveyRedirect />} />
           <Route element={<AuthGuard />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardView />} />

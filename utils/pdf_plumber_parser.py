@@ -14,6 +14,18 @@ DAY_NAMES = ['星期一', '星期二', '星期三', '星期四', '星期五', '�
 # =========================
 # 课程名清洗（增强版）
 # =========================
+# 跨页溢出会把「描述尾巴」粘到下一页的单元格里。清洗之后仍然带标签分隔符的，
+# 就是这种尾巴，不是课程名。带冒号的写法是刻意的：裸的「教师」「学班」也出现在
+# 合法课程名里（教师职业道德…、小学班队原理与实践）。
+_FRAGMENT_MARKERS = re.compile(
+    r'/'                                      # 描述行一律用 / 分隔，课程名不含
+    r'|教师\s*[:：]|学班\s*[:：]|备注\s*[:：]'
+    r'|学分\s*[:：]|校区\s*[:：]|场地\s*[:：]'
+    r'|教学班|考核方式|选课备注|课程学时组成|周学时|总学时'
+    r'|班组成|时组成|核方式|课备注|选课备'
+)
+
+
 def _extract_course_name_from_block(raw_course):
     lines = raw_course.strip().split('\n')
     valid_lines = []
@@ -30,6 +42,9 @@ def _extract_course_name_from_block(raw_course):
             continue
         if len(line) == 1 and not re.match(r'[\u4e00-\u9fa5]', line):
             continue
+        # description lines always carry '/', course names never do
+        if '/' in line:
+            continue
         valid_lines.append(line)
 
     course = ''.join(valid_lines)
@@ -43,6 +58,13 @@ def _extract_course_name_from_block(raw_course):
     course = re.sub(r'[★☆■◆\n]', '', course).strip()
     course = re.sub(r'^总', '', course)
     course = re.sub(r'^\W+', '', course)
+    # 跨页处的换行连字符会留下悬空分隔符（如「…与技术专业导论-」），去掉。
+    # 全库校验过：没有任何合法课程名以这类符号结尾。
+    course = re.sub(r'[-/：:、]+$', '', course).strip()
+
+    # 兜底：清洗后仍带标签的，判为跨页片段，不产出记录
+    if _FRAGMENT_MARKERS.search(course):
+        return ''
 
     return course
 

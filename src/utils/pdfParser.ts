@@ -1,8 +1,11 @@
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import type { TextItem as PDFTextItem } from 'pdfjs-dist/types/src/display/api';
 
-// 使用 CDN 方式加载 PDF.js worker，避免本地文件的 MIME 类型问题
-GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.5.207/build/pdf.worker.mjs';
+// 自托管 PDF.js worker 与 cmaps（位于 public/pdfjs/），不依赖外部 CDN。
+// worker 是用 new Worker(url, { type: 'module' }) 加载的，扩展名不影响解析，
+// 因此存为 .js，规避 .mjs 的 MIME 类型问题。
+const PDFJS_BASE = '/pdfjs/';
+GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js';
 
 export interface TextItem {
   str: string;
@@ -16,7 +19,7 @@ export async function extractTextWithCoords(file: File): Promise<TextItem[]> {
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = getDocument({
     data: arrayBuffer,
-    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.5.207/cmaps/',
+    cMapUrl: PDFJS_BASE + 'cmaps/',
     cMapPacked: true,
   });
 
