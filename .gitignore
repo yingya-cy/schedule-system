@@ -95,3 +95,18 @@ docs/superpowers/
 .claude/plans/
 docs/superpowers/
 xiaoli.pdf
+
+# SSL 证书（敏感）
+nginx/ssl/
+nginx/acme/
+
+# 知识库数据（体积大）
+dify-kb/
+
+# 配置备份
+*.conf.bak*
+docker-compose.yml.bak*
+
+# 临时脚本
+scratch/
+tmp/
