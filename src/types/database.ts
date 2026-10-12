@@ -48,6 +48,8 @@ export interface Course {
 export interface CreateScheduleDto {
   name: string;
   department: string;
+  /** 【多校区】所属校区（默认河源） */
+  campus?: string;
   filename?: string;
   file_data?: string;
   file_type?: string;
@@ -92,6 +94,8 @@ export interface FreeTimeQuery {
   department?: string;
   name?: string;
   term_id?: number;
+  campus?: string;
+  total_weeks?: number;
 }
 
 export interface FreeTimeResult {

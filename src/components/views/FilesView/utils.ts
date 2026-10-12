@@ -206,3 +206,44 @@ export function ocrResultToCourses(
     isNew: true
   }));
 }
+
+/**
+ * 从上传的文件名中提取姓名
+ * 例：
+ *   "张三.pdf"                -> "张三"
+ *   "张三的课表.png"           -> "张三"
+ *   "24大数据1班-张三.pdf"     -> "张三"
+ *   "张三-课表-20241012.pdf"   -> "张三"
+ *   "刘飞扬的课程表.png"        -> "刘飞扬"
+ */
+export function extractNameFromFilename(filename?: string): string {
+  if (!filename) return '';
+
+  // 1. 去扩展名
+  let name = filename.replace(/\.[a-zA-Z0-9]+$/, '');
+
+  // 2. 去日期（任意位置，含 20241012 或 2024-10-12 形式）
+  name = name.replace(/[\s_\-—]*20\d{6}[\s_\-—]*/g, '');
+  name = name.replace(/[\s_\-—]*\d{8}[\s_\-—]*/g, '');
+
+  // 3. 去课表类词（"的课表"/"课程表"/"课表"/"课程"）
+  name = name.replace(/[\s_\-—]*(的|是)?(新)?课(程)?表?[\s_\-—]*/g, '');
+
+  // 4. 去"XX级XX班"（任意位置）
+  name = name.replace(/[\s_\-—]*[0-9]{2}[\u4e00-\u9fa5a-zA-Z0-9]*班[\s_\-—]*/g, '');
+
+  // 5. 去尾部序号（如 "(1)" "_2"）
+  name = name.replace(/[\s_\-—]*[\(（]?\d+[\)）]?$/, '');
+
+  // 6. 清理首尾分隔符
+  name = name.replace(/^[\s_\-—]+|[\s_\-—]+$/g, '').trim();
+
+  // 7. 若还剩多段（用 - _ 空格连接），优先取最长的纯中文姓名段
+  if (/[-_—\s]/.test(name)) {
+    const parts = name.split(/[\s_\-—]+/).filter(Boolean);
+    const cn = parts.find(p => /^[\u4e00-\u9fa5]{2,4}$/.test(p));
+    if (cn) name = cn;
+  }
+
+  return name;
+}

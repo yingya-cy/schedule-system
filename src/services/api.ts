@@ -40,6 +40,7 @@ export const api = {
   async createSchedule(data: {
     name: string;
     department: string;
+    campus?: string;
     filename?: string;
     file_data?: string;
     file_type?: string;
@@ -138,6 +139,7 @@ export const api = {
     department?: string;
     name?: string;
     term_id?: number;
+    campus?: string;
   }): Promise<FreeTimeResult[]> {
     const searchParams = new URLSearchParams();
     if (params.week) searchParams.append('week', params.week.toString());

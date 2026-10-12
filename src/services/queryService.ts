@@ -47,6 +47,12 @@ export class QueryService {
       params.push(query.department);
     }
 
+    // 【多校区】按校区过滤
+    if (query.campus) {
+      conditions.push('campus = ?');
+      params.push(query.campus);
+    }
+
     if (query.name) {
       conditions.push('name LIKE ?');
       params.push(`%${query.name.replace(/[%_]/g, '\\$&')}%`);
@@ -82,7 +88,22 @@ export class QueryService {
     }
 
     // 4. 确定查询范围
-    const weeks = query.week ? [query.week] : Array.from({ length: 18 }, (_, i) => i + 1);
+    // 【修复】周次上限不再硬编码 18：优先用 total_weeks，否则从数据推导（下限18）
+    let maxWeek = 18;
+    if (query.total_weeks && query.total_weeks > 0) {
+      maxWeek = query.total_weeks;
+    } else {
+      for (const course of allCourses) {
+        const wl = course.weeks as unknown;
+        if (Array.isArray(wl)) {
+          for (const w of wl) {
+            const iv = parseInt(String(w), 10);
+            if (!isNaN(iv) && iv > maxWeek) maxWeek = iv;
+          }
+        }
+      }
+    }
+    const weeks = query.week ? [query.week] : Array.from({ length: maxWeek }, (_, i) => i + 1);
     const days = query.day ? [query.day] : Array.from({ length: 7 }, (_, i) => i + 1);
     const sections = query.section ? [query.section] : Array.from({ length: 11 }, (_, i) => i + 1);
 
@@ -169,12 +190,28 @@ export class QueryService {
   }
 
   /**
+   * 【多校区】获取校区列表（含默认值，保证白云即使没数据也出现）
+   */
+  async getCampuses(): Promise<string[]> {
+    const defaults = ['河源', '白云'];
+    try {
+      const [rows] = await pool.execute('SELECT DISTINCT campus FROM schedules WHERE campus IS NOT NULL');
+      const fromDb = (rows as { campus: string }[]).map(r => r.campus).filter(Boolean);
+      const merged = Array.from(new Set([...defaults, ...fromDb]));
+      return merged.sort();
+    } catch {
+      return defaults;
+    }
+  }
+
+  /**
    * 获取所有空闲时间矩阵
    * 优化：一次性加载所有数据，内存中计算
    */
-  async getAllFreeTimeData(termId?: number): Promise<{
+  async getAllFreeTimeData(termId?: number, campus?: string): Promise<{
     total_schedules: number;
     departments: string[];
+    campus: string;
     people: { name: string; department: string; courses: { weekday: number; sections: number[]; weeks: number[] }[] }[];
   }> {
     let tid: number | undefined = termId;
@@ -182,14 +219,17 @@ export class QueryService {
       const [terms] = await pool.execute("SELECT id FROM terms WHERE status = 'active' LIMIT 1");
       tid = (terms as RowDataPacket[])[0]?.id;
     }
-    if (!tid) return { total_schedules: 0, departments: [], people: [] };
+    if (!tid) return { total_schedules: 0, departments: [], campus: campus || '', people: [] };
+    // 【多校区】按校区过滤
+    const campusCond = campus ? 'AND s.campus = ?' : '';
+    const sqlParams: (string | number)[] = campus ? [tid, campus] : [tid];
     const [rows] = await pool.execute(`
       SELECT s.id as schedule_id, s.name, s.department, c.weekday, c.sections, c.weeks
       FROM schedules s
       JOIN terms t ON s.term_id = t.id
       LEFT JOIN courses c ON s.id = c.schedule_id
-      WHERE t.id = ?
-    `, [tid]);
+      WHERE t.id = ? ${campusCond}
+    `, sqlParams);
 
     const personMap = new Map<string, { name: string; department: string; courses: { weekday: number; sections: number[]; weeks: number[] }[] }>();
     for (const row of rows as { schedule_id: number; name: string; department: string; weekday: number; sections: number[]; weeks: number[] }[]) {
@@ -211,6 +251,7 @@ export class QueryService {
     return {
       total_schedules: scheduleNames.length,
       departments,
+      campus: campus || '',
       people: Array.from(personMap.values()),
     };
   }

@@ -7,8 +7,8 @@ import { RowDataPacket } from '../utils/db-types';
 export class ScheduleRepository {
   // ==================== Schedule Operations ====================
 
-  async findAll(filters?: { department?: string; name?: string; term_id?: number; created_by?: string }): Promise<Schedule[]> {
-    let query = 'SELECT id, name, department, term_id, filename, file_type, created_by, created_at, updated_at FROM schedules';
+  async findAll(filters?: { department?: string; name?: string; term_id?: number; created_by?: string; campus?: string }): Promise<Schedule[]> {
+    let query = 'SELECT id, name, department, term_id, campus, filename, file_type, created_by, created_at, updated_at FROM schedules';
     const params: (string | number)[] = [];
     const conditions: string[] = [];
 
@@ -30,6 +30,12 @@ export class ScheduleRepository {
     if (filters?.created_by) {
       conditions.push('created_by = ?');
       params.push(filters.created_by);
+    }
+
+    // 【多校区】按校区过滤
+    if (filters?.campus) {
+      conditions.push('campus = ?');
+      params.push(filters.campus);
     }
 
     if (conditions.length > 0) {
@@ -79,6 +85,7 @@ export class ScheduleRepository {
       const scheduleInsert = {
         name: dto.name,
         department: dto.department,
+        campus: dto.campus || '河源',
         term_id: termId,
         filename: dto.filename || null,
         file_data: dto.file_data || null,

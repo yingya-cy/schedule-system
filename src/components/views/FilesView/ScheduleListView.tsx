@@ -18,6 +18,9 @@ interface ScheduleListViewProps {
   onDeleteSchedule: (id: number) => void;
   onExportReverse: () => void;
   terms?: { id: number; name: string; status: string }[];
+  campuses?: string[];
+  currentCampus?: string;
+  onCampusChange?: (c: string) => void;
   currentTermId?: number;
   onTermChange?: (id: number) => void;
 }
@@ -129,6 +132,9 @@ export default function ScheduleListView({
   onDeleteSchedule,
   onExportReverse,
   terms,
+  campuses,
+  currentCampus,
+  onCampusChange,
   currentTermId,
   onTermChange,
 }: ScheduleListViewProps) {
@@ -172,6 +178,18 @@ export default function ScheduleListView({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* 【多校区】校区切换 */}
+          {campuses && campuses.length > 0 && (
+            <select
+              value={currentCampus || ''}
+              onChange={e => onCampusChange?.(e.target.value)}
+              className="px-3 py-2.5 text-sm rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+            >
+              {campuses.map(c => (
+                <option key={c} value={c}>{c}校区</option>
+              ))}
+            </select>
+          )}
           {terms && terms.length > 0 && (
             <select
               value={currentTermId || ''}

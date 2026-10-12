@@ -36,15 +36,29 @@ export default function DashboardView() {
   const currentTermId = useAppStore((s) => s.currentTermId);
   const availableTerms = useAppStore((s) => s.availableTerms);
   const setCurrentTermId = useAppStore((s) => s.setCurrentTermId);
+  // 【多校区】
+  const currentCampus = useAppStore((s) => s.currentCampus);
+  const setCurrentCampus = useAppStore((s) => s.setCurrentCampus);
+  const [campuses, setCampuses] = useState<string[]>(['河源', '白云']);
+
+  // 【多校区】加载校区列表
+  useEffect(() => {
+    const tk = localStorage.getItem('auth_token');
+    fetch('/api/campuses', { headers: tk ? { Authorization: `Bearer ${tk}` } : {} })
+      .then(r => r.json())
+      .then(j => { if (j.success && Array.isArray(j.data)) setCampuses(j.data); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (currentTermId) params.append('term_id', String(currentTermId));
+    if (currentCampus) params.append('campus', currentCampus);
     fetch(`/api/dashboard/stats?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(json => { if (json.success) setStats(json.data); })
       .catch(() => {});
-  }, [token, currentTermId]);
+  }, [token, currentTermId, currentCampus]);
 
   const loadFreeTimeData = async () => {
     try {
@@ -53,6 +67,7 @@ export default function DashboardView() {
         week: currentWeek,
         department: selectedDepartment || undefined,
         term_id: currentTermId || undefined,
+        campus: currentCampus || undefined,
       });
       setFreeTimeData(data);
     } catch (err) {
@@ -64,7 +79,7 @@ export default function DashboardView() {
 
   useEffect(() => {
     loadFreeTimeData();
-  }, [currentWeek, selectedDepartment, currentTermId]);
+  }, [currentWeek, selectedDepartment, currentTermId, currentCampus]);
 
   const getCurrentTimeSlot = useMemo(() => {
     if (useCustomRange) {
@@ -82,21 +97,23 @@ export default function DashboardView() {
   }, [useCustomRange, customStartSection, customEndSection, selectedTimeSlotIndex]);
 
   const getFreePeopleForSlot = (day: number, sections: number[]) => {
-    const peopleMap = new Map<string, { name: string; department: string }>();
+    if (sections.length === 0) return [];
 
-    for (const section of sections) {
+    // Collect free_people for each section
+    const freeBySection = sections.map((section) => {
       const result = freeTimeData.find(
         r => r.day === day && r.section === section
       );
+      return result?.free_people ?? [];
+    });
 
-      if (result) {
-        for (const person of result.free_people) {
-          peopleMap.set(person.name, person);
-        }
-      }
-    }
+    // Intersection: only people who are free in ALL sections
+    const [first, ...rest] = freeBySection;
+    const intersected = first.filter((person) =>
+      rest.every((list) => list.some((p) => p.name === person.name))
+    );
 
-    return Array.from(peopleMap.values());
+    return intersected;
   };
 
   const currentPeople = getFreePeopleForSlot(selectedDay, getCurrentTimeSlot.sections);
@@ -117,6 +134,18 @@ export default function DashboardView() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* 【多校区】校区切换 */}
+          {campuses.length > 0 && (
+            <select
+              value={currentCampus || ''}
+              onChange={e => setCurrentCampus(e.target.value)}
+              className="px-2 py-1 text-xs rounded-lg bg-surface-container-low border border-surface-container-high"
+            >
+              {campuses.map(c => (
+                <option key={c} value={c}>{c}校区</option>
+              ))}
+            </select>
+          )}
           {availableTerms.length > 0 && (
             <select
               value={currentTermId || ''}

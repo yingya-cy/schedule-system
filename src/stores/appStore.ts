@@ -21,6 +21,10 @@ interface AppState {
   refreshTerms: () => Promise<void>;
   setCurrentTermId: (id: number) => void;
 
+  // 【多校区】
+  currentCampus: string;
+  setCurrentCampus: (c: string) => void;
+
   // Schedules
   schedules: ScheduleData[];
   schedulesLoading: boolean;
@@ -32,6 +36,13 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  // 【多校区】
+  currentCampus: localStorage.getItem('campus') || '河源',
+  setCurrentCampus: (c: string) => {
+    localStorage.setItem('campus', c);
+    set({ currentCampus: c });
+  },
+
   // Departments
   departments: [],
   departmentsLoaded: false,

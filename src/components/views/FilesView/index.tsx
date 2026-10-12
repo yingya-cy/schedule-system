@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { EditableCourse, ScheduleData, Department } from '@/types';
 import { api } from '@/services/api';
@@ -8,6 +8,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import MessageDialog from '@/components/MessageDialog';
 import { useAppStore } from '@/stores/appStore';
 import { ViewMode, UploadState, BatchResult, initialUploadState } from './constants';
+import { extractNameFromFilename } from './utils';
 import ScheduleListView from './ScheduleListView';
 import ScheduleUploadView from './ScheduleUploadView';
 import BatchResultView from './BatchResultView';
@@ -20,7 +21,19 @@ export default function FilesView() {
   const removeSchedule = useAppStore((s) => s.removeSchedule);
   const departments = useAppStore((s) => s.departments);
   const availableTerms = useAppStore((s) => s.availableTerms);
+
+  // 【多校区】加载校区列表
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    fetch('/api/campuses', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then(r => r.json())
+      .then(j => { if (j.success && Array.isArray(j.data)) setCampuses(j.data); })
+      .catch(() => {});
+  }, []);
   const currentTermId = useAppStore((s) => s.currentTermId);
+  // 【多校区】当前校区（默认河源）
+  const [currentCampus, setCurrentCampus] = useState<string>('河源');
+  const [campuses, setCampuses] = useState<string[]>(['河源', '白云']);
   const setCurrentTermId = useAppStore((s) => s.setCurrentTermId);
   const refreshTerms = useAppStore((s) => s.refreshTerms);
 
@@ -123,7 +136,9 @@ export default function FilesView() {
 
     setCurrentEditIndex(index);
     setEditableCourses([...result.courses]);
-    setEditName(result.name || '');
+    // 姓名优先用 result.name，为空则从文件名提取
+    const autoName = result.name || extractNameFromFilename(result.filename) || '';
+    setEditName(autoName);
     setEditDepartment(result.department || '');
     setViewMode('edit');
   };
@@ -176,6 +191,7 @@ export default function FilesView() {
         const schedule = await api.createSchedule({
         name: editName.trim(),
         department: editDepartment,
+        campus: currentCampus,
         filename: currentResult?.filename,
         file_data: currentResult?.file_data,
         file_type: currentResult?.file_type,
@@ -272,6 +288,7 @@ export default function FilesView() {
       await api.createSchedule({
         name: data.name,
         department: data.department,
+        campus: currentCampus,
         courses: data.courses.map(c => ({
           course_name: c.course_name,
           weekday: c.weekday,
@@ -336,19 +353,22 @@ export default function FilesView() {
               terms={availableTerms}
               currentTermId={currentTermId ?? undefined}
               onTermChange={id => setCurrentTermId(id)}
+              campuses={campuses}
+              currentCampus={currentCampus}
+              onCampusChange={setCurrentCampus}
               onExportReverse={async () => {
                 try {
                   const token = localStorage.getItem('auth_token');
                   const res = await fetch('/api/export/reverse-schedule', {
                     method: 'POST',
                     headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ term_id: currentTermId }),
+                    body: JSON.stringify({ term_id: currentTermId, campus: currentCampus }),
                   });
                   if (!res.ok) throw new Error('导出失败');
                   const blob = await res.blob();
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a'); a.href = url;
-                  a.download = 'reverse-schedule.xlsx'; a.click();
+                  a.download = `反课表_${currentCampus || '全部'}.xlsx`; a.click();
                   URL.revokeObjectURL(url);
                 } catch { /* ignore */ }
               }}

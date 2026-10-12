@@ -229,9 +229,20 @@ export function registerScheduleRoutes(app: Express) {
     }
   });
 
+  // 【多校区】校区列表
+  app.get('/api/campuses', async (_req, res) => {
+    try {
+      const campuses = await queryService.getCampuses();
+      res.json({ success: true, data: campuses });
+    } catch (error: unknown) {
+      sendError(res, error);
+    }
+  });
+
   app.get('/api/query/all-free-time', async (req, res) => {
     try {
-      const result = await queryService.getAllFreeTimeData();
+      const { campus } = req.query;
+      const result = await queryService.getAllFreeTimeData(undefined, campus as string | undefined);
       res.json({ success: true, data: result });
     } catch (error: unknown) {
       sendError(res, error);
@@ -297,17 +308,22 @@ export function registerScheduleRoutes(app: Express) {
 
   app.get('/api/dashboard/stats', async (req, res) => {
     try {
-      const { term_id } = req.query;
+      const { term_id, campus } = req.query;
       let termId = term_id ? parseInt(term_id as string) : undefined;
       if (!termId) {
         const [terms] = await pool.query("SELECT id FROM terms WHERE status = 'active' LIMIT 1");
         termId = (terms as RowDataPacket[])[0]?.id;
       }
+      // 【多校区】按校区过滤
+      const campusCond = campus ? 'AND campus = ?' : '';
+      const campusCond2 = campus ? 'AND s.campus = ?' : '';
+      const schedParams: (string | number)[] = campus ? [termId as number, campus as string] : [termId as number];
+      const courseParams: (string | number)[] = campus ? [termId as number, campus as string] : [termId as number];
       const [[schedCount], [courseCount], [userCount], [deptCount], [fileCount]] = await Promise.all([
-        pool.query('SELECT COUNT(*) as total FROM schedules WHERE term_id = ?', [termId]),
-        pool.query('SELECT COUNT(*) as total FROM courses c JOIN schedules s ON c.schedule_id = s.id WHERE s.term_id = ?', [termId]),
+        pool.query(`SELECT COUNT(*) as total FROM schedules WHERE term_id = ? ${campusCond}`, schedParams),
+        pool.query(`SELECT COUNT(*) as total FROM courses c JOIN schedules s ON c.schedule_id = s.id WHERE s.term_id = ? ${campus ? 'AND s.campus = ?' : ''}`, courseParams),
         pool.query('SELECT COUNT(*) as total FROM users WHERE is_active = 1'),
-        pool.query('SELECT COUNT(*) as total FROM departments'),
+        pool.query(`SELECT COUNT(DISTINCT department) as total FROM schedules WHERE term_id = ? ${campusCond}`, schedParams),
         pool.query('SELECT COUNT(*) as total FROM file_items'),
       ]);
       res.json({
