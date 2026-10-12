@@ -15,11 +15,11 @@
 
 ```bash
 # SSH 到旧服务器
-ssh root@47.120.29.188
+<ssh-login>
 
 # 导出 MySQL 全部数据
 cd /root/workspace/schedule-system
-docker exec schedule-mysql mysqldump -uroot -p753412 --all-databases > /tmp/full-backup.sql
+docker exec schedule-mysql mysqldump -uroot -p<db-password> --all-databases > /tmp/full-backup.sql
 
 # 同时保存 .env 文件
 cat .env
@@ -29,8 +29,8 @@ cat .env
 
 ```bash
 # 从旧服务器下载
-scp root@47.120.29.188:/tmp/full-backup.sql .
-scp root@47.120.29.188:/root/workspace/schedule-system/.env .
+scp root@<server-ip>:/tmp/full-backup.sql .
+scp root@<server-ip>:/root/workspace/schedule-system/.env .
 
 # 上传到新服务器
 scp full-backup.sql root@新服务器IP:/root/workspace/schedule-system/
@@ -69,7 +69,7 @@ docker compose up -d
 
 ```bash
 # 等 MySQL 启动后
-docker exec -i schedule-mysql mysql -uroot -p753412 < full-backup.sql
+docker exec -i schedule-mysql mysql -uroot -p<db-password> < full-backup.sql
 ```
 
 ### 6. 验证

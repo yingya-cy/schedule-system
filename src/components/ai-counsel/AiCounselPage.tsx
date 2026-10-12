@@ -6,7 +6,9 @@ import { marked } from 'marked';
 import { Menu, X } from 'lucide-react';
 
 const HOTLINE = '全国心理援助热线 400-161-9995';
-const CRISIS_KEYWORDS = ['自杀', '自伤', '自残', '想死', '不想活', '结束生命', '伤害自己', '伤害他人'];
+const CRISIS_KEYWORDS = ['自杀', '自伤', '自残', '想死', '不想活', '结束生命', '伤害自己', '伤害他人',
+  '不想活了', '想自杀', '活不下去', '活着没意思', '我要死', '我想死', '杀了我', '死了算了',
+  '离开这个世界', '结束自己', '一了百了', '不想存在', '解脱', '去死', '想不开'];
 
 function checkCrisis(text: string): boolean {
   return CRISIS_KEYWORDS.some((kw) => text.includes(kw));
@@ -212,6 +214,7 @@ export default function AiCounselPage() {
               const data = JSON.parse(line.slice(6));
               if (data.error) { setStreamError(data.error); break; }
               if (data.done) break;
+              if (data.crisis === 'yes' || data.crisis === 'uncertain') { setShowCrisis(true); }
               if (data.chunk) {
                 fullResponse += data.chunk;
                 chunkBuf.current += data.chunk;
@@ -315,7 +318,7 @@ export default function AiCounselPage() {
         .markdown-content table { border-collapse: collapse; margin: 0.25em 0; font-size: 0.9em; }
         .markdown-content th, .markdown-content td { border: 1px solid rgb(var(--outline-variant)/.4); padding: 0.25em 0.5em; text-align: left; }
       `}</style>
-    <div ref={containerRef} className="flex flex-col overflow-hidden" style={chatHeight ? { height: chatHeight } : undefined}>
+    <div ref={containerRef} className="flex flex-col" style={chatHeight ? { height: chatHeight } : undefined}>
       <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
       <div className={`${showSidebar ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-64 border-r border-outline-variant/40 shrink-0`}>

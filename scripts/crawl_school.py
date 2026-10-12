@@ -106,6 +106,13 @@ SOURCES = [
         "category": "06-departments",
         "pagination": "sbxd/gzdt/{}.htm",
     },
+    {
+        "name": "校团委通知",
+        "list_url": "https://tw.gpnu.edu.cn/",
+        "detail_base": "https://tw.gpnu.edu.cn",
+        "category": "06-departments",
+        "pagination": None,
+    },
 ]
 
 # 内容提取的选择器（按优先级）
@@ -201,8 +208,8 @@ def extract_article_links(html: str, base_url: str) -> list[dict]:
 
     for a in soup.find_all("a", href=True):
         href = a["href"].strip()
-        # 匹配 /info/xxx/xxx.htm 格式的详情页链接
-        if re.search(r"/info/\d+/\d+\.htm", href):
+        # 匹配 info/xxx/xxx.htm 格式的详情页链接（有无前导 / 均可）
+        if re.search(r"info/\d+/\d+\.htm", href):
             title = a.get_text(strip=True)
             if title and len(title) > 4:
                 full_url = urljoin(base_url, href)

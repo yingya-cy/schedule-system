@@ -14,10 +14,8 @@ npx playwright test   # E2E (需先启动 dev server)
 
 ## 服务器
 
-- **IP**: 47.120.29.188
-- **登录**: `ssh root@47.120.29.188`（已配置 SSH key）
 - **部署**: Docker Compose，容器 `schedule-mysql` / `schedule-backend` / `schedule-nginx` / `schedule-ai-service`
-- **数据库**: MySQL 8.0，端口 3307（映射），密码 `753412`
+- **数据库**: MySQL 8.0，端口 3307（映射），密码由 `.env` 中 `DB_PASSWORD` 配置
 
 ## 架构
 
@@ -200,7 +198,7 @@ URL.revokeObjectURL(url);
 
 ## 部署到服务器
 
-**服务器**: `ssh root@47.120.29.188`，项目路径 `/root/workspace/schedule-system`
+**服务器**: SSH 连接已配置，项目路径 `/root/workspace/schedule-system`
 
 **自动判断部署方式：**
 ```bash

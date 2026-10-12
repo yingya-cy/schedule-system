@@ -51,7 +51,7 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: 753412
+          MYSQL_ROOT_PASSWORD: <db-password>
           MYSQL_DATABASE: schedule_system
         ports:
           - 3306:3306
@@ -72,7 +72,7 @@ jobs:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
           DB_USER: root
-          DB_PASSWORD: 753412
+          DB_PASSWORD: <db-password>
           DB_NAME: schedule_system
           JWT_SECRET: ci-test-secret
         run: npm run test:integration
