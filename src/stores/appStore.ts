@@ -6,6 +6,7 @@ import { useAuthStore } from './authStore';
 interface TermOption {
   id: number;
   name: string;
+  campus?: string;
   status: 'active' | 'archived';
 }
 
@@ -40,7 +41,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentCampus: localStorage.getItem('campus') || '河源',
   setCurrentCampus: (c: string) => {
     localStorage.setItem('campus', c);
-    set({ currentCampus: c });
+    // 【届次联动】切校区 → 重置届次为空，再按新校区拉取
+    set({ currentCampus: c, currentTermId: null });
+    // 异步刷新该校区的届次列表
+    void get().refreshTerms();
   },
 
   // Departments
@@ -62,7 +66,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   refreshTerms: async () => {
     try {
-      const res = await fetch('/api/terms', {
+      const campus = get().currentCampus;
+      // 【届次联动】按当前校区过滤届次
+      const res = await fetch(`/api/terms?campus=${encodeURIComponent(campus)}`, {
         headers: { Authorization: `Bearer ${useAuthStore.getState().token}` },
       });
       const json = await res.json();
@@ -70,7 +76,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         const terms = json.data as TermOption[];
         set({
           availableTerms: terms,
-          currentTermId: get().currentTermId || terms.find(t => t.status === 'active')?.id || null,
+          // 当前届次不在列表里（切了校区）→ 取该校区最新的
+          currentTermId: terms.some(t => t.id === get().currentTermId)
+            ? get().currentTermId
+            : (terms.find(t => t.status === 'active')?.id ?? terms[0]?.id ?? null),
         });
       }
     } catch (err) {

@@ -236,7 +236,8 @@ export default function ScheduleUploadView({
     if (weeksList && weeksList.length > 0) {
       return weeksList;
     }
-    if (!weeksStr) return Array.from({ length: 18 }, (_, i) => i + 1);
+    // 【修复】解析失败返回空数组，不再兜底填满 18 周
+    if (!weeksStr) return [];
     const singleMatch = weeksStr.match(/^(\d+)周$/);
     if (singleMatch) {
       return [parseInt(singleMatch[1])];
@@ -247,7 +248,8 @@ export default function ScheduleUploadView({
       const end = parseInt(match[2]);
       return Array.from({ length: end - start + 1 }, (_, i) => start + i);
     }
-    return Array.from({ length: 18 }, (_, i) => i + 1);
+    // 【修复】未匹配 → 空数组（原为兜底填满 18 周）
+    return [];
   };
 
   return (

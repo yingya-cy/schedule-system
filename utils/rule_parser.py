@@ -6,30 +6,55 @@ def clean_course_name(name):
     return name.strip()
 
 def parse_weeks(s):
+    """解析周次字符串 → 升序去重列表
+
+    支持：'1-16周' / '第8周' / '1-4周,6-16周' / '7-13周(单)' / '2-16周(双)'
+         / '1-2周/3周/5-6周/7-8周'（斜杠分隔）
+    """
     if not s:
         return []
-    s = s.replace('周', '')
-    parts = s.split(',')
+    # 【修复】去"第"字（原来 "第8周" 因 int("第8") 失败而丢失）
+    s = s.replace('周', '').replace('第', '')
+    # 【修复】支持逗号和斜杠两种分隔
+    parts = re.split(r'[,，/]', s)
     weeks = []
     for p in parts:
         p = p.strip()
         if not p:
             continue
+
+        # 【修复】识别单双周标记并在解析前剥离
+        week_type = None
+        if '(单)' in p or '（单）' in p:
+            week_type = 'odd'
+        elif '(双)' in p or '（双）' in p:
+            week_type = 'even'
+        p = re.sub(r'[（(][单双][)）]', '', p).strip()
+
         if '-' in p:
             parts_dash = p.split('-')
-            if len(parts_dash) == 2:
+            if len(parts_dash) >= 2:
                 try:
                     start, end = int(parts_dash[0]), int(parts_dash[1])
-                    for i in range(start, end + 1):
-                        weeks.append(i)
                 except ValueError:
-                    pass
+                    continue
+                rng = list(range(start, end + 1))
+                if week_type == 'odd':
+                    rng = [x for x in rng if x % 2 == 1]
+                elif week_type == 'even':
+                    rng = [x for x in rng if x % 2 == 0]
+                weeks.extend(rng)
         else:
             try:
-                weeks.append(int(p))
+                n = int(p)
+                if week_type == 'odd' and n % 2 == 0:
+                    continue
+                if week_type == 'even' and n % 2 == 1:
+                    continue
+                weeks.append(n)
             except ValueError:
                 pass
-    return sorted(list(set([w for w in weeks if not isinstance(w, float)])))
+    return sorted(set(w for w in weeks if isinstance(w, int)))
 
 def build_record_from_text(text, day, session_raw, section_start, section_end):
     type_match = re.search(r'[★☆■◆]', text)

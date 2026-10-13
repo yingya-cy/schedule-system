@@ -5,20 +5,36 @@ import { RowDataPacket, ResultSetHeader } from '../utils/db-types';
 
 const router = Router();
 
-// GET /api/terms — list all terms
+// GET /api/terms — list all terms（支持 ?campus= 按校区过滤）
 router.get('/', authenticate, async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM terms ORDER BY sequence_number DESC');
+    const { campus } = req.query;
+    let sql = 'SELECT * FROM terms';
+    const params: string[] = [];
+    if (campus) {
+      sql += ' WHERE campus = ?';
+      params.push(campus as string);
+    }
+    sql += ' ORDER BY campus, sequence_number DESC';
+    const [rows] = await pool.query(sql, params);
     res.json({ success: true, data: rows });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: error instanceof Error ? error.message : '未知错误' });
   }
 });
 
-// GET /api/terms/current — get active term
+// GET /api/terms/current — get active term（支持 ?campus=）
 router.get('/current', async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM terms WHERE status = 'active' LIMIT 1");
+    const { campus } = req.query;
+    let sql = "SELECT * FROM terms WHERE status = 'active'";
+    const params: string[] = [];
+    if (campus) {
+      sql += ' AND campus = ?';
+      params.push(campus as string);
+    }
+    sql += ' ORDER BY sequence_number DESC LIMIT 1';
+    const [rows] = await pool.query(sql, params);
     const terms = rows as RowDataPacket[];
     res.json({ success: true, data: terms[0] || null });
   } catch (error: unknown) {
@@ -29,16 +45,19 @@ router.get('/current', async (req, res) => {
 // POST /api/terms — admin creates a new term
 router.post('/', authenticate, requireRole('admin'), async (req, res) => {
   try {
-    const { name, academic_year, semester } = req.body;
+    const { name, campus, academic_year, semester } = req.body;
     if (!name || !academic_year || !semester) {
       res.status(400).json({ success: false, error: 'name, academic_year, semester 为必填项' });
       return;
     }
-    const [maxRow] = await pool.query('SELECT MAX(sequence_number) as maxSeq FROM terms');
+    const [maxRow] = await pool.query(
+      'SELECT MAX(sequence_number) as maxSeq FROM terms WHERE campus = ?',
+      [campus || '河源']
+    );
     const seq = ((maxRow as RowDataPacket[])[0].maxSeq || 0) + 1;
     const [result] = await pool.query(
-      'INSERT INTO terms (name, academic_year, semester, sequence_number) VALUES (?, ?, ?, ?)',
-      [name, academic_year, semester, seq]
+      'INSERT INTO terms (name, campus, academic_year, semester, sequence_number) VALUES (?, ?, ?, ?, ?)',
+      [name, campus || '河源', academic_year, semester, seq]
     );
     res.json({ success: true, data: { id: (result as ResultSetHeader).insertId } });
   } catch (error: unknown) {

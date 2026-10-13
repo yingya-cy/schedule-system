@@ -22,6 +22,20 @@ export default function FilesView() {
   const departments = useAppStore((s) => s.departments);
   const availableTerms = useAppStore((s) => s.availableTerms);
 
+  const currentTermId = useAppStore((s) => s.currentTermId);
+  // 【多校区】当前校区（默认河源）
+  // 【届次联动】校区 state 改用 store（setCurrentCampus 里会联动刷新届次）
+  const currentCampus = useAppStore((s) => s.currentCampus);
+  const setCurrentCampus = useAppStore((s) => s.setCurrentCampus);
+  const [campuses, setCampuses] = useState<string[]>(['河源', '白云']);
+  const setCurrentTermId = useAppStore((s) => s.setCurrentTermId);
+  const refreshTerms = useAppStore((s) => s.refreshTerms);
+
+  // 【届次联动】校区变化时刷新届次列表（必须放在 refreshTerms 声明之后）
+  useEffect(() => {
+    void refreshTerms();
+  }, [currentCampus, refreshTerms]);
+
   // 【多校区】加载校区列表
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
@@ -30,12 +44,6 @@ export default function FilesView() {
       .then(j => { if (j.success && Array.isArray(j.data)) setCampuses(j.data); })
       .catch(() => {});
   }, []);
-  const currentTermId = useAppStore((s) => s.currentTermId);
-  // 【多校区】当前校区（默认河源）
-  const [currentCampus, setCurrentCampus] = useState<string>('河源');
-  const [campuses, setCampuses] = useState<string[]>(['河源', '白云']);
-  const setCurrentTermId = useAppStore((s) => s.setCurrentTermId);
-  const refreshTerms = useAppStore((s) => s.refreshTerms);
 
   // View mode state
   const [viewMode, setViewMode] = useState<ViewMode>('list');

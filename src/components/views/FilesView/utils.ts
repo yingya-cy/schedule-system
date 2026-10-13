@@ -49,7 +49,9 @@ export function parseWeeks(weeksStr: string, weeksList?: number[]): number[] {
   }
 
   // If no weeks_list, parse string
-  if (!weeksStr) return Array.from({ length: 18 }, (_, i) => i + 1);
+  // 【修复】解析失败不再兜底填满 18 周（会掩盖真问题、产生假数据）；
+  // 返回空数组，下游 formatWeeks([]) 会显示为空
+  if (!weeksStr) return [];
 
   // Match single week, e.g. "4周"
   const singleMatch = weeksStr.match(/^(\d+)周$/);
@@ -77,7 +79,8 @@ export function parseWeeks(weeksStr: string, weeksList?: number[]): number[] {
     return weeks.sort((a, b) => a - b);
   }
 
-  return Array.from({ length: 18 }, (_, i) => i + 1);
+  // 【修复】所有规则都没匹配上 → 返回空数组（原为兜底填满 18 周）
+  return [];
 }
 
 /**

@@ -73,8 +73,34 @@ def _extract_course_name_from_block(raw_course):
 # 周数字符串
 # =========================
 def _extract_weeks_text(text):
-    text_cleaned = text.replace('\n', '')
-    matches = re.findall(r'\d+-\d+周(?:\([单双]\))?|\d+周(?:\([单双]\))?', text_cleaned)
+    """提取周次文本（支持跨行、多段逗号分隔、单双周）
+
+    原实现只匹配"数字[-数字]周"，跨行时（"15-16" 与 "周" 被切开）会丢段。
+    修复：先做激进拼接（去所有空白），再用更宽的正则抓完整周次区段。
+    """
+    if not text:
+        return ""
+
+    # 1. 激进拼接：去掉所有空白字符（含换行、空格、制表）
+    cleaned = re.sub(r'\s+', '', text)
+
+    # 2. 抓"周次区段"：从第一个数字开始，允许 数字 - , 周 (单)/(双) 的组合
+    #    形如：1-12周,15-16周   /  1-4周,6-16周  /  第17周  /  5-10周(单)
+    m = re.search(
+        r'((?:第?\d+(?:-\d+)?周(?:[\(（][单双][\)）])?\s*[,，]?\s*)+)',
+        cleaned
+    )
+    if m:
+        seg = m.group(1)
+        # 统一全角逗号、去掉多余空白
+        seg = seg.replace('，', ',').replace(' ', '')
+        # 规范化成 "1-12周,15-16周"
+        parts = [x for x in re.split(r'[,]', seg) if x.strip()]
+        if parts:
+            return ','.join(parts)
+
+    # 3. 回退：原逻辑
+    matches = re.findall(r'第?\d+-\d+周(?:\([单双]\))?|第?\d+周(?:\([单双]\))?', cleaned)
     return ','.join(matches) if matches else ''
 
 
@@ -117,7 +143,7 @@ def _parse_weeks_to_list(week_str):
             continue
         
         # 匹配单个周数，例如 "16周"
-        single_match = re.match(r'(\d+)周(?:\([单双]\))?', part)
+        single_match = re.match(r'第?(\d+)周(?:\([单双]\))?', part)
         if single_match:
             weeks.add(int(single_match.group(1)))
 

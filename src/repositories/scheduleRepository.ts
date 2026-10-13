@@ -4,6 +4,14 @@ import { CreateScheduleDto, CreateCourseDto, UpdateScheduleDto, UpdateCourseDto 
 import { buildInsertQuery, buildUpdateQuery, getInsertId, getAffectedRows } from '../utils/sqlBuilder';
 import { RowDataPacket } from '../utils/db-types';
 
+
+/** 【防护】字段截断：避免超长值导致 "Data too long" 500 错误 */
+function clip(v: string | null | undefined, max: number): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v);
+  return s.length > max ? s.slice(0, max) : s;
+}
+
 export class ScheduleRepository {
   // ==================== Schedule Operations ====================
 
@@ -104,13 +112,13 @@ export class ScheduleRepository {
       for (const courseDto of dto.courses) {
         const courseInsert = {
           schedule_id: scheduleId,
-          course_name: courseDto.course_name,
+          course_name: clip(courseDto.course_name, 200),
           weekday: courseDto.weekday,
           sections: JSON.stringify(courseDto.sections),
           weeks: JSON.stringify(courseDto.weeks),
-          teacher: courseDto.teacher || null,
-          location: courseDto.location || null,
-          remark: courseDto.remark || null
+          teacher: clip(courseDto.teacher, 100),
+          location: clip(courseDto.location, 100),
+          remark: courseDto.remark ? String(courseDto.remark).slice(0, 2000) : null
         };
         const { query: q, params: p } = buildInsertQuery('courses', courseInsert);
         await connection.execute(q, p);

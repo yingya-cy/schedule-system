@@ -357,9 +357,11 @@ def convert_week_to_list(week_data):
     
     if isinstance(week_data, str):
         weeks = set()
-        text = week_data.replace('\n', '').replace(' ', '')
+        # 【修复】去换行/空格，并去掉"第"字（原来 "第8周" 因 re.match 开头不匹配而丢失）
+        text = week_data.replace('\n', '').replace(' ', '').replace('第', '')
         
-        parts = text.split(',')
+        # 【修复】支持逗号和斜杠两种分隔（原只按逗号分，"1-2周/3周/5-6周" 只取第一段）
+        parts = re.split(r'[,，/]', text)
         for part in parts:
             part = part.strip()
             if not part:
