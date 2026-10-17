@@ -5,10 +5,12 @@
 import re
 import pdfplumber
 import logging
+from collections import Counter, defaultdict
 
 logger = logging.getLogger(__name__)
 
 DAY_NAMES = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
+CODED_PERIOD = re.compile(r'/\s*(\d{9})\s*/\s*\(\s*(\d+)\s*-\s*(\d+)\s*节\s*\)')
 
 
 # =========================
@@ -31,19 +33,19 @@ def _extract_course_name_from_block(raw_course):
     valid_lines = []
 
     garbage_pattern = re.compile(
-        r'^(?:[:：\d/★☆■◆\(（])|^(?:周学时|总学时|学分|理论|实践|注|选课|备注|第一|第[二三四五六七八九十]|考核|组成|学时组成)'
+        r'^(?:[:：\d/★☆■◆\(（])|^(?:周学时|总学时|学分|选课|备注|考核|组成|学时组成|(?:理论|实践|注)\s*[:：])'
     )
 
     for line in lines:
         line = line.strip()
         if not line:
             continue
+        if '/' in line or _FRAGMENT_MARKERS.search(line) or line.startswith((':', '：')):
+            valid_lines.clear()
+            continue
         if garbage_pattern.match(line):
             continue
         if len(line) == 1 and not re.match(r'[\u4e00-\u9fa5]', line):
-            continue
-        # description lines always carry '/', course names never do
-        if '/' in line:
             continue
         valid_lines.append(line)
 
@@ -126,7 +128,7 @@ def _parse_weeks_to_list(week_str):
             week_type = 'even'
         
         # 匹配周数范围，例如 "2-4周(双)"
-        range_match = re.match(r'(\d+)-(\d+)周(?:\([单双]\))?', part)
+        range_match = re.match(r'第?(\d+)-(\d+)周(?:\([单双]\))?', part)
         if range_match:
             start_num = int(range_match.group(1))
             end_num = int(range_match.group(2))
@@ -208,7 +210,7 @@ def _has_time_info(text):
     """检测文本是否包含时间信息（节次）"""
     if not text:
         return False
-    return bool(re.search(r'\d+-\d+节?|\d+节', text))
+    return bool(re.search(r'\d+-\d+节|\d+节|[（\(]\d+-\d+[）\)]', text))
 
 
 def _has_weeks_info(text):
@@ -241,23 +243,7 @@ def _is_weeks_only(text):
     if not text or not text.strip():
         return False
     
-    text = text.strip()
-    
-    # 必须有周数信息
-    if not _has_weeks_info(text):
-        return False
-    
-    # 不能有时间信息
-    if _has_time_info(text):
-        return False
-    
-    # 不能有课程名（长度较长的中文文本）
-    # 提取课程名，如果为空或很短，说明没有课程名
-    course = _extract_course_name_from_block(text)
-    if course and len(course) >= 2:
-        return False
-    
-    return True
+    return not _has_time_info(text) and _extract_weeks_only(text) is not None
 
 
 def _extract_weeks_only(text):
@@ -265,17 +251,64 @@ def _extract_weeks_only(text):
     if not text:
         return None
     
-    # 提取周数
-    matches = re.findall(r'\d+-\d+周(?:\([单双]\))?|\d+周(?:\([单双]\))?', text)
-    if matches:
-        return ','.join(matches)
-    
-    # 检测是否是补全的周数（例如"16周"）
-    match = re.match(r'^(\d+)周$', text.strip())
-    if match:
-        return match.group(1) + '周'
-    
-    return None
+    cleaned = re.sub(r'\s+', '', text)
+    token = r'\u7b2c?\d+(?:-\d+)?\u5468(?:[\(\uff08][\u5355\u53cc][\)\uff09])?'
+    if not re.fullmatch(rf'{token}(?:[,\uff0c]{token})*', cleaned):
+        return None
+
+    return (
+        cleaned
+        .replace('\uff0c', ',')
+        .replace('\uff08', '(')
+        .replace('\uff09', ')')
+    )
+
+
+def _extract_leading_weeks(text):
+    if not text:
+        return ''
+
+    cleaned = re.sub(r'\s+', '', text)
+    match = re.match(
+        r'(\u7b2c?\d+\u5468(?:[\(\uff08][\u5355\u53cc][\)\uff09])?'
+        r'(?:[,\uff0c]\u7b2c?\d+(?:-\d+)?\u5468(?:[\(\uff08][\u5355\u53cc][\)\uff09])?)*)'
+        r'(?=/|$)',
+        cleaned,
+    )
+    if not match:
+        return ''
+
+    return (
+        match.group(1)
+        .replace('\uff0c', ',')
+        .replace('\uff08', '(')
+        .replace('\uff09', ')')
+        .rstrip(',')
+    )
+
+
+def _complete_pending_weeks(records, pending_weeks_completion, col_idx, cell):
+    pending_info = pending_weeks_completion.get(col_idx)
+    if not pending_info:
+        return False
+
+    continuation = _extract_leading_weeks(cell)
+    if not continuation:
+        return False
+
+    first, *remaining = continuation.split(',')
+    first = re.sub(r'^\u7b2c', '', first)
+    completed = f"{pending_info['prefix']}-{first}"
+    if not _parse_weeks_to_list(completed):
+        return False
+    additions = [completed, *remaining]
+    record_idx = pending_info['record_idx']
+    old_weeks = records[record_idx]['weeks']
+    new_weeks = ','.join(part for part in [old_weeks, *additions] if part)
+    records[record_idx]['weeks'] = new_weeks
+    records[record_idx]['weeks_list'] = _parse_weeks_to_list(new_weeks)
+    pending_weeks_completion.pop(col_idx)
+    return True
 
 
 def _extract_pending_course_name(text):
@@ -297,6 +330,74 @@ def _extract_pending_course_name(text):
         return None
     
     return course
+
+
+def _parse_coded_table(table):
+    days = {
+        col: cell.strip()
+        for row in table
+        for col, cell in enumerate(row)
+        if cell and cell.strip() in DAY_NAMES
+    }
+    names_by_code = defaultdict(Counter)
+    entries = []
+
+    for row in table:
+        for col, cell in enumerate(row):
+            if col not in days or not cell:
+                continue
+            matches = list(CODED_PERIOD.finditer(cell))
+            previous_end = 0
+            for match in matches:
+                candidate_lines = cell[previous_end:match.start()].rsplit('/', 1)[-1].splitlines()
+                metadata_end = max(
+                    (
+                        index for index, line in enumerate(candidate_lines)
+                        if re.search(r'(?:地点|教室|教师|老师|校区|备注|学分|教学班)[:：]', line)
+                    ),
+                    default=-1
+                )
+                candidate_lines = candidate_lines[metadata_end + 1:]
+                candidate = ''.join(candidate_lines).strip()
+                candidate = re.sub(r'^\d+(?:\.\d+)?', '', candidate)
+                if len(candidate) >= 2 and not re.search(r'\d+\.', candidate):
+                    names_by_code[match.group(1)][candidate] += 1
+                weeks_end = cell.find('/', match.end())
+                if weeks_end < 0:
+                    weeks_end = len(cell)
+                weeks_text = _extract_weeks_text(cell[match.end():weeks_end])
+                period = f'{match.group(2)}-{match.group(3)}节'
+                entries.append((days[col], match.group(1), period, weeks_text))
+                previous_end = match.end()
+
+    names = {code: counts.most_common(1)[0][0] for code, counts in names_by_code.items()}
+    return [
+        {
+            'course': names.get(code, ''),
+            'period': period,
+            'day': day,
+            'weeks': weeks_text,
+            'weeks_list': _parse_weeks_to_list(weeks_text),
+            'is_fragment': False
+        }
+        for day, code, period, weeks_text in entries
+        if code in names and weeks_text
+    ]
+
+
+def _extract_other_courses_text(pdf):
+    for page in pdf.pages:
+        for table in page.extract_tables() or []:
+            for row in table:
+                for cell in row:
+                    if cell:
+                        match = re.search(r'其他课程[：:](.*)', cell, re.S)
+                        if match:
+                            return match.group(1).replace('\n', '').strip()
+
+    full_text = '\n'.join(page.extract_text() or '' for page in pdf.pages)
+    match = re.search(r'其他课程[：:](.*)', full_text)
+    return match.group(1).strip() if match else ''
 
 
 def parse_vertical_pdf_with_plumber(pdf_path):
@@ -334,6 +435,23 @@ def parse_vertical_pdf_with_plumber(pdf_path):
 
                 table = tables[0]
                 logger.info(f'行数: {len(table)}')
+
+                coded_count = sum(
+                    len(CODED_PERIOD.findall(cell))
+                    for row in table for cell in row if cell
+                )
+                period_count = sum(
+                    len(re.findall(r'\(\s*\d+\s*-\s*\d+\s*节\s*\)', cell))
+                    for row in table for cell in row if cell
+                )
+                if coded_count >= 5:
+                    if coded_count != period_count:
+                        raise ValueError('课程代码版课表混有未识别课程，需改用其他识别方式')
+                    coded_records = _parse_coded_table(table)
+                    if len(coded_records) != coded_count:
+                        raise ValueError('课程代码版课表未能完整解析')
+                    records.extend(coded_records)
+                    continue
                 
                 # 调试：显示前3行表格内容（帮助诊断图片型PDF）
                 logger.info(f'\n[诊断] 表格前3行内容:')
@@ -356,8 +474,18 @@ def parse_vertical_pdf_with_plumber(pdf_path):
 
                     for col_idx, cell in enumerate(row):
                         if col_idx in col_to_day:
+                            completed_pending_weeks = _complete_pending_weeks(
+                                records, pending_weeks_completion, col_idx, cell
+                            )
+                            if completed_pending_weeks:
+                                logger.info(
+                                    'Completed split week range for column %s', col_idx
+                                )
+
                             # 情况1：检测只有周数的单元格（额外周数）
                             if _is_weeks_only(cell):
+                                if completed_pending_weeks:
+                                    continue
                                 extra_weeks = _extract_weeks_only(cell)
                                 if extra_weeks:
                                     # 优先从上一页的课程合并
@@ -491,6 +619,8 @@ def parse_vertical_pdf_with_plumber(pdf_path):
                                     logger.warning(f'检测到时间信息但无匹配课程名: 列{col_idx}, 内容: {repr(cell[:50])}')
                             else:
                                 # 正常处理
+                                if parsed_list:
+                                    pending_courses.pop(col_idx, None)
                                 for parsed in parsed_list:
                                     parsed['day'] = col_to_day[col_idx]
                                     records.append(parsed)
@@ -507,6 +637,16 @@ def parse_vertical_pdf_with_plumber(pdf_path):
                                                 'prefix': prefix
                                             }
                                             logger.info(f'检测到未完成的周数范围: 列{col_idx} "{prefix}-" 等待补全')
+
+                            if cell and _has_time_info(cell):
+                                trailing = re.split(r'[（\(]\d+-\d+节?[）\)]', cell)[-1]
+                                trailing_name = _extract_course_name_from_block(trailing)
+                                if trailing_name:
+                                    pending_courses[col_idx] = {
+                                        'course': trailing_name,
+                                        'page': page_num,
+                                        'row': row_idx
+                                    }
                 
                 # 更新上一页课程缓冲区
                 last_page_courses = current_page_courses.copy()
@@ -526,14 +666,10 @@ def parse_vertical_pdf_with_plumber(pdf_path):
         # =========================
         # 其他课程
         # =========================
-        full_text = '\n'.join([page.extract_text() or '' for page in pdf.pages])
+        other_text = _extract_other_courses_text(pdf)
 
-        other_match = re.search(r'其他课程[：:](.*)', full_text)
-
-        if other_match:
+        if other_text:
             logger.info('检测到其他课程')
-
-            other_text = other_match.group(1).replace('\n', '')
 
             for item in other_text.split(';'):
                 if not item.strip():
