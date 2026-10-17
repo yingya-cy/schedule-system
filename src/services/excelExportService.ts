@@ -61,58 +61,98 @@ export function detectParity(weeks: number[]): '' | '单' | '双' {
   return '';
 }
 
-export function formatWeeks(weeks: number[]): string {
-  if (weeks.length === 0) return '';
-  const sorted = [...weeks].sort((a, b) => a - b);
+interface WeekSegment {
+  weeks: number[];
+  text: string;
+  parity: boolean;
+  mask: number;
+}
 
-  // Try whole-array parity first
-  const parity = sorted.length > 1 ? detectParity(sorted) : '';
-  if (parity) return parity + formatWeekGroups(sorted);
+interface WeekSolution {
+  segments: WeekSegment[];
+  textLength: number;
+  parityCount: number;
+}
 
-  // Split into homogeneous-step runs
-  const runs: number[][] = [];
-  let cur: number[] = [sorted[0]];
+function weekMask(weeks: number[]): number {
+  return weeks.reduce((mask, week) => mask | (1 << (week - 1)), 0);
+}
 
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = cur[cur.length - 1];
-    const curr = sorted[i];
-    const diff = curr - prev;
+function formatWeekSegments(weeks: number[]): WeekSegment[] {
+  const sorted = [...new Set(weeks)].filter(w => w >= 1 && w <= 18).sort((a, b) => a - b);
+  if (sorted.length === 0) return [];
 
-    if (cur.length === 1 && diff <= 2) {
-      cur.push(curr);
-    } else if (cur.length === 1) {
-      runs.push(cur);
-      cur = [curr];
-    } else {
-      const curStep = cur[1] - cur[0];
-      if (diff === curStep) {
-        cur.push(curr);
-      } else {
-        runs.push(cur);
-        cur = [curr];
+  const targetMask = weekMask(sorted);
+  const available = new Set(sorted);
+  const candidatesByMask = new Map<number, WeekSegment>();
+
+  const addCandidate = (values: number[], text: string, parity: boolean) => {
+    const mask = weekMask(values);
+    const current = candidatesByMask.get(mask);
+    if (!current || text.length < current.text.length ||
+        (text.length === current.text.length && current.parity && !parity)) {
+      candidatesByMask.set(mask, { weeks: values, text, parity, mask });
+    }
+  };
+
+  for (const start of sorted) {
+    const consecutive: number[] = [];
+    for (let end = start; end <= 18 && available.has(end); end++) {
+      consecutive.push(end);
+      addCandidate(
+        [...consecutive],
+        start === end ? `(${start})` : `(${start}-${end})`,
+        false,
+      );
+    }
+
+    const sameParity: number[] = [];
+    for (let end = start; end <= 18 && available.has(end); end += 2) {
+      sameParity.push(end);
+      if (sameParity.length >= 2) {
+        addCandidate(
+          [...sameParity],
+          `${start % 2 === 1 ? '单' : '双'}(${start}-${end})`,
+          true,
+        );
       }
     }
   }
-  runs.push(cur);
 
-  const formatted = runs.map(r => {
-    if (r.length <= 1) return { text: formatWeekGroups(r), parity: '' };
-    const f = formatWeekGroups(r);
-    if (f.includes('-')) {
-      const p = detectParity(r);
-      if (p) return { text: p + f, parity: p };
+  const candidates = [...candidatesByMask.values()];
+  const memo = new Map<number, WeekSolution>();
+  const solve = (remaining: number): WeekSolution => {
+    if (remaining === 0) return { segments: [], textLength: 0, parityCount: 0 };
+    const cached = memo.get(remaining);
+    if (cached) return cached;
+
+    const firstBit = remaining & -remaining;
+    let best: WeekSolution | undefined;
+    for (const candidate of candidates) {
+      if ((candidate.mask & firstBit) === 0 || (candidate.mask & remaining) !== candidate.mask) continue;
+      const rest = solve(remaining & ~candidate.mask);
+      const solution: WeekSolution = {
+        segments: [candidate, ...rest.segments],
+        textLength: candidate.text.length + rest.textLength + (rest.segments.length > 0 ? 1 : 0),
+        parityCount: Number(candidate.parity) + rest.parityCount,
+      };
+      if (!best || solution.textLength < best.textLength ||
+          (solution.textLength === best.textLength && solution.segments.length < best.segments.length) ||
+          (solution.textLength === best.textLength && solution.segments.length === best.segments.length &&
+            solution.parityCount < best.parityCount)) {
+        best = solution;
+      }
     }
-    return { text: f, parity: '' };
-  });
 
-  const withP = formatted.filter(r => r.parity);
-  const withoutP = formatted.filter(r => !r.parity);
-  if (withP.length > 0) {
-    const head = withP.map(r => r.text).join('');
-    const tail = withoutP.map(r => r.text).join('');
-    return tail ? `${head}/${tail}` : head;
-  }
-  return formatted.map(r => r.text).join('/');
+    memo.set(remaining, best!);
+    return best!;
+  };
+
+  return solve(targetMask).segments;
+}
+
+export function formatWeeks(weeks: number[]): string {
+  return formatWeekSegments(weeks).map(segment => segment.text).join('/');
 }
 
 function formatFreeTimeForPeriod(person: PersonData, day: number, periodSections: number[]): string {
@@ -125,28 +165,89 @@ function formatFreeTimeForPeriod(person: PersonData, day: number, periodSections
 
   const allFree = allWeeks.filter(w => periodSections.every(s => isFree(person, day, s, w)));
 
-  const sectionOnly: Map<number, number[]> = new Map();
-  for (const s of periodSections) {
-    const only = sectionFree.get(s)!.filter(w => !allFree.includes(w));
-    if (only.length > 0) sectionOnly.set(s, only);
-  }
-
-  // Use plain formatter for in-section display: smart split but no / and no 单/双
-  const fmtPlain = (w: number[]) => formatWeeks(w).replace(/[\/单双]/g, '');
-
-  const allFreeStr = allFree.length > 0 ? fmtPlain(allFree) : '';
-  const cellParts: string[] = [];
-  let hasSectionSpecific = false;
-  for (const s of periodSections) {
-    const only = sectionOnly.get(s);
-    if (!only || only.length === 0) continue;
-    hasSectionSpecific = true;
-    const onlyStr = fmtPlain(only);
-    cellParts.push(allFreeStr ? `${s}${onlyStr}/${allFreeStr}` : `${s}${onlyStr}`);
-  }
-  // If no section-specific data, use formatWeeks for pure free-time display (with / and 单/双)
+  const hasSectionSpecific = periodSections.some(section =>
+    sectionFree.get(section)!.some(week => !allFree.includes(week))
+  );
   if (!hasSectionSpecific) return formatWeeks(allFree);
-  return cellParts.join('');
+
+  interface ScopedSegment extends WeekSegment { section?: number }
+  interface NotationPlan {
+    segments: ScopedSegment[];
+    text: string;
+    groupCount: number;
+  }
+
+  const expectedPairs = new Set<string>();
+  for (const section of periodSections) {
+    for (const week of sectionFree.get(section)!) expectedPairs.add(`${section}:${week}`);
+  }
+
+  const buildPlan = (commonWeeks: number[]): NotationPlan | undefined => {
+    const common = new Set(commonWeeks);
+    if (commonWeeks.some(week => !allFree.includes(week))) return undefined;
+
+    const segments: ScopedSegment[] = [];
+    for (const section of periodSections) {
+      const residual = sectionFree.get(section)!.filter(week => !common.has(week));
+      for (const segment of formatWeekSegments(residual)) segments.push({ ...segment, section });
+    }
+    for (const segment of formatWeekSegments(commonWeeks)) segments.push(segment);
+
+    const actualPairs = new Set<string>();
+    for (const segment of segments) {
+      const scopedSections = segment.section === undefined ? periodSections : [segment.section];
+      for (const section of scopedSections) {
+        for (const week of segment.weeks) actualPairs.add(`${section}:${week}`);
+      }
+    }
+    if (actualPairs.size !== expectedPairs.size ||
+        [...expectedPairs].some(pair => !actualPairs.has(pair))) return undefined;
+
+    const groups: Array<{ section?: number; clauses: string[] }> = [];
+    let selectionGroupCount = 0;
+    let previousSelectionKey: string | undefined;
+    for (const segment of segments) {
+      const useParity = segment.parity && segment.weeks.length > 2;
+      const modifier = useParity ? segment.text.slice(0, 1) : '';
+      const weekTexts = segment.parity && !useParity
+        ? segment.weeks.map(week => `(${week})`)
+        : [useParity ? segment.text.slice(1) : segment.text];
+      const clause = `${modifier}${weekTexts.join('')}`;
+      const selectionKey = `${segment.section ?? 'common'}:${modifier}`;
+      if (selectionKey !== previousSelectionKey) {
+        selectionGroupCount++;
+        previousSelectionKey = selectionKey;
+      }
+      const previous = groups[groups.length - 1];
+      if (previous && previous.section === segment.section) {
+        previous.clauses.push(clause);
+      } else {
+        groups.push({ section: segment.section, clauses: [clause] });
+      }
+    }
+
+    return {
+      segments,
+      text: groups
+        .map(group => `${group.section ?? ''}${group.clauses.join('')}`)
+        .join('/'),
+      groupCount: selectionGroupCount,
+    };
+  };
+
+  // Preserve the conventional shared semester tail when both final weeks are
+  // free. Otherwise keep all shared weeks unscoped before falling back to a
+  // fully section-scoped representation.
+  const sharedTail = allFree.includes(17) && allFree.includes(18) ? [17, 18] : undefined;
+  const commonCandidates: number[][] = sharedTail ? [sharedTail, allFree, []] : [allFree, []];
+  const plans = commonCandidates
+    .filter((weeks, index, all) => all.findIndex(other => weekMask(other) === weekMask(weeks)) === index)
+    .map(buildPlan)
+    .filter((plan): plan is NotationPlan => plan !== undefined);
+  const preferred = plans.reduce<NotationPlan | undefined>((best, plan) =>
+    !best || plan.groupCount < best.groupCount ? plan : best
+  , undefined);
+  return preferred?.text ?? '';
 }
 
 // Shared styles
@@ -217,7 +318,7 @@ export class ExcelExportService {
       // === Row 1: Title ===
       ws.mergeCells(1, 1, 1, totalCols);
       const titleCell = ws.getCell('A1');
-      titleCell.value = termName ? `第${termName}届朋辈反课表` : '朋辈反课表';
+      titleCell.value = termName ? `${termName}朋辈反课表` : '朋辈反课表';
       sc(titleCell, FONT.title);
       ws.getRow(1).height = 61.1;
 

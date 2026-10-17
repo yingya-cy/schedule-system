@@ -60,6 +60,11 @@ describe('formatWeekInfo', () => {
     expect(formatWeekInfo([1, 2, 3, 4])).toBe('1-4周');
   });
 
+  it('does not turn sparse week arrays into continuous ranges', () => {
+    expect(formatWeekInfo([7, 9, 11, 13])).toBe('7,9,11,13周');
+    expect(formatWeekInfo([1, 2, 3, 15, 16])).toBe('1-3,15-16周');
+  });
+
   it('formats range type', () => {
     expect(formatWeekInfo({ type: 'range', start: 1, end: 8 })).toBe('1-8周');
   });

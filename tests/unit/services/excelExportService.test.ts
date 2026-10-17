@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatWeekGroups, detectParity, formatWeeks } from '@/services/excelExportService';
+import excelExportService, { formatWeekGroups, detectParity, formatWeeks } from '@/services/excelExportService';
 
 describe('detectParity', () => {
   it('returns 单 for all-odd weeks', () => {
@@ -121,5 +121,65 @@ describe('formatWeeks', () => {
 
   it('handles multiple parity runs with single /', () => {
     expect(formatWeeks([1, 3, 5, 7, 9, 12, 14, 16, 17])).toBe('单(1-9)双(12-16)/(17)');
+  });
+});
+
+describe('generateReverseScheduleWorkbook', () => {
+  it('uses chronological week groups without parity labels for section-specific cells', async () => {
+    const workbook = await excelExportService.generateReverseScheduleWorkbook({
+      departments: ['Test Department'],
+      people: [{
+        name: 'Parity Student',
+        department: 'Test Department',
+        courses: [
+          {
+            weekday: 1,
+            sections: [5],
+            weeks: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17],
+          },
+          {
+            weekday: 1,
+            sections: [6],
+            weeks: [3, 5],
+          },
+        ],
+      }],
+    });
+
+    const monday = workbook.getWorksheet('星期一');
+    expect(monday).toBeDefined();
+    expect(monday!.getCell('J4').value).toBe(
+      'Parity Student6(2)(4)(6-12)(15-17)/(1)(13-14)(18)'
+    );
+  });
+
+  it('keeps slashes between week groups in ordinary cells', async () => {
+    const workbook = await excelExportService.generateReverseScheduleWorkbook({
+      departments: ['Test Department'],
+      people: [{
+        name: 'Grouped Student',
+        department: 'Test Department',
+        courses: [{
+          weekday: 1,
+          sections: [1, 2],
+          weeks: [4, 5, 6],
+        }],
+      }],
+    });
+
+    const monday = workbook.getWorksheet('星期一');
+    expect(monday).toBeDefined();
+    expect(monday!.getCell('B4').value).toBe('Grouped Student(1-3)/(7-18)');
+  });
+
+  it('uses the supplied term name directly in the workbook title', async () => {
+    const workbook = await excelExportService.generateReverseScheduleWorkbook({
+      departments: [],
+      people: [],
+    }, '白云第十四届第一学期');
+
+    expect(workbook.getWorksheet('星期一')!.getCell('A1').value).toBe(
+      '白云第十四届第一学期朋辈反课表'
+    );
   });
 });

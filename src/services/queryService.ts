@@ -26,6 +26,19 @@ interface FreePerson {
   department: string;
 }
 
+const ALL_WEEKDAYS = Array.from({ length: 7 }, (_, index) => index + 1);
+const ALL_SECTIONS = Array.from({ length: 11 }, (_, index) => index + 1);
+
+function isMilitaryPractice(courseName: string | null | undefined): boolean {
+  return Boolean(courseName?.includes('军事实践'));
+}
+
+function courseOccupiesSlot(course: CourseRow, day: number, section: number, week: number): boolean {
+  if (!(course.weeks as number[]).includes(week)) return false;
+  if (isMilitaryPractice(course.course_name)) return true;
+  return course.weekday === day && (course.sections as number[]).includes(section);
+}
+
 export class QueryService {
   /**
    * 查询空闲时间
@@ -74,7 +87,7 @@ export class QueryService {
     const scheduleIds = schedules.map(s => s.id);
     const placeholders = scheduleIds.map(() => '?').join(', ');
     const [courseRows] = await pool.execute(
-      `SELECT schedule_id, weekday, sections, weeks FROM courses WHERE schedule_id IN (${placeholders})`,
+      `SELECT schedule_id, course_name, weekday, sections, weeks FROM courses WHERE schedule_id IN (${placeholders})`,
       scheduleIds
     );
     const allCourses = courseRows as CourseRow[];
@@ -117,11 +130,7 @@ export class QueryService {
 
           for (const schedule of schedules) {
             const courses = coursesByScheduleId.get(schedule.id) || [];
-            const isFree = !courses.some(course =>
-              course.weekday === day &&
-              (course.sections as number[]).includes(section) &&
-              (course.weeks as number[]).includes(week)
-            );
+            const isFree = !courses.some(course => courseOccupiesSlot(course, day, section, week));
 
             if (isFree) {
               freePeople.push({
@@ -224,7 +233,7 @@ export class QueryService {
     const campusCond = campus ? 'AND s.campus = ?' : '';
     const sqlParams: (string | number)[] = campus ? [tid, campus] : [tid];
     const [rows] = await pool.execute(`
-      SELECT s.id as schedule_id, s.name, s.department, c.weekday, c.sections, c.weeks
+      SELECT s.id as schedule_id, s.name, s.department, c.course_name, c.weekday, c.sections, c.weeks
       FROM schedules s
       JOIN terms t ON s.term_id = t.id
       LEFT JOIN courses c ON s.id = c.schedule_id
@@ -232,16 +241,26 @@ export class QueryService {
     `, sqlParams);
 
     const personMap = new Map<string, { name: string; department: string; courses: { weekday: number; sections: number[]; weeks: number[] }[] }>();
-    for (const row of rows as { schedule_id: number; name: string; department: string; weekday: number; sections: number[]; weeks: number[] }[]) {
+    for (const row of rows as { schedule_id: number; name: string; department: string; course_name: string; weekday: number; sections: number[]; weeks: number[] }[]) {
       if (!personMap.has(row.name)) {
         personMap.set(row.name, { name: row.name, department: row.department, courses: [] });
       }
       if (row.weekday != null) {
-        personMap.get(row.name)!.courses.push({
-          weekday: row.weekday,
-          sections: row.sections,
-          weeks: row.weeks,
-        });
+        if (isMilitaryPractice(row.course_name)) {
+          for (const weekday of ALL_WEEKDAYS) {
+            personMap.get(row.name)!.courses.push({
+              weekday,
+              sections: ALL_SECTIONS,
+              weeks: row.weeks,
+            });
+          }
+        } else {
+          personMap.get(row.name)!.courses.push({
+            weekday: row.weekday,
+            sections: row.sections,
+            weeks: row.weeks,
+          });
+        }
       }
     }
 

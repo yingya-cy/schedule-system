@@ -16,7 +16,8 @@ export function parsePeriod(section: unknown): number[] {
 }
 
 export function mapBackendDataToArray(data: BackendCourseData[]): UnifiedCourse[] {
-  return data.map(item => {
+  return data
+    .map(item => {
     const dayStr = getWeekdayName(item.weekday || item.day);
 
     // item.section 可能是数组（如 AI OCR）也可能是字符串（如旧格式）
@@ -41,7 +42,7 @@ export function mapBackendDataToArray(data: BackendCourseData[]): UnifiedCourse[
       classroom: item.classroom || item.location || '',
       remark: item.remark || ''
     };
-  });
+    });
 };
 
 export const mapFrontendDataToArray = (data: CourseRecord[]): UnifiedCourse[] => {

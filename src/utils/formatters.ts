@@ -49,7 +49,19 @@ export function formatWeekInfo(week: WeekInput): string {
     return week;
   }
   if (Array.isArray(week) && week.length > 0) {
-    return `${week[0]}-${week[week.length - 1]}周`;
+    const ranges: string[] = [];
+    let start = week[0];
+    let end = start;
+    for (const current of week.slice(1)) {
+      if (current === end + 1) {
+        end = current;
+      } else {
+        ranges.push(start === end ? `${start}` : `${start}-${end}`);
+        start = end = current;
+      }
+    }
+    ranges.push(start === end ? `${start}` : `${start}-${end}`);
+    return `${ranges.join(',')}周`;
   }
   if (typeof week === 'object' && 'type' in week) {
     if (week.type === 'range') {
