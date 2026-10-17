@@ -23,7 +23,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuthStore } from '@/stores/authStore';
 
 const navItems: NavItem[] = [
-  { id: 'dashboard', label: '仪表盘', icon: 'dashboard' },
+  { id: 'dashboard', label: '工作台', icon: 'dashboard' },
   { id: 'files', label: '课表中心', icon: 'calendar' },
   { id: 'file-center', label: '文件中心', icon: 'folder' },
   { id: 'scoring', label: '比赛评分', icon: 'trophy' },
@@ -96,7 +96,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen overflow-x-hidden">
+    <div className="pp-shell flex min-h-screen overflow-x-hidden">
       {/* Mobile Overlay */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -113,27 +113,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Sidebar */}
       <motion.aside
-        initial={{ x: -100, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
+        initial={false}
+        animate={{ x: isMobile && !mobileMenuOpen ? -256 : 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 180, damping: 24 }}
+        inert={isMobile && !mobileMenuOpen}
+        aria-hidden={isMobile && !mobileMenuOpen}
         className={cn(
-          "fixed left-0 top-0 h-full w-64 border-r border-outline-variant/40 bg-surface/90 backdrop-blur-md flex flex-col p-4 gap-2 pb-4 z-50",
-          "lg:translate-x-0",
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          "pp-sidebar fixed left-0 top-0 h-full w-64 border-r border-outline-variant/40 bg-surface/90 backdrop-blur-md flex flex-col p-4 gap-2 pb-4 z-50"
         )}
       >
         <div className="flex items-center gap-3 px-3 mb-8 mt-2">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#5590b2] to-[#d4b88a] flex items-center justify-center text-white shadow-sm">
+          <div className="pp-brand-mark">
             <motion.div
-              animate={{ rotate: [0, 15, -15, 0] }}
+              animate={{ rotate: 0 }}
               transition={{ repeat: Infinity, duration: 4 }}
             >
-              <LayoutDashboard size={22} />
+              <span>朋</span>
             </motion.div>
           </div>
           <div>
-            <h1 className="text-lg font-extrabold text-primary font-headline leading-none">校园智联</h1>
-            <p className="text-[10px] text-outline uppercase tracking-widest mt-1">Campus Connect</p>
+            <h1 className="pp-wordmark">朋小辈</h1>
+            <p className="pp-brand-subtitle">朋辈心理健康服务队</p>
           </div>
         </div>
 
@@ -181,17 +181,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <div className="flex-1 lg:ml-64 flex flex-col w-full pb-20 lg:pb-0 min-w-0 overflow-hidden">
         {/* Top Bar */}
-        <header className="sticky top-0 z-40 h-16 bg-surface-container-lowest/80 backdrop-blur-md flex justify-between items-center px-4 lg:px-8 shadow-nav">
+        <header className="pp-topbar sticky top-0 z-40 h-16 bg-surface-container-lowest/80 backdrop-blur-md flex justify-between items-center px-4 lg:px-8 shadow-nav">
           <div className="flex items-center gap-4 min-w-0 flex-1">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? '关闭导航' : '打开导航'}
+              aria-expanded={mobileMenuOpen}
               className="focus-ring lg:hidden p-3 hover:bg-surface-container-low rounded-lg transition-colors"
             >
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
             <h2 className="text-base sm:text-lg lg:text-xl font-bold tracking-tighter font-headline truncate title-ink"
               title={ROUTE_LABELS[currentPath as RoutePath] || ROUTE_LABELS['/dashboard']}>
-              {ROUTE_LABELS[currentPath as RoutePath] || ROUTE_LABELS['/dashboard']}
+              {currentPath === '/dashboard' ? '工作台' : ROUTE_LABELS[currentPath as RoutePath] || ROUTE_LABELS['/dashboard']}
             </h2>
           </div>
 
@@ -199,6 +201,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  aria-label="账户菜单"
                   className="flex items-center gap-2 p-2 hover:bg-surface-container-low rounded-xl transition-all active:opacity-80"
                 >
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
@@ -246,7 +249,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* View Container */}
-        <main className="p-4 lg:p-8 min-h-[calc(100dvh-64px)] w-full">
+      <main data-page={currentPath} className="handbook-pages p-4 lg:p-8 min-h-[calc(100dvh-64px)] w-full">
           <motion.div
             key={currentPath}
             initial={{ opacity: 0, y: 10 }}
@@ -261,12 +264,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Tab Bar */}
       {isMobile && (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-sm border-t border-surface-container-high safe-area-inset flex lg:hidden">
-          {visibleNavItems.map((item) => (
+        <nav className="pp-bottom-nav fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-sm border-t border-surface-container-high safe-area-inset flex lg:hidden">
+          {visibleNavItems.filter(item => ['dashboard', 'files', 'scoring', 'profile'].includes(item.id)).map((item) => (
             <button
               key={item.id}
               onClick={() => handleNavClick(item.id)}
               title={item.label}
+              aria-label={item.label}
               className={cn(
                 "flex-1 flex items-center justify-center py-3 touch-target transition-colors",
                 currentView === `/${item.id}`
@@ -275,6 +279,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             >
               {getIcon(item.icon)}
+              <span>{item.label}</span>
             </button>
           ))}
         </nav>
@@ -287,7 +292,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <h3 className="text-lg font-bold text-on-surface">设置</h3>
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-on-surface">深色模式</span>
-              <button onClick={toggleDark} className="w-12 h-7 rounded-full bg-surface-container-high border border-outline-variant relative transition-colors">
+              <button role="switch" aria-label="深色模式" aria-checked={dark} onClick={toggleDark} className="w-12 h-7 rounded-full bg-surface-container-high border border-outline-variant relative transition-colors">
                 <motion.div
                   className="w-5 h-5 rounded-full absolute top-0.5 flex items-center justify-center"
                   animate={{ left: dark ? 24 : 4 }}

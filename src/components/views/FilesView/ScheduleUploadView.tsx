@@ -4,7 +4,7 @@ import { Upload, FileText, FileImage, RefreshCw, Square, AlertCircle, X } from '
 import { cn } from '@/lib/utils';
 import { UploadState, BatchResult } from './constants';
 import { processSingleFile } from '@/services/fileProcessor';
-import { readFileAsBase64, parseWeekday, parseSections, parseWeeks } from './utils';
+import { readFileAsBase64, parseSections, assertValidCourseSections } from './utils';
 
 interface ScheduleUploadViewProps {
   uploadState: UploadState;
@@ -136,6 +136,7 @@ export default function ScheduleUploadView({
             remark: course.remark || '',
             isNew: true
           }));
+          assertValidCourseSections(courses);
 
           const fileData = await readFileAsBase64(file);
 
@@ -216,20 +217,6 @@ export default function ScheduleUploadView({
       if (timeStr.includes(key)) return value;
     }
     return 1;
-  };
-
-  const parseSections = (timeStr: string): number[] => {
-    const match = timeStr.match(/(\d+)[-~](\d+)节?/);
-    if (match) {
-      const start = parseInt(match[1]);
-      const end = parseInt(match[2]);
-      return Array.from({ length: end - start + 1 }, (_, i) => start + i);
-    }
-    const singleMatch = timeStr.match(/第?(\d+)节?/);
-    if (singleMatch) {
-      return [parseInt(singleMatch[1])];
-    }
-    return [1, 2];
   };
 
   const parseWeeks = (weeksStr: string, weeksList?: number[]): number[] => {

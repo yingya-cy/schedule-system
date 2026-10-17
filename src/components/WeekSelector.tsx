@@ -46,6 +46,8 @@ export default function WeekSelector({
         {Array.from({ length: maxWeek - minWeek + 1 }, (_, i) => minWeek + i).map(week => (
           <button
             key={week}
+            aria-label={`第${week}周`}
+            aria-pressed={currentWeek === week}
             onClick={() => onWeekChange(week)}
             className={cn(
               "focus-ring py-2.5 text-sm font-semibold rounded-xl transition-all",

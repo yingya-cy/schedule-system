@@ -46,6 +46,8 @@ export default function DaySelector({
           return (
             <button
               key={day}
+              aria-label={day}
+              aria-pressed={selectedDay === dayNum}
               onClick={() => onDayChange(dayNum)}
               className={cn(
                 "py-2 text-xs font-medium rounded transition-all",

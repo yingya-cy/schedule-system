@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import HandbookPageHeading from '../HandbookPageHeading';
 import {
   Phone,
   Video,
@@ -76,18 +77,10 @@ export default function ChatView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0 transition-transform hover:scale-105 hover:rotate-3 cursor-default">
-          <MessageCircle className="text-on-primary" size={24} />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-on-surface font-headline">群聊</h1>
-          <p className="text-sm text-on-surface-variant mt-1">团队内部即时通讯</p>
-        </div>
-      </div>
-      <div className="flex h-[calc(100vh-210px)] gap-6">
+      <HandbookPageHeading title="群聊" description="团队内部即时通讯" art="chat" />
+      <div className="handbook-chat-grid flex h-[calc(100vh-210px)] gap-6">
       {/* Left Sidebar: Conversations */}
-      <div className="w-80 flex flex-col gap-4">
+      <div className="handbook-chat-list w-80 flex flex-col gap-4">
         <div className="bg-surface-container-low rounded-xl p-2 flex gap-1">
           <button className="flex-1 py-2 text-xs font-semibold bg-white text-primary rounded-lg shadow-sm">群聊</button>
           <button className="flex-1 py-2 text-xs font-medium text-on-surface-variant hover:bg-white/50 rounded-lg transition-colors">私聊</button>
@@ -133,9 +126,9 @@ export default function ChatView() {
       </div>
 
       {/* Main Chat Window */}
-      <div className="flex-1 flex flex-col bg-surface-container-lowest rounded-2xl shadow-[0_8px_40px_rgb(0,0,0,0.03)] overflow-hidden border border-surface-container-high/30">
+      <div className="handbook-chat-window min-w-0 flex-1 flex flex-col bg-surface-container-lowest rounded-lg overflow-hidden border border-surface-container-high/30">
         {/* Chat Header */}
-        <div className="px-6 py-4 border-b border-surface-container-low flex justify-between items-center bg-white/50 backdrop-blur-md">
+        <div className="handbook-chat-header px-6 py-4 border-b border-surface-container-low flex justify-between items-center bg-white/50 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg overflow-hidden">
               <img className="w-full h-full object-cover" src="https://picsum.photos/seed/group-header/100/100" alt="group" />
@@ -219,7 +212,7 @@ export default function ChatView() {
             <button className="p-1.5 text-outline hover:text-primary hover:bg-blue-50 rounded-lg transition-colors"><History size={20} /></button>
           </div>
           <div className="flex items-end gap-4">
-            <div className="flex-1 min-h-[44px] bg-surface-container-low rounded-xl px-4 py-3 border border-transparent focus-within:border-primary/20 focus-within:bg-white transition-all">
+            <div className="flex-1 min-w-0 min-h-[44px] bg-surface-container-low rounded-xl px-4 py-3 border border-transparent focus-within:border-primary/20 focus-within:bg-white transition-all">
               <textarea
                 className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm resize-none leading-relaxed"
                 placeholder="输入消息..."

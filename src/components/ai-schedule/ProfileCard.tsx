@@ -42,7 +42,7 @@ export default function ProfileCard({ onChange }: ProfileCardProps) {
 
   if (editing) {
     return (
-      <div className="bg-surface-container-low/60 rounded-2xl border border-outline-variant/30 p-4">
+      <div className="handbook-profile-card border border-outline-variant/30 p-4">
         <div className="flex items-start gap-4 flex-wrap">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
             {user?.name?.[0] || '?'}
@@ -88,7 +88,7 @@ export default function ProfileCard({ onChange }: ProfileCardProps) {
   const hasProfile = profile.grade || profile.major || profile.college || profile.planNote;
 
   return (
-    <div className="bg-surface-container-low/60 rounded-2xl border border-outline-variant/30 p-4">
+    <div className="handbook-profile-card border border-outline-variant/30 p-4">
       <div className="flex items-start gap-4 flex-wrap">
         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
           {user?.name?.[0] || '?'}

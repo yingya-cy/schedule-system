@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock } from 'lucide-react';
+import { Clock, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TIME_SLOTS, TimeSlot } from '@/types';
 
@@ -27,12 +27,14 @@ export default function TimeSlotSelector({
   onCustomEndChange
 }: TimeSlotSelectorProps) {
   return (
-    <div className="space-y-3">
+    <div className="handbook-time-control space-y-3">
       {/* Time slot list */}
       <div className="space-y-2">
         {timeSlots.map((slot, index) => (
           <button
             key={slot.label}
+            aria-label={slot.label}
+            aria-pressed={selectedIndex === index && !useCustomRange}
             onClick={() => onIndexChange(index)}
             className={cn(
               "w-full px-4 py-3 rounded-xl text-left transition-all flex items-center justify-between",
@@ -50,9 +52,9 @@ export default function TimeSlotSelector({
                 {slot.period}
               </span>
             </div>
-            <Clock size={16} className={cn(
-              selectedIndex === index && !useCustomRange ? "text-on-primary/80" : "text-outline"
-            )} />
+            {selectedIndex === index && !useCustomRange
+              ? <Check size={16} className="handbook-time-mark" aria-hidden="true" />
+              : <Clock size={16} className="handbook-time-mark" aria-hidden="true" />}
           </button>
         ))}
       </div>
@@ -80,6 +82,7 @@ export default function TimeSlotSelector({
               <label className="block text-sm text-on-surface-variant mb-2">开始节次</label>
               <select
                 value={customStartSection}
+                aria-label="开始节次"
                 onChange={(e) => onCustomStartChange(parseInt(e.target.value))}
                 className="w-full px-4 py-2.5 bg-surface-container-lowest border border-surface-container-high rounded-xl focus:ring-2 focus:ring-primary outline-none"
               >
@@ -92,6 +95,7 @@ export default function TimeSlotSelector({
               <label className="block text-sm text-on-surface-variant mb-2">结束节次</label>
               <select
                 value={customEndSection}
+                aria-label="结束节次"
                 onChange={(e) => onCustomEndChange(parseInt(e.target.value))}
                 className="w-full px-4 py-2.5 bg-surface-container-lowest border border-surface-container-high rounded-xl focus:ring-2 focus:ring-primary outline-none"
               >

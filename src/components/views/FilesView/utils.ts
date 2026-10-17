@@ -28,15 +28,23 @@ export function parseSections(timeStr: string): number[] {
   if (match) {
     const start = parseInt(match[1]);
     const end = parseInt(match[2]);
+    if (start < 1 || end < start || end > 24) return [];
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }
 
-  const singleMatch = timeStr.match(/第?(\d+)节?/);
+  const singleMatch = timeStr.match(/第?(\d+)节/);
   if (singleMatch) {
-    return [parseInt(singleMatch[1])];
+    const sectionNumber = parseInt(singleMatch[1]);
+    return sectionNumber >= 1 && sectionNumber <= 24 ? [sectionNumber] : [];
   }
 
   return [1, 2];
+}
+
+export function assertValidCourseSections(courses: ReadonlyArray<{ sections: number[] }>): void {
+  if (courses.some(course => course.sections.length === 0)) {
+    throw new Error('识别到无效节次，请检查课表后重新上传');
+  }
 }
 
 /**

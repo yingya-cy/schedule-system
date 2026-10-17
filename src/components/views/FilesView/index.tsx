@@ -33,8 +33,8 @@ export default function FilesView() {
 
   // 【届次联动】校区变化时刷新届次列表（必须放在 refreshTerms 声明之后）
   useEffect(() => {
-    void refreshTerms();
-  }, [currentCampus, refreshTerms]);
+    void refreshTerms().then(() => refreshSchedules());
+  }, [currentCampus, refreshTerms, refreshSchedules]);
 
   // 【多校区】加载校区列表
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import HandbookPageHeading from '../HandbookPageHeading';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, Edit3, X, Shield, Search, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
@@ -149,16 +150,8 @@ export default function UserManagementView() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0 transition-transform hover:scale-105 hover:rotate-3 cursor-default">
-            <Shield className="text-on-primary" size={24} />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-on-surface font-headline">用户管理</h2>
-            <p className="text-sm text-on-surface-variant mt-1">管理系统用户账号和权限</p>
-          </div>
-        </div>
+      <div className="handbook-page-header flex items-center justify-between gap-3">
+        <HandbookPageHeading title="用户管理" description="管理系统用户账号和权限" art="users" />
         <div className="flex items-center gap-2">
           {currentUser?.role === 'admin' && (
             <button

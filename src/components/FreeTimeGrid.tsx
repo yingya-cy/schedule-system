@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'motion/react';
 import { Users } from 'lucide-react';
 import { WEEKDAYS } from '@/types';
 
@@ -68,7 +67,7 @@ export default function FreeTimeGrid({
           </h3>
           <p className="text-sm text-on-surface-variant mt-1">
             {department ? `${department} · ` : '全部部门 · '}
-            共 {people.length} 人空闲
+            {loading ? '正在加载名单' : `共 ${people.length} 人空闲`}
           </p>
         </div>
         {loading && (
@@ -88,19 +87,16 @@ export default function FreeTimeGrid({
         <div className="p-6">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
             {people.map((person, index) => (
-              <motion.div
+              <div
                 key={`${person.name}-${index}`}
-                initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ delay: index * 0.03, type: "spring", stiffness: 300, damping: 20 }}
-                className="bg-surface-container-low rounded-xl p-4 border border-surface-container-high/60 hover:border-primary/30 hover:shadow-md transition-all card-hover text-center"
+                className="member-row bg-surface-container-low rounded-xl p-4 border border-surface-container-high/60 hover:border-primary/30 hover:shadow-md transition-all card-hover text-center"
               >
-                <div className="w-12 h-12 bg-gradient-to-br from-primary/15 to-primary/5 rounded-full flex items-center justify-center text-primary font-bold text-lg mx-auto mb-3">
+                <div className="handbook-member-stamp w-12 h-12 bg-gradient-to-br from-primary/15 to-primary/5 rounded-full flex items-center justify-center text-primary font-bold text-lg mx-auto mb-3">
                   {person.name.charAt(0)}
                 </div>
-                <p className="font-semibold text-on-surface text-sm truncate">{person.name}</p>
-                <p className="text-xs text-on-surface-variant truncate mt-1">{person.department}</p>
-              </motion.div>
+                <p className="member-name font-semibold text-on-surface text-sm truncate">{person.name}</p>
+                <p className="handbook-member-department text-xs text-on-surface-variant truncate mt-1">{person.department}</p>
+              </div>
             ))}
           </div>
         </div>

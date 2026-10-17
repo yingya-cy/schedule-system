@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import HandbookPageHeading from '../HandbookPageHeading';
 import { useAiCounselStore } from '../../stores/aiCounselStore';
 import { aiCounselApi } from '../../services/aiCounselApi';
 import type { CounselMessage } from '../../services/aiCounselApi';
@@ -277,10 +278,15 @@ export default function AiCounselPage() {
   const [chatHeight, setChatHeight] = useState<number | null>(null);
 
   const measureHeight = useCallback(() => {
-    if (containerRef.current?.parentElement) {
-      const parentRect = containerRef.current.parentElement.getBoundingClientRect();
-      const available = window.innerHeight - parentRect.top;
-      setChatHeight(Math.max(300, available));
+    if (containerRef.current) {
+      const top = containerRef.current.getBoundingClientRect().top;
+      const viewport = window.visualViewport;
+      let bottom = viewport ? viewport.height + viewport.offsetTop : window.innerHeight;
+      const navigation = document.querySelector('.pp-bottom-nav');
+      if (navigation && getComputedStyle(navigation).display !== 'none') {
+        bottom = Math.min(bottom, navigation.getBoundingClientRect().top);
+      }
+      setChatHeight(Math.max(120, bottom - top - 12));
     }
   }, []);
 
@@ -288,9 +294,11 @@ export default function AiCounselPage() {
     measureHeight();
     window.addEventListener('resize', measureHeight);
     window.addEventListener('orientationchange', measureHeight);
+    window.visualViewport?.addEventListener('resize', measureHeight);
     return () => {
       window.removeEventListener('resize', measureHeight);
       window.removeEventListener('orientationchange', measureHeight);
+      window.visualViewport?.removeEventListener('resize', measureHeight);
     };
   }, [measureHeight]);
 
@@ -321,7 +329,8 @@ export default function AiCounselPage() {
         .markdown-content table { border-collapse: collapse; margin: 0.25em 0; font-size: 0.9em; }
         .markdown-content th, .markdown-content td { border: 1px solid rgb(var(--outline-variant)/.4); padding: 0.25em 0.5em; text-align: left; }
       `}</style>
-    <div ref={containerRef} className="flex flex-col" style={chatHeight ? { height: chatHeight } : undefined}>
+    <HandbookPageHeading title="AI 咨询" art="counsel" />
+    <div ref={containerRef} className="handbook-conversation flex flex-col mt-4" style={chatHeight ? { height: chatHeight } : undefined}>
       <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
       <div className={`${showSidebar ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-64 border-r border-outline-variant/40 shrink-0`}>

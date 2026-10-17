@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { LayoutDashboard, Eye, EyeOff } from 'lucide-react';
+import ActivityEntries from '@/components/ActivityEntries';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function LoginView() {
@@ -63,7 +64,7 @@ export default function LoginView() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="pp-login min-h-screen flex items-center justify-center bg-background p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -74,24 +75,26 @@ export default function LoginView() {
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#5590b2] to-[#d4b88a] flex items-center justify-center mx-auto shadow-[0_4px_16px_rgba(85,144,178,0.18)] mb-4">
             <motion.div
-              animate={{ rotate: [0, 15, -15, 0] }}
+              animate={{ rotate: 0 }}
               transition={{ repeat: Infinity, duration: 4 }}
             >
-              <LayoutDashboard size={30} className="text-white" />
+              <span className="brand-letter text-white" aria-hidden="true">朋</span>
             </motion.div>
           </div>
-          <h1 className="text-2xl font-extrabold text-primary font-headline">校园智联</h1>
-          <p className="text-sm text-outline mt-2">Campus Connect</p>
+          <h1 className="text-2xl font-extrabold text-primary font-headline">朋小辈</h1>
+          <p className="text-sm text-outline mt-2">朋辈心理健康服务队</p>
         </div>
 
         {/* Login Card */}
         <div className="bg-surface-container-lowest/85 backdrop-blur-sm rounded-3xl border border-outline-variant/50 shadow-[0_4px_20px_rgba(139,119,90,0.06)] p-6">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-on-surface mb-1.5 font-headline">
+              <label htmlFor="login-username" className="block text-sm font-semibold text-on-surface mb-1.5 font-headline">
                 用户名
               </label>
               <input
+                id="login-username"
+                autoComplete="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -102,11 +105,13 @@ export default function LoginView() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-on-surface mb-1.5 font-headline">
+              <label htmlFor="login-password" className="block text-sm font-semibold text-on-surface mb-1.5 font-headline">
                 密码
               </label>
               <div className="relative">
                 <input
+                  id="login-password"
+                  autoComplete="current-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -115,6 +120,7 @@ export default function LoginView() {
                 />
                 <button
                   type="button"
+                  aria-label={showPassword ? '隐藏密码' : '显示密码'}
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface-variant transition-colors p-1"
                 >
@@ -161,6 +167,7 @@ export default function LoginView() {
             立即注册
           </Link>
         </p>
+        <ActivityEntries />
       </motion.div>
     </div>
   );

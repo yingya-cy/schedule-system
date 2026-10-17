@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import HandbookPageHeading from '../../HandbookPageHeading';
 import { motion, AnimatePresence } from 'motion/react';
 import { FileText, FileSpreadsheet, Search, X, Plus, Upload, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -161,26 +162,14 @@ export default function ScheduleListView({
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        className="handbook-page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <div className="flex items-center gap-3">
-          <motion.div
-            whileHover={{ scale: 1.05, rotate: 5 }}
-            className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30"
-          >
-            <FileSpreadsheet className="text-on-primary" size={24} />
-          </motion.div>
-          <div>
-            <h1 className="text-2xl font-bold text-on-surface tracking-tight font-headline">课表中心</h1>
-            <p className="text-sm text-on-surface-variant">
-              {schedules.length > 0 ? `共 ${schedules.length} 条课表` : '管理您的课表数据'}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
+        <HandbookPageHeading title="课表中心" description={schedules.length > 0 ? `共 ${schedules.length} 条课表` : '管理您的课表数据'} art="calendar" />
+        <div className="handbook-page-actions flex items-center gap-3">
           {/* 【多校区】校区切换 */}
           {campuses && campuses.length > 0 && (
             <select
+              aria-label="校区"
               value={currentCampus || ''}
               onChange={e => onCampusChange?.(e.target.value)}
               className="px-3 py-2.5 text-sm rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
@@ -192,6 +181,7 @@ export default function ScheduleListView({
           )}
           {terms && terms.length > 0 && (
             <select
+              aria-label="学期"
               value={currentTermId || ''}
               onChange={e => onTermChange?.(Number(e.target.value))}
               className="px-3 py-2.5 text-sm rounded-xl bg-surface-container-low border border-surface-container-high text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
@@ -205,6 +195,7 @@ export default function ScheduleListView({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={onManualEntryClick}
+            aria-label="手动录入" title="手动录入"
             className="focus-ring flex items-center gap-2 px-5 py-2.5 bg-surface-container-low text-on-surface font-medium rounded-xl hover:bg-surface-container-high transition-all"
           >
             <Plus size={18} />
@@ -212,6 +203,7 @@ export default function ScheduleListView({
           </motion.button>
           <button
             onClick={onExportReverse}
+            aria-label="导出反课表" title="导出反课表"
             className="focus-ring flex items-center gap-2 px-5 py-2.5 bg-surface-container-low text-on-surface font-medium rounded-xl hover:bg-surface-container-high transition-all"
           >
             <Download size={18} />
@@ -221,6 +213,7 @@ export default function ScheduleListView({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={onUploadClick}
+            aria-label="上传课表" title="上传课表"
             className="focus-ring flex items-center gap-2 px-5 py-2.5 btn-primary"
           >
             <Upload size={18} />
@@ -235,7 +228,7 @@ export default function ScheduleListView({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-surface-container-lowest rounded-2xl border border-surface-container-high shadow-sm overflow-hidden"
+          className="handbook-table-panel bg-surface-container-lowest border border-surface-container-high overflow-hidden"
         >
           {/* Filter bar */}
           <div className="p-3 sm:p-4 border-b border-surface-container-high">

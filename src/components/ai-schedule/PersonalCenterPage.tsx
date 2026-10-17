@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import HandbookPageHeading from '../HandbookPageHeading';
 import { useAuthStore } from '../../stores/authStore';
 import { useAiScheduleStore } from '../../stores/aiScheduleStore';
 import type { EditableCourse, ProfileData } from '../../types';
@@ -269,20 +270,23 @@ export default function PersonalCenterPage() {
 
       <div className="flex-1 flex min-h-0 relative">
         {/* Main content */}
-        <div className="flex-1 min-w-0 overflow-y-auto scrollbar-thin p-4 lg:p-6 space-y-4">
+        <div className="flex-1 min-w-0 overflow-y-auto scrollbar-thin space-y-4">
+          <HandbookPageHeading title="个人中心" art="profile" />
           <ProfileCard onChange={setProfile} />
 
           {/* Toolbar: tabs + actions */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-1 bg-surface-container-low/50 rounded-xl p-1">
+            <div className="handbook-page-tabs flex items-center gap-1 bg-surface-container-low/50 p-1">
               <button
                 onClick={() => setActiveTab('plan')}
+                aria-pressed={activeTab === 'plan'}
                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'plan' ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
               >
                 AI 计划
               </button>
               <button
                 onClick={() => setActiveTab('schedule')}
+                aria-pressed={activeTab === 'schedule'}
                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'schedule' ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
               >
                 个人课表

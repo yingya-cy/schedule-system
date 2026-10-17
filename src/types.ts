@@ -94,8 +94,8 @@ export interface BackendCourseData {
   course?: string;
   name?: string;
   time?: string;
-  weeks?: string;
-  week?: string;
+  weeks?: string | number[];
+  week?: string | number[];
   weeks_list?: number[];
   teacher?: string;
   classroom?: string;

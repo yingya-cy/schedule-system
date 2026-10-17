@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import HandbookPageHeading from '../HandbookPageHeading';
 import TemplateList from './pages/TemplateList.tsx';
 import CompetitionList from './pages/CompetitionList.tsx';
 import CompetitionDetail from './pages/CompetitionDetail.tsx';
@@ -78,16 +79,10 @@ export default function ScoringDashboard() {
     <ToastProvider>
     <div className="min-h-screen bg-background">
       {nav.view === 'home' && (
-        <div className="p-6 lg:p-8">
+        <div>
           {/* 页面标题 */}
           <div className="mb-8 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0 transition-transform hover:scale-105 hover:rotate-3 cursor-default">
-              <Trophy className="text-on-primary" size={24} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-primary font-headline tracking-tight">比赛评分系统</h1>
-              <p className="text-sm text-outline mt-1">多维度评分模板 · 多人离线评分</p>
-            </div>
+            <HandbookPageHeading title="比赛评分系统" description="多维度评分模板 · 多人离线评分" art="scoring" />
           </div>
 
           {/* 功能卡片 */}
@@ -206,10 +201,10 @@ export default function ScoringDashboard() {
 function NavCard({ icon, title, desc, onClick }: { icon: React.ReactNode; title: string; desc: string; onClick: () => void }) {
   return (
     <motion.button
-      whileHover={{ scale: 1.02 }}
+      whileHover={{ y: -2 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className="flex flex-col sm:flex-row items-center sm:items-start gap-3 p-5 sm:p-5 bg-surface rounded-2xl border border-surface-container-high shadow-sm hover:shadow-md hover:border-primary/30 transition-all text-left"
+      className="handbook-action-card flex flex-col sm:flex-row items-center sm:items-start gap-3 p-5 sm:p-5 bg-surface border border-surface-container-high hover:border-primary/30 transition-colors text-left"
     >
       <div className="p-2.5 bg-primary/10 rounded-xl flex-shrink-0">{icon}</div>
       <div className="text-center sm:text-left">

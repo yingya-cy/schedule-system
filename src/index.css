@@ -104,11 +104,13 @@
   }
 
   /* Z-index scale: 10(dropdown), 20(sticky), 30(modal), 40(overlay), 50(toast) */
-  --z-dropdown: 10;
-  --z-sticky: 20;
-  --z-modal: 30;
-  --z-overlay: 40;
-  --z-toast: 50;
+  :root {
+    --z-dropdown: 10;
+    --z-sticky: 20;
+    --z-modal: 30;
+    --z-overlay: 40;
+    --z-toast: 50;
+  }
 
   a {
     @apply transition-colors duration-300;

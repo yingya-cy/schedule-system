@@ -36,6 +36,8 @@ interface AppState {
   removeSchedule: (id: number) => void;
 }
 
+let latestSchedulesRequest = 0;
+
 export const useAppStore = create<AppState>((set, get) => ({
   // 【多校区】
   currentCampus: localStorage.getItem('campus') || '河源',
@@ -72,7 +74,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         headers: { Authorization: `Bearer ${useAuthStore.getState().token}` },
       });
       const json = await res.json();
-      if (json.success) {
+      if (json.success && get().currentCampus === campus) {
         const terms = json.data as TermOption[];
         set({
           availableTerms: terms,
@@ -98,14 +100,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   schedulesLoaded: false,
 
   refreshSchedules: async () => {
+    const requestId = ++latestSchedulesRequest;
     try {
       set({ schedulesLoading: true });
       const termId = get().currentTermId;
       const data = await api.getSchedules(termId ? { term_id: termId } : {});
-      set({ schedules: data, schedulesLoading: false, schedulesLoaded: true });
+      if (requestId === latestSchedulesRequest) {
+        set({ schedules: data, schedulesLoading: false, schedulesLoaded: true });
+      }
     } catch (err) {
       console.error('Failed to load schedules:', err);
-      set({ schedulesLoading: false });
+      if (requestId === latestSchedulesRequest) set({ schedulesLoading: false });
     }
   },
 

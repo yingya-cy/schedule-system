@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import HandbookPageHeading from '../../HandbookPageHeading';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus, Trash2, Edit3, X, FolderPlus, FileText, Image, Video, ExternalLink,
@@ -520,16 +521,8 @@ export default function FileCenterView() {
       {!selectedActivity ? (
         /* Activity Selection Grid */
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0 transition-transform hover:scale-105 hover:rotate-3 cursor-default">
-                <FolderOpen className="text-on-primary" size={24} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-on-surface font-headline">文件中心</h1>
-                <p className="text-sm text-on-surface-variant mt-1">管理活动和文件资源</p>
-              </div>
-            </div>
+          <div className="handbook-page-header flex items-center justify-between gap-3 mb-4">
+            <HandbookPageHeading title="文件中心" description="管理活动和文件资源" art="archive" />
             <button
               onClick={openCreateActivity}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-on-primary hover:bg-primary/90 transition-colors"
@@ -546,7 +539,7 @@ export default function FileCenterView() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {activities.map(a => (
-                <div key={a.id} className="group relative bg-surface rounded-2xl border border-surface-container-high p-5 hover:border-primary/30 hover:shadow-md transition-all">
+                <div key={a.id} className="handbook-archive-card group relative bg-surface border border-surface-container-high p-5 hover:border-primary/30 hover:shadow-md transition-all">
                   <button
                     onClick={() => {
                       setSelectedActivity(a);

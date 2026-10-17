@@ -1,15 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion } from 'motion/react';
-import { RefreshCw, Calendar, Users, Clock, BookOpen, FolderOpen, Layers, BarChart3 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import HandbookPageHeading from '../HandbookPageHeading';
+import { RefreshCw, Calendar, CalendarDays, Users, Clock, BookOpen, FolderOpen, Layers, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FreeTimeResult, TIME_SLOTS, WEEKDAYS } from '@/types';
 import { api } from '@/services/api';
 import { useAppStore } from '@/stores/appStore';
 import { useAuthStore } from '@/stores/authStore';
+import ActivityEntries from '@/components/ActivityEntries';
 import WeekSelector from '@/components/WeekSelector';
 import DaySelector from '@/components/DaySelector';
 import TimeSlotSelector from '@/components/TimeSlotSelector';
 import FreeTimeGrid from '@/components/FreeTimeGrid';
+import WeeklyFreeTimeOverview from '@/components/WeeklyFreeTimeOverview';
+import { peopleForSections, sectionLabel } from '@/lib/freeTime';
 
 interface DashboardStats {
   schedules: number;
@@ -32,6 +35,11 @@ export default function DashboardView() {
   const [useCustomRange, setUseCustomRange] = useState(false);
   const [customStartSection, setCustomStartSection] = useState(1);
   const [customEndSection, setCustomEndSection] = useState(2);
+  const [viewMode, setViewMode] = useState<'overview' | 'classic'>('overview');
+  const [hasSelection, setHasSelection] = useState(false);
+  const [overviewSelection, setOverviewSelection] = useState({ day: 1, sections: [1, 2] });
+  const [loadError, setLoadError] = useState('');
+  const requestId = useRef(0);
 
   const currentTermId = useAppStore((s) => s.currentTermId);
   const availableTerms = useAppStore((s) => s.availableTerms);
@@ -61,82 +69,68 @@ export default function DashboardView() {
   }, [token, currentTermId, currentCampus]);
 
   const loadFreeTimeData = async () => {
+    const id = ++requestId.current;
     try {
       setLoading(true);
+      setLoadError('');
       const data = await api.queryFreeTime({
         week: currentWeek,
         department: selectedDepartment || undefined,
         term_id: currentTermId || undefined,
         campus: currentCampus || undefined,
       });
-      setFreeTimeData(data);
+      if (id === requestId.current) setFreeTimeData(data);
     } catch (err) {
-      console.error('Failed to load free time data:', err);
+      if (id === requestId.current) {
+        setFreeTimeData([]);
+        setLoadError(err instanceof Error ? err.message : '加载失败，请重试');
+      }
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadFreeTimeData();
+    return () => { requestId.current++; };
   }, [currentWeek, selectedDepartment, currentTermId, currentCampus]);
 
   const getCurrentTimeSlot = useMemo(() => {
+    if (viewMode === 'overview') {
+      return { label: sectionLabel(overviewSelection.sections), sections: overviewSelection.sections, period: '总览' };
+    }
     if (useCustomRange) {
       const sections = Array.from(
         { length: customEndSection - customStartSection + 1 },
         (_, i) => customStartSection + i
       );
       return {
-        label: `第${customStartSection}-${customEndSection}节`,
+        label: sectionLabel(sections),
         sections,
         period: '自定义'
       };
     }
     return TIME_SLOTS[selectedTimeSlotIndex];
-  }, [useCustomRange, customStartSection, customEndSection, selectedTimeSlotIndex]);
+  }, [viewMode, overviewSelection, useCustomRange, customStartSection, customEndSection, selectedTimeSlotIndex]);
 
-  const getFreePeopleForSlot = (day: number, sections: number[]) => {
-    if (sections.length === 0) return [];
-
-    // Collect free_people for each section
-    const freeBySection = sections.map((section) => {
-      const result = freeTimeData.find(
-        r => r.day === day && r.section === section
-      );
-      return result?.free_people ?? [];
-    });
-
-    // Intersection: only people who are free in ALL sections
-    const [first, ...rest] = freeBySection;
-    const intersected = first.filter((person) =>
-      rest.every((list) => list.some((p) => p.name === person.name))
-    );
-
-    return intersected;
+  const activeDay = viewMode === 'overview' ? overviewSelection.day : selectedDay;
+  const currentPeople = peopleForSections(freeTimeData, activeDay, getCurrentTimeSlot.sections);
+  const currentCount = currentPeople.length;
+  const selectOverviewRange = (day: number, sections: number[]) => {
+    setOverviewSelection({ day, sections });
+    setHasSelection(true);
   };
 
-  const currentPeople = getFreePeopleForSlot(selectedDay, getCurrentTimeSlot.sections);
-  const currentCount = currentPeople.length;
-
   return (
-    <div className="space-y-8 w-full">
+    <div className="pp-dashboard space-y-8 w-full">
       {/* Header */}
-      <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="flex items-center gap-3">
-          <motion.div whileHover={{ scale: 1.05, rotate: 5 }}
-            className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 flex-shrink-0">
-            <BarChart3 className="text-on-primary" size={24} />
-          </motion.div>
-          <div>
-            <h1 className="text-2xl font-bold text-on-surface font-headline">空闲统计</h1>
-            <p className="text-sm text-on-surface-variant mt-1">查看各部门成员的空闲时间分布</p>
-          </div>
-        </div>
+      <section className="handbook-heading flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <HandbookPageHeading title="空闲统计" description="查看各部门成员的空闲时间分布" art="dashboard" />
         <div className="flex items-center gap-2">
           {/* 【多校区】校区切换 */}
           {campuses.length > 0 && (
             <select
+              aria-label="校区"
               value={currentCampus || ''}
               onChange={e => setCurrentCampus(e.target.value)}
               className="px-2 py-1 text-xs rounded-lg bg-surface-container-low border border-surface-container-high"
@@ -148,6 +142,7 @@ export default function DashboardView() {
           )}
           {availableTerms.length > 0 && (
             <select
+              aria-label="学期"
               value={currentTermId || ''}
               onChange={e => setCurrentTermId(Number(e.target.value))}
               className="px-2 py-1 text-xs rounded-lg bg-surface-container-low border border-surface-container-high"
@@ -160,6 +155,7 @@ export default function DashboardView() {
         </div>
         <div className="flex items-center gap-3">
           <select
+            aria-label="部门"
             value={selectedDepartment}
             onChange={(e) => setSelectedDepartment(e.target.value)}
             className="px-4 py-2.5 bg-surface-container-low border border-surface-container-high rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none appearance-none pr-10 min-w-[140px]"
@@ -170,6 +166,8 @@ export default function DashboardView() {
             ))}
           </select>
           <button
+            aria-label="刷新空闲名单"
+            title="刷新空闲名单"
             onClick={loadFreeTimeData}
             disabled={loading}
             className="p-2.5 bg-surface-container-low border border-surface-container-high rounded-xl hover:bg-surface-container transition-all"
@@ -178,6 +176,8 @@ export default function DashboardView() {
           </button>
         </div>
       </section>
+
+      <ActivityEntries />
 
       {/* Stats Banner */}
       {stats && (
@@ -189,34 +189,43 @@ export default function DashboardView() {
             { icon: <Calendar size={18} />, label: '部门数', value: stats.departments, color: 'text-orange-600 bg-orange-50' },
             { icon: <FolderOpen size={18} />, label: '文件数', value: stats.files, color: 'text-pink-600 bg-pink-50' },
           ].map(s => (
-            <div key={s.label} className="bg-surface-container-lowest rounded-2xl border border-surface-container-high p-4 flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${s.color}`}>
+            <div key={s.label} className="handbook-stat bg-surface-container-lowest rounded-2xl border border-surface-container-high p-4 flex items-center gap-3">
+              <div className={`handbook-stat-icon w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${s.color}`}>
                 {s.icon}
               </div>
               <div>
-                <p className="text-2xl font-extrabold text-on-surface font-headline">{s.value}</p>
-                <p className="text-xs text-outline">{s.label}</p>
+                <p className="handbook-stat-value text-2xl font-extrabold text-on-surface">{s.value}</p>
+                <p className="handbook-stat-label text-xs">{s.label}</p>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Selector cards */}
+      <div className="weekly-mode" aria-label="空闲时间显示方式">
+        <button aria-pressed={viewMode === 'overview'} onClick={() => setViewMode('overview')}><CalendarDays size={16} aria-hidden="true" />周总览</button>
+        <button aria-pressed={viewMode === 'classic'} onClick={() => setViewMode('classic')}><SlidersHorizontal size={16} aria-hidden="true" />按条件筛选</button>
+      </div>
+
+      {viewMode === 'overview' ? <WeeklyFreeTimeOverview data={freeTimeData} week={currentWeek} day={activeDay}
+        sections={getCurrentTimeSlot.sections} selected={hasSelection} loading={loading} error={loadError}
+        onWeekChange={setCurrentWeek} onSelect={selectOverviewRange} onRetry={loadFreeTimeData} /> : <>
+      {loadError && <div role="alert" className="weekly-error"><span>{loadError}</span><button onClick={loadFreeTimeData}>重试</button></div>}
+      {/* Original selectors remain available for comparison. */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Week selector */}
-        <div className="md:col-span-4 bento-card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-on-surface font-headline">选择周次</h3>
+        <div className="handbook-sheet sheet-week md:col-span-4 bento-card">
+          <div className="handbook-sheet-heading flex items-center justify-between mb-4">
+            <h3 className="font-bold text-on-surface font-headline"><Calendar size={17} aria-hidden="true" />选择周次</h3>
             <span className="text-sm text-on-surface-variant">共18周</span>
           </div>
           <WeekSelector currentWeek={currentWeek} onWeekChange={setCurrentWeek} />
         </div>
 
         {/* Time slot selector */}
-        <div className="md:col-span-4 bento-card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-on-surface font-headline">时间段选择</h3>
+        <div className="handbook-sheet sheet-time md:col-span-4 bento-card">
+          <div className="handbook-sheet-heading flex items-center justify-between mb-4">
+            <h3 className="font-bold text-on-surface font-headline"><Clock size={17} aria-hidden="true" />时间段选择</h3>
             <button
               onClick={() => setUseCustomRange(!useCustomRange)}
               className={cn(
@@ -231,20 +240,20 @@ export default function DashboardView() {
           </div>
           <TimeSlotSelector
             selectedIndex={selectedTimeSlotIndex}
-            onIndexChange={setSelectedTimeSlotIndex}
+            onIndexChange={index => { setSelectedTimeSlotIndex(index); setUseCustomRange(false); }}
             useCustomRange={useCustomRange}
             onToggleCustomRange={() => setUseCustomRange(!useCustomRange)}
             customStartSection={customStartSection}
             customEndSection={customEndSection}
-            onCustomStartChange={setCustomStartSection}
+            onCustomStartChange={start => { setCustomStartSection(start); setCustomEndSection(end => Math.max(end, start)); }}
             onCustomEndChange={setCustomEndSection}
           />
         </div>
 
         {/* Day selector */}
-        <div className="md:col-span-4 bento-card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-on-surface font-headline">选择星期</h3>
+        <div className="handbook-sheet sheet-day md:col-span-4 bento-card">
+          <div className="handbook-sheet-heading flex items-center justify-between mb-4">
+            <h3 className="font-bold text-on-surface font-headline"><CalendarDays size={17} aria-hidden="true" />选择星期</h3>
             <span className="text-sm text-on-surface-variant">共7天</span>
           </div>
           <DaySelector selectedDay={selectedDay} onDayChange={setSelectedDay} />
@@ -254,19 +263,20 @@ export default function DashboardView() {
           </div>
         </div>
       </div>
+      </>}
 
       {/* Free time grid */}
-      <FreeTimeGrid
+      {(viewMode === 'classic' || hasSelection) && !loadError && <FreeTimeGrid
         people={currentPeople}
         week={currentWeek}
-        day={selectedDay}
+        day={activeDay}
         timeSlotLabel={getCurrentTimeSlot.label}
         department={selectedDepartment || undefined}
         loading={loading}
-      />
+      />}
 
       {/* Stats explanation */}
-      <div className="bg-surface-container-lowest rounded-2xl shadow-lg border border-surface-container-high p-6">
+      {viewMode === 'classic' && <div className="bg-surface-container-lowest rounded-2xl shadow-lg border border-surface-container-high p-6">
         <h3 className="font-bold text-lg text-on-surface font-headline mb-4">统计说明</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-on-surface-variant">
           <div className="flex items-start gap-3">
@@ -297,7 +307,7 @@ export default function DashboardView() {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
     </div>
   );
