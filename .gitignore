@@ -110,3 +110,11 @@ docker-compose.yml.bak*
 # 临时脚本
 scratch/
 tmp/
+
+# 运行时备份与构建快照（体积大、非源码）
+backups/
+dist-covered-*/
+
+# 环境变量历史副本（含密钥，禁止入库）
+.env.bak-*
+.env.*.bak
