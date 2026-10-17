@@ -360,8 +360,8 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
         weekday,
         sections,
         weeks,
-        teacher: '',
-        location: '',
+        teacher: String(rec.teacher || rec['教师'] || rec['老师'] || ''),
+        location: String(rec.location || rec['地点'] || rec['教室'] || ''),
         remark: '',
       };
     });
