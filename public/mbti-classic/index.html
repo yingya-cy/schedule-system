@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>朋辈部门专属检测</title>
+<style>
+  :root {
+    --bg: #f7f5ef;
+    --card: #fffdf7;
+    --ink: #25221e;
+    --muted: #756f66;
+    --line: #ded7ca;
+    --red: #bd3d37;
+    --blue: #4b9fb0;
+    --green: #77a867;
+    --yellow: #e8b84c;
+    --shadow: 0 12px 30px rgba(54, 42, 28, .10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    min-height: 100vh;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: var(--ink);
+    background:
+      linear-gradient(90deg, rgba(189,61,55,.05) 1px, transparent 1px),
+      linear-gradient(rgba(189,61,55,.04) 1px, transparent 1px),
+      var(--bg);
+    background-size: 24px 24px;
+  }
+  .wrap { width: 100%; max-width: 520px; margin: 0 auto; padding: 18px 16px 44px; }
+  .view { display: none; animation: enter .25s ease; }
+  .view.active { display: block; }
+  @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .brand { font-size: 14px; font-weight: 800; }
+  .badge {
+    font-size: 12px; font-weight: 800; color: var(--red);
+    border: 1.5px solid var(--red); border-radius: 999px;
+    padding: 6px 10px; background: rgba(255,255,255,.45);
+  }
+  .hero {
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .hero-head { padding: 28px 22px 18px; }
+  .eyebrow { font-size: 12px; font-weight: 900; color: var(--red); letter-spacing: 1.5px; margin-bottom: 10px; }
+  h1 {
+    font-size: 42px;
+    line-height: 1.08;
+    letter-spacing: 0;
+    font-weight: 900;
+  }
+  .hero p { margin-top: 14px; color: var(--muted); line-height: 1.8; font-size: 14px; }
+  .mini-poster {
+    margin-top: 18px;
+    min-height: 160px;
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(255,253,247,.08), rgba(255,253,247,.12)),
+      url("素材/mini-poster-six-depts.png") center/cover no-repeat;
+    border: 1px solid var(--line);
+    position: relative;
+    overflow: hidden;
+    padding: 16px;
+  }
+  .mini-poster::before { content: none; }
+  .mini-poster::after {
+    content: "";
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    width: 54px;
+    height: 34px;
+    border: 3px solid var(--red);
+    border-left: 0;
+    border-bottom: 0;
+    border-radius: 0 12px 0 0;
+    transform: rotate(-8deg);
+  }
+  .dept-cloud { display: none; }
+  .dept-token {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid rgba(37,34,30,.18);
+    border-radius: 12px;
+    background: rgba(255,253,247,.82);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 900;
+    box-shadow: 3px 3px 0 rgba(37,34,30,.08);
+  }
+  .dept-token:nth-child(2n) { transform: translateY(5px); }
+  .dept-token:nth-child(3n) { background: rgba(255,245,221,.9); }
+  .rules {
+    border-top: 1px solid var(--line);
+    padding: 18px 22px 20px;
+    background: rgba(255,255,255,.35);
+  }
+  .rules h2 { font-size: 15px; margin-bottom: 8px; }
+  .rules p { margin-top: 0; font-size: 14px; }
+  .dept-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .dept {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fffaf0;
+    padding: 11px 12px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .dept b { display: flex; align-items: center; gap: 9px; color: var(--ink); font-size: 14px; margin-bottom: 2px; }
+  .dept-icon {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    flex: 0 0 36px;
+  }
+  .home-actions { padding: 18px 22px 22px; }
+  button {
+    font-family: inherit;
+  }
+  .btn {
+    width: 100%;
+    border: 0;
+    background: var(--red);
+    color: white;
+    border-radius: 14px;
+    padding: 15px 16px;
+    font-size: 16px;
+    font-weight: 900;
+    box-shadow: 0 7px 0 #842923;
+    cursor: pointer;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 4px 0 #842923; }
+  .btn-soft {
+    border: 1.5px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    box-shadow: none;
+  }
+  .join-block { margin-top: 22px; }
+  .join-block-title { text-align: center; font-size: 16px; font-weight: 900; color: var(--ink); margin-bottom: 12px; }
+  .join-card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-bottom: 12px; text-align: center; }
+  .join-card .join-name { font-size: 15px; font-weight: 900; margin-bottom: 10px; }
+  .join-card img { width: 190px; height: 190px; border-radius: 14px; background: #fff; border: 1px solid #eee; }
+  .join-lead { text-align: center; font-size: 13px; color: var(--ink); line-height: 1.8; margin: 0 4px 14px; }
+  .join-card .join-hint { font-size: 12px; color: var(--muted); margin-top: 9px; }
+  .join-note { text-align: center; font-size: 12px; color: var(--muted); line-height: 1.7; margin-top: 10px; }
+  .join-fab {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 50;
+    background: var(--red); color: #fff; border: 0; border-radius: 999px;
+    font-size: 15px; font-weight: 900; padding: 13px 34px; cursor: pointer;
+    box-shadow: 0 6px 20px rgba(189,61,55,.42); font-family: inherit;
+  }
+  .join-fab:active { transform: translateX(-50%) scale(.97); }
+  .view-result { padding-bottom: 86px; }
+  .footnote { text-align: center; color: var(--muted); font-size: 12px; line-height: 1.7; margin-top: 16px; }
+
+  .quiz-top { display: flex; align-items: center; gap: 12px; margin: 10px 0 16px; }
+  .q-count { font-size: 12px; font-weight: 900; color: var(--red); white-space: nowrap; }
+  .track { flex: 1; height: 8px; border-radius: 999px; background: #e5ded2; overflow: hidden; }
+  .fill { height: 100%; width: 0%; background: var(--red); border-radius: 999px; transition: width .22s ease; }
+  .q-card {
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 22px 18px;
+  }
+  .q-label { font-size: 12px; font-weight: 900; color: var(--blue); letter-spacing: 1px; }
+  .q-text { margin: 8px 0 18px; font-size: 18px; line-height: 1.65; font-weight: 900; }
+  .sort-tip {
+    background: rgba(189,61,55,0.08); border: 1px dashed rgba(189,61,55,0.35);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
+    font-size: 12.5px; color: var(--ink); line-height: 1.6;
+  }
+  .sort-progress { text-align: center; font-size: 13px; color: var(--muted); margin: -2px 0 12px; }
+  .sort-progress b { color: var(--red); font-size: 16px; }
+  .skill-btn {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 13px 16px; margin-bottom: 9px;
+    background: #fff; border: 1.5px solid var(--line);
+    border-radius: 14px; font-size: 14px; color: var(--ink);
+    text-align: left; cursor: pointer; transition: .15s;
+  }
+  .skill-btn .skill-rank {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--line); color: var(--muted);
+    font-size: 18px; font-weight: 900; flex-shrink: 0;
+  }
+  .skill-btn .skill-rank::before { content: ""; }
+  .skill-btn:not(.chosen) .skill-rank { background: rgba(189,61,55,0.10); color: var(--red); }
+  .skill-btn .skill-text { flex: 1; }
+  .skill-btn.chosen {
+    border-color: var(--accent);
+    border-width: 2px;
+    border-left: 6px solid var(--red);
+    background: rgba(189,61,55,0.09);
+    box-shadow: 0 2px 8px rgba(189,61,55,0.18);
+    font-weight: 900;
+  }
+  .skill-btn.chosen .skill-rank { background: var(--red); color: #fff; }
+  .cap-btn {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 13px 16px; margin-bottom: 9px;
+    background: #fff; border: 1.5px solid var(--line);
+    border-radius: 14px; font-size: 14px; color: var(--ink);
+    text-align: left; cursor: pointer; transition: .15s;
+  }
+  .cap-btn .cap-check {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 9px;
+    background: var(--line); color: #fff;
+    font-size: 17px; font-weight: 900; flex-shrink: 0;
+  }
+  .cap-btn.chosen {
+    border-color: var(--red); border-width: 2px; border-left: 6px solid var(--red);
+    background: rgba(189,61,55,0.09); font-weight: 900;
+  }
+  .cap-btn.chosen .cap-check { background: var(--red); }
+  .cap-next { margin-top: 6px; }
+  .sort-next { display: none; margin-top: 6px; }
+  .cap-next:disabled { opacity: .5; }
+
+  .skill-hint { margin-top: 12px; font-size: 11px; color: var(--muted); text-align: center; }
+
+  .opt {
+    width: 100%;
+    border: 1.5px solid var(--line);
+    background: #fffaf0;
+    color: var(--ink);
+    text-align: left;
+    border-radius: 13px;
+    padding: 13px 14px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-size: 15px;
+    line-height: 1.5;
+    cursor: pointer;
+  }
+  .opt .letter {
+    flex: 0 0 auto;
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    display: grid; place-items: center;
+    color: white;
+    background: var(--red);
+    font-size: 16px;
+    font-weight: 900;
+  }
+  .opt:active { background: #f3eadb; transform: scale(.99); }
+
+  .share-card {
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .result-hero {
+    padding: 20px;
+    min-height: 190px;
+    background: var(--accent);
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .result-hero::before,
+  .result-hero::after {
+    content: "";
+    position: absolute;
+    border-radius: 999px;
+    background: rgba(255,255,255,.2);
+  }
+  .result-hero::before { width: 170px; height: 170px; right: -55px; top: -35px; }
+  .result-hero::after { width: 110px; height: 110px; left: -32px; bottom: -28px; }
+  .avatar-img {
+    width: 128px;
+    height: 128px;
+    object-fit: cover;
+    border-radius: 32px;
+    border: 5px solid rgba(255,255,255,.72);
+    background: #fffdf7;
+    box-shadow: 0 14px 30px rgba(0,0,0,.14);
+  }
+  .result-top {
+    position: relative; z-index: 1;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 18px;
+  }
+  .result-kicker { font-size: 12px; font-weight: 900; opacity: .86; letter-spacing: 1.5px; margin-bottom: 4px; }
+  .result-name { font-size: 34px; line-height: 1.1; font-weight: 900; }
+  .result-tag {
+    display: inline-block;
+    margin-top: 12px;
+    border-radius: 999px;
+    padding: 7px 11px;
+    background: rgba(255,255,255,.9);
+    color: var(--tag);
+    font-size: 13px;
+    font-weight: 900;
+  }
+  .result-body { padding: 18px 18px 6px; }
+  .result-body p {
+    color: #4f4940;
+    font-size: 14.5px;
+    line-height: 1.9;
+    margin-bottom: 10px;
+  }
+  .score-box { margin: 12px 18px 18px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .score-title { font-size: 13px; font-weight: 900; margin-bottom: 10px; }
+  .score-row { display: grid; grid-template-columns: 24px auto 1fr 42px; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 12.5px; color: #544d43; font-weight: 800; }
+  .bar { height: 8px; background: #e8e0d3; border-radius: 999px; overflow: hidden; }
+  .bar span { display: block; height: 100%; width: 0%; border-radius: 999px; background: var(--bar); transition: width .45s ease; }
+
+  .result-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .result-actions .wide { grid-column: 1 / -1; }
+
+  /* 长按保存图片区 */
+  .save-img-block { margin-top: 16px; }
+  .save-hint {
+    text-align: center; font-size: 13px; color: var(--muted);
+    margin-bottom: 10px; font-weight: 600;
+  }
+  .result-head { text-align: center; padding: 26px 22px 4px; }
+  .result-head .result-kicker {
+    display: inline-block; padding: 6px 18px; border-radius: 999px;
+    background: var(--red); color: #fff; font-size: 13px; font-weight: 900; letter-spacing: 1px;
+  }
+  .result-head .result-name { font-size: 40px; font-weight: 900; color: var(--ink); margin: 12px 0 4px; }
+  .result-head .tie-note { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.7; }
+  .save-img-block { padding: 10px 22px 0; }
+
+  .save-img {
+    display: block; width: 100%; max-width: 420px;
+    margin: 0 auto; border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    -webkit-user-select: none; user-select: none;
+  }
+  .toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(18px);
+    background: var(--ink); color: white; padding: 10px 14px;
+    border-radius: 999px; opacity: 0; pointer-events: none; transition: .2s ease; font-size: 13px; z-index: 9;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ===== 二选一答题 ===== */
+  .quiz-nav { margin-top: 14px; display: flex; justify-content: center; }
+  .btn-prev {
+    border: none; cursor: pointer; font-family: inherit;
+    background: transparent; color: var(--muted);
+    font-size: 14px; font-weight: 600; padding: 10px 22px;
+    border-radius: 12px;
+  }
+  .btn-prev:active, .btn-prev:hover { background: rgba(0,0,0,0.05); color: var(--ink); }
+  .opt.chosen {
+    border-color: var(--accent);
+    border-width: 2px;
+    background: rgba(189,61,55,0.09);
+    box-shadow: 0 2px 8px rgba(189,61,55,0.18);
+    color: var(--ink);
+    font-weight: 900;
+  }
+  .opt.chosen .letter { background: var(--red); color: #fff; box-shadow: 0 0 0 2px rgba(189,61,55,.25); }
+
+  /* ===== 横向点状选择器（5 档程度） ===== */
+  .scale-wrap { margin-top: 26px; padding: 0 2px; }
+  .scale-dots { display: flex; justify-content: space-between; align-items: center; }
+  .dot {
+    width: 46px; height: 46px; border: none; background: transparent;
+    cursor: pointer; position: relative; padding: 0;
+  }
+  .dot::after {
+    content: ""; display: block; width: 18px; height: 18px;
+    border-radius: 50%; background: var(--line);
+    margin: auto; transition: transform .15s, background .15s, box-shadow .15s;
+  }
+  .dot[data-v="2"]::after { width: 13px; height: 13px; }  /* 中立点略小 */
+  .dot.chosen::after {
+    background: var(--accent); transform: scale(1.18);
+    box-shadow: 0 2px 8px rgba(189,61,55,.4);
+  }
+  .dot:active::after { transform: scale(0.9); }
+  .scale-tags {
+    display: flex; justify-content: space-between;
+    margin-top: 2px; padding: 0 1px;
+  }
+  .scale-tags span {
+    width: 20%; text-align: center;
+    font-size: 11px; color: var(--muted); line-height: 1.6;
+  }
+  .scale-tags span.on { color: var(--accent); font-weight: 700; }
+
+  /* ===== 结果页：轴条 + 排序 ===== */
+  .axis-box { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); }
+  .axis-row { margin-bottom: 14px; }
+  .axis-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .axis-bar {
+    display: flex; height: 10px; border-radius: 99px; overflow: hidden;
+    background: var(--line);
+  }
+  .axis-bar span { display: block; height: 100%; width: 0%; transition: width .6s ease; }
+  .axis-bar .axis-left { background: var(--ax, var(--accent)); border-radius: 99px 0 0 99px; }
+  .axis-bar .axis-right { background: var(--ax, var(--accent)); opacity: 0.55; border-radius: 0 99px 99px 0; }
+  .axis-num { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .axis-num b { color: var(--ink); }
+
+  .score-row .rank-no {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 6px;
+    background: var(--line); color: var(--muted);
+    font-size: 11px; font-weight: 700; margin-right: 2px;
+  }
+  .score-row.top { font-weight: 700; }
+  .score-row.top .rank-no { background: transparent; font-size: 17px; line-height: 1; }
+
+  .tie-note {
+    margin: -6px 0 14px; padding: 10px 14px;
+    background: rgba(189,61,55,0.06); border: 1px dashed rgba(189,61,55,0.35);
+    border-radius: 12px; font-size: 13px; line-height: 1.7; color: var(--ink);
+  }
+
+  .avatar-emoji {
+    width: 112px; height: 112px; border-radius: 28px;
+    background: rgba(255,255,255,0.16);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 52px;
+  }
+
+  /* ===== 气质代码卡（三轴揉成整体） ===== */
+  .type-card {
+    background: #fffdf7; border: 1px solid var(--line);
+    border-radius: 16px; padding: 18px 20px;
+    margin-bottom: 14px; text-align: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+  }
+  .type-code {
+    font-size: 30px; font-weight: 900; letter-spacing: 2px;
+    color: var(--accent);
+  }
+  .type-words {
+    margin-top: 6px; font-size: 15px; font-weight: 700; color: var(--ink);
+  }
+  .type-desc {
+    margin-top: 8px; font-size: 13px; color: var(--muted); line-height: 1.7;
+  }
+
+  @media (max-width: 390px) {
+    h1 { font-size: 36px; }
+    .dept-grid { grid-template-columns: 1fr; }
+    .score-row { grid-template-columns: 24px auto 1fr 42px; }
+    .avatar-img { width: 112px; height: 112px; border-radius: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">朋辈心理健康服务队</div>
+  </div>
+
+  <section id="view-home" class="view active">
+    <div class="hero">
+      <div class="hero-head">
+        <div class="eyebrow">DEPARTMENT MATCH</div>
+        <h1>测测你的<br>朋辈部门人格</h1>
+        <p>12 道小测试：10 道情景题凭直觉选最像你的选项，再给想学的技能排个序、勾选你有过相关经历的方面，看看你的做事风格、兴趣和经验最对应哪个部门。</p>
+        <div class="mini-poster" aria-label="六部门招新装饰图"></div>
+      </div>
+      <div class="rules">
+        <h2>做题规则</h2>
+        <p>前 10 题每题 4 个选项，凭直觉选最像你的那个就好，选项顺序每次随机；最后两题：把感兴趣的技能从高到低排个序，再勾选你有过相关经历的方面。答完可以保存结果图，也能复制结果链接分享。</p>
+        <div class="dept-grid">
+          <div class="dept"><b><img class="dept-icon" src="素材/department-icons/策划部.png" alt="">策划部</b>创意脑洞担当</div>
+          <div class="dept"><b><img class="dept-icon" src="素材/department-icons/秘书部.png" alt="">秘书部</b>细致执行担当</div>
+          <div class="dept"><b><img class="dept-icon" src="素材/department-icons/网编部.png" alt="">网编部</b>内容打磨担当</div>
+          <div class="dept"><b><img class="dept-icon" src="素材/department-icons/外联部.png" alt="">外联部</b>人际社交担当</div>
+          <div class="dept"><b><img class="dept-icon" src="素材/department-icons/咨询部.png" alt="">咨询部</b>台前互动担当</div>
+          <div class="dept"><b><img class="dept-icon" src="素材/department-icons/宣传部.png" alt="">宣传部</b>幕后设计担当</div>
+        </div>
+      </div>
+      <div class="home-actions">
+        <button class="btn" id="btn-start">开始测试</button>
+        <div class="footnote">结果仅供趣味参考，欢迎投递朋辈心理健康服务队</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-quiz" class="view">
+    <div class="quiz-top">
+      <div class="q-count" id="pnum">1 / 12</div>
+      <div class="track"><div class="fill" id="pfill"></div></div>
+    </div>
+    <div class="q-card">
+      <div class="q-label" id="qnum">QUESTION 1</div>
+      <div class="q-text" id="qtext"></div>
+      <div id="opts"></div>
+    </div>
+    <div class="quiz-nav">
+      <button class="btn-prev" id="btn-prev" style="visibility:hidden;">← 上一题</button>
+    </div>
+  </section>
+
+  <section id="view-result" class="view">
+    <div class="share-card" id="share-card"></div>
+    <div class="save-img-block">
+      <div class="save-hint">👇 长按下方图片，保存到手机相册</div>
+      <img id="save-img" class="save-img" alt="结果图，长按保存" style="display:none;">
+    </div>
+    <div class="result-actions">
+      <button class="btn btn-soft" id="btn-copy">复制链接</button>
+      <button class="btn btn-soft" id="btn-home">返回首页</button>
+      <button class="btn wide" id="btn-retry">再测一次</button>
+    </div>
+    <div class="join-block" id="join-block">
+      <div class="join-block-title">加入我们</div>
+      <div class="join-lead">测完啦？如果对朋辈感兴趣，扫码填个报名表，或者进你校区的咨询群聊聊天～<br>两件事都可以做，没有先后顺序。</div>
+      <div class="join-card">
+        <div class="join-name">📝 招新报名表</div>
+        <img src="素材/qrcodes/qrcode-baoming.png" alt="报名表二维码">
+        <div class="join-hint">长按识别，填写报名表（约 1 分钟）</div>
+      </div>
+      <div class="join-card">
+        <div class="join-name">💬 河源校区咨询群</div>
+        <img src="素材/qrcodes/qrcode-heyuan-0926.png" alt="河源校区群二维码">
+        <div class="join-hint">长按识别进群，有疑问随时问</div>
+      </div>
+      <div class="join-card">
+        <div class="join-name">💬 白云校区咨询群</div>
+        <img src="素材/qrcodes/qrcode-baiyun-0918b.png" alt="白云校区群二维码">
+        <div class="join-hint">长按识别进群，有疑问随时问</div>
+      </div>
+      <div class="join-note">群二维码每 7 天更新，本页长期有效，随时可扫。</div>
+    </div>
+    <div class="footnote">朋辈心理健康服务队 · 如果浏览器拦截下载，可以长按结果图或直接截图保存</div>
+    <button class="join-fab" id="btn-join-jump">加入我们 ↓</button>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+// ============ 题库（12题陈述句 × 4档程度，每题对6部门各有权重） ============
+// weights 顺序 = [策划, 秘书, 网编, 外联, 咨询, 宣传]；程度乘数：非常像我1.0 比较像我0.65 有点像我0.3 不太像我0
+// ============ 兴趣技能排序题（第 11 题） ============
+// 6 个技能对应 6 个部门；用户按兴趣排序，第1名 +6 分、第6名 +1 分
+var SKILLS = [
+  { name: "策划活动、组织流程", dept: 0 },
+  { name: "整理文档、发通知", dept: 1 },
+  { name: "拍照、写推文", dept: 2 },
+  { name: "拉赞助、管账", dept: 3 },
+  { name: "上台主持、带游戏", dept: 4 },
+  { name: "做海报、布置场地", dept: 5 }
+];
+
+// ============ 能力多选题（第 12 题） ============
+// 6 项能力对应 6 个部门；勾选 = 已具备该能力，每项 +3 分
+var CAPABILITIES = [
+  { name: "策划活动、组织流程", dept: 0 },
+  { name: "整理文档、发通知", dept: 1 },
+  { name: "拍照、写推文", dept: 2 },
+  { name: "拉赞助、管账", dept: 3 },
+  { name: "主持、带游戏", dept: 4 },
+  { name: "海报设计、场地布置", dept: 5 }
+];
+
+// ============ 结果图二维码（加入朋辈） ============
+var QRCODES = [
+  { src: "素材/qrcodes/qrcode-test.png", label: "MBTI 测试" },
+  { src: "素材/qrcodes/qrcode-baoming.png", label: "招新报名表" },
+  { src: "素材/qrcodes/qrcode-heyuan-0926.png", label: "河源校区\n招新咨询群" },
+  { src: "素材/qrcodes/qrcode-baiyun-0918b.png", label: "白云校区\n招新咨询群" }
+];
+
+var QUESTIONS = [
+  { q: "社团要办“社团文化节”，大家刚开始七嘴八舌——", opts: [
+    { t: "先冒出一个别人没想到的玩法方向", w: [3, 0, 0, 0, 0, 0] },
+    { t: "拿出纸笔，把流程和时间点一条条列清楚", w: [0, 3, 0, 0, 0, 1] },
+    { t: "说“先定方向，我回去把方案整理出来”", w: [0, 0, 3, 0, 0, 1] },
+    { t: "拉几个人私下先聊，问问大家想要什么样的", w: [0, 0, 0, 3, 1, 0] }
+  ]},
+  { q: "开会讨论时——", opts: [
+    { t: "话题跑偏了，你会把大家拉回来", w: [0, 0, 0, 0, 3, 0] },
+    { t: "你边听边记，会后把要点整理好发给大家", w: [0, 0, 3, 0, 0, 1] },
+    { t: "你更在意教室布置和 PPT 效果", w: [0, 0, 0, 0, 0, 3] },
+    { t: "你会主动接话，让不爱说话的人也能开口", w: [0, 0, 0, 3, 1, 0] }
+  ]},
+  { q: "小组分工时——", opts: [
+    { t: "你习惯先把活儿拆成小块再分", w: [0, 3, 0, 1, 0, 0] },
+    { t: "你上手就接下最花心思的部分", w: [0, 0, 0, 0, 0, 3] },
+    { t: "你说“分之前先想清楚到底要达成什么”", w: [3, 0, 0, 0, 0, 0] },
+    { t: "你说“谁擅长什么就做什么，不用硬分”", w: [0, 0, 0, 3, 1, 0] }
+  ]},
+  { q: "活动当天——", opts: [
+    { t: "你在现场跑前跑后，哪里缺人补哪里", w: [0, 1, 0, 3, 0, 0] },
+    { t: "轮到你上场时，气氛由你负责", w: [0, 0, 0, 0, 3, 0] },
+    { t: "你在后台盯着流程，保证不出岔子", w: [0, 0, 0, 0, 0, 3] },
+    { t: "你提前把现场要用的东西都备齐了", w: [0, 0, 0, 0, 0, 3] }
+  ]},
+  { q: "大家卡壳没头绪时——", opts: [
+    { t: "你先抛出一个新方向让大家试", w: [3, 0, 0, 0, 1, 0] },
+    { t: "你把问题拆开，一步步理清楚", w: [0, 3, 0, 0, 0, 0] },
+    { t: "你去找有经验的人取取经", w: [0, 0, 0, 3, 1, 0] },
+    { t: "你说“别急，先缓一缓再想”", w: [0, 0, 0, 0, 3, 0] }
+  ]},
+  { q: "刚认识一群新朋友——", opts: [
+    { t: "你不急着开口，先观察再决定跟谁聊", w: [1, 0, 3, 0, 0, 1] },
+    { t: "你先自我介绍，主动开话题", w: [0, 0, 0, 1, 3, 0] },
+    { t: "你会留意记住大家的名字和特点", w: [0, 0, 0, 3, 0, 0] },
+    { t: "你更愿意先把现场的东西整理妥当", w: [0, 0, 0, 0, 0, 3] }
+  ]},
+  { q: "完成一项任务时——", opts: [
+    { t: "做完后你还会再检查一遍", w: [0, 3, 0, 0, 0, 0] },
+    { t: "你会想“还有没有更好的做法”", w: [3, 0, 0, 0, 0, 0] },
+    { t: "你习惯找人一起做，边做边商量", w: [0, 0, 0, 1, 3, 0] },
+    { t: "你一个人安静地把这件事做到最好", w: [0, 0, 3, 0, 0, 1] }
+  ]},
+  { q: "办一场活动，你觉得——", opts: [
+    { t: "氛围和大家的参与感最重要", w: [0, 0, 0, 1, 3, 0] },
+    { t: "流程顺、不卡壳最重要", w: [0, 3, 0, 0, 0, 1] },
+    { t: "内容有新鲜感最重要", w: [1, 0, 3, 0, 0, 1] },
+    { t: "大家玩得尽兴最重要", w: [0, 0, 0, 3, 1, 0] }
+  ]},
+  { q: "别人请你帮忙时——", opts: [
+    { t: "你会先问清楚：这事到底想做成什么样", w: [3, 0, 0, 0, 0, 0] },
+    { t: "你会先把方法想明白再动手", w: [0, 3, 1, 0, 0, 0] },
+    { t: "你会想出一个更有意思的办法", w: [3, 0, 0, 0, 0, 0] },
+    { t: "你会安静做好，再告诉他结果", w: [0, 0, 3, 0, 0, 1] }
+  ]},
+  { q: "忙完闲下来时——", opts: [
+    { t: "你脑子里还在想“下次可以怎么改进”", w: [3, 0, 0, 0, 0, 0] },
+    { t: "你把今天的事在脑子里过一遍", w: [0, 3, 0, 0, 0, 0] },
+    { t: "你在翻大家的动态，看有什么新鲜事", w: [0, 0, 3, 0, 0, 0] },
+    { t: "你在琢磨怎么把东西做得更好看", w: [0, 0, 0, 0, 0, 3] }
+  ]},
+  { sort: true, q: "倒数第二道：下面这些技能，按你最想学/最感兴趣的程度从高到低排序——从最喜欢的开始点，连点 6 下排完。" },
+  { multi: true, q: "最后一道：下面这些方面，你有过相关的经历或经验吗？（可多选，勾选后点“下一题”）" }
+];
+;
+
+// 全局总分（所有题权重之和）：契合度百分比 = 部门得分 / 全局总分，
+// 保证全选同一档时各部门占比天然不同（避免全 100%/50% 的平局）
+var GLOBAL_MAX = 0;
+QUESTIONS.forEach(function (q) { if (q.opts) q.opts.forEach(function (o) { o.w.forEach(function (w) { GLOBAL_MAX += w; }); }); });
+
+// 每个部门的理论满分（权重和），仅用于参考展示
+var DEPT_MAX = [7, 10, 8, 7, 9, 9];
+// 程度档：文字 + 乘数（5 档，0 为最像我）；answers 存 0-4
+var LEVELS = [
+  { label: "非常像我", mult: 1.0 },
+  { label: "比较像我", mult: 0.75 },
+  { label: "中立", mult: 0.5 },
+  { label: "有点像我", mult: 0.25 },
+  { label: "不太像我", mult: 0 }
+];
+
+// ============ 6 个部门（含"理想气质向量"用于加权匹配） ============
+// ideal = [轴1(创意↔执行), 轴2(内容↔社交), 轴3(台前↔幕后)]，正=左极 负=右极
+var DEPTS = [
+  { key: "P", dept: "策划部", tag: "脑洞造梦师", accent: "#bd3d37", image: "素材/sticker-planning.png", icon: "素材/department-icons/策划部.png",
+    ideal: [5, 1, 0],
+    desc: ["你是团队的灵感发电机，脑洞一开就停不下来。",
+           "活动怎么玩、流程怎么串、各部门怎么配合，你心里都有一张更大的图。",
+           "把想法变成全校同学都参与过的活动，就是你最有成就感的事。"] },
+  { key: "S", dept: "秘书部", tag: "靠谱守护者", accent: "#4b9fb0", image: "素材/sticker-secretary.png", icon: "素材/department-icons/秘书部.png",
+    ideal: [-5, 0, -1],
+    desc: ["你是队伍的稳定中枢，细枝末节都逃不过你的眼睛。",
+           "场地、文件、证明、通知，事情再多你也能理得清清楚楚。",
+           "有你在，大家就知道\u201c这事稳了\u201d。"] },
+  { key: "N", dept: "网编部", tag: "时光雕琢家", accent: "#77a867", image: "素材/sticker-content.png", icon: "素材/department-icons/网编部.png",
+    ideal: [0, 5, 0],
+    desc: ["你是时光的收藏家，文字、照片、视频，把每一次活动定格成记忆。",
+           "一篇推文、一支视频，你能安静地打磨很久。",
+           "朋辈的故事，由你讲给更多人听。"] },
+  { key: "O", dept: "外联部", tag: "社牛外交官", accent: "#c98b26", image: "素材/sticker-outreach.png", icon: "素材/department-icons/外联部.png",
+    ideal: [0, -5, 0],
+    desc: ["你是队伍的外交官，赞助、嘉宾、物资，没有你搭不上的线。",
+           "见人说人话、见鬼说鬼话——等等，是见什么人说什么话。",
+           "队伍走出去的路，由你铺平。"] },
+  { key: "C", dept: "咨询部", tag: "氛围主理人", accent: "#8b5cf6", image: "素材/sticker-consulting.png", icon: "素材/department-icons/咨询部.png",
+    ideal: [1, 0, 5],
+    desc: ["你是台前的那束光，主持、暖场、带游戏，气氛由你拿捏。",
+           "你擅长让大家玩得开、聊得来，也把心理的力量悄悄传递出去。",
+           "有你在的现场，永远不缺笑声。"] },
+  { key: "M", dept: "宣传部", tag: "星光传递官", accent: "#ec4899", image: "素材/sticker-publicity.png", icon: "素材/department-icons/宣传部.png",
+    ideal: [0, 0, -5],
+    desc: ["你是美的制造者，海报、布置、物料，让每个活动一眼就吸引人。",
+           "你眼光在线，动手能力也在线，审美就是你的武器。",
+           "活动还没开始，你的作品已经先声夺人。"] }
+];
+
+var answers = [];          // 每题答案：原始选项索引 0-3
+var displayOrder = [];     // 每题显示顺序（每次测试随机洗牌，防“选A=策划”猜题）
+var cur = 0;
+var currentKey = "";
+var currentCounts = [0, 0, 0, 0, 0, 0];
+
+function show(id) {
+  document.querySelectorAll(".view").forEach(function (v) { v.classList.remove("active"); });
+  document.getElementById(id).classList.add("active");
+  window.scrollTo(0, 0);
+}
+
+var sortOrder = [];  // 排序题当前排好的技能序列（第1名在前）
+
+function renderQ() {
+  var q = QUESTIONS[cur];
+  document.getElementById("qnum").textContent = "QUESTION " + (cur + 1);
+  document.getElementById("qtext").textContent = q.q;
+  document.getElementById("pnum").textContent = (cur + 1) + " / " + QUESTIONS.length;
+  document.getElementById("pfill").style.width = Math.round(cur / QUESTIONS.length * 100) + "%";
+
+  var prevBtn = document.getElementById("btn-prev");
+  if (prevBtn) prevBtn.style.visibility = cur === 0 ? "hidden" : "visible";
+
+  if (q.sort) { renderSortQ(); return; }
+  if (q.multi) { renderMultiQ(); return; }
+
+  var box = document.getElementById("opts");
+  box.innerHTML = "";
+  var chosen = cur < answers.length ? answers[cur] : -1;
+  var order = displayOrder[cur] || [0, 1, 2, 3];
+
+  // 4 选项单选：按洗牌后的顺序显示，计分记原始索引
+  var letters = ["A", "B", "C", "D"];
+  order.forEach(function (origIdx, pos) {
+    var opt = q.opts[origIdx];
+    if (!opt) return;
+    var btn = document.createElement("button");
+    btn.className = "opt" + (origIdx === chosen ? " chosen" : "");
+    btn.innerHTML = '<span class="letter">' + letters[pos] + '</span><span class="opt-text"></span>';
+    btn.querySelector(".opt-text").textContent = opt.t;
+    btn.addEventListener("click", function () { choose(origIdx); });
+    box.appendChild(btn);
+  });
+}
+
+function renderSortQ() {
+  var box = document.getElementById("opts");
+  box.innerHTML = "";
+  // 排序提示条 + 进度
+  var tip = document.createElement("div");
+  tip.className = "sort-tip";
+  box.appendChild(tip);
+  var prog = document.createElement("div");
+  prog.className = "sort-progress";
+  box.appendChild(prog);
+  sortOrder = (cur < answers.length && Array.isArray(answers[cur])) ? answers[cur].slice() : [];
+  SKILLS.forEach(function (sk, idx) {
+    var btn = document.createElement("button");
+    btn.className = "skill-btn";
+    btn.innerHTML = '<span class="skill-rank"></span><span class="skill-text"></span>';
+    btn.querySelector(".skill-text").textContent = sk.name;
+    btn.addEventListener("click", function () { skillClick(idx); });
+    box.appendChild(btn);
+  });
+  // 下一题按钮（排满后显示；重进已排满时兜底用）
+  var nextBtn = document.createElement("button");
+  nextBtn.className = "btn wide cap-next sort-next";
+  nextBtn.textContent = "下一题 →";
+  nextBtn.addEventListener("click", function () {
+    if (cur < answers.length) answers[cur] = sortOrder.slice(); else answers.push(sortOrder.slice());
+    cur++;
+    if (cur < QUESTIONS.length) renderQ(); else showResult();
+  });
+  box.appendChild(nextBtn);
+  refreshSortRanks();
+}
+
+function refreshSortRanks() {
+  var box = document.getElementById("opts");
+  var tip = box.querySelector(".sort-tip");
+  var prog = box.querySelector(".sort-progress");
+  if (tip) tip.textContent = "从最感兴趣的排起：点第 1 下 = 最喜欢（点已排的可以取消重排）";
+  if (prog) {
+    prog.innerHTML = "已排 <b>" + sortOrder.length + "</b> / " + SKILLS.length + (sortOrder.length > 0 && sortOrder.length < SKILLS.length ? "，接下来是第 <b>" + (sortOrder.length + 1) + "</b> 名" : "");
+  }
+  box.querySelectorAll(".skill-btn").forEach(function (b, i) {
+    var pos = sortOrder.indexOf(i);
+    b.className = "skill-btn" + (pos >= 0 ? " chosen" : "");
+    var rankEl = b.querySelector(".skill-rank");
+    if (pos >= 0) {
+      rankEl.textContent = String(pos + 1);
+      b.setAttribute("data-rank", pos + 1);
+    } else {
+      rankEl.textContent = "＋";
+      b.removeAttribute("data-rank");
+    }
+  });
+  var nextBtn = box.querySelector(".sort-next");
+  if (nextBtn) {
+    nextBtn.style.display = sortOrder.length === SKILLS.length ? "block" : "none";
+    if (sortOrder.length === SKILLS.length) nextBtn.textContent = "下一题 →（已排 6 项）";
+  }
+}
+
+function skillClick(idx) {
+  var pos = sortOrder.indexOf(idx);
+  if (pos >= 0) {
+    sortOrder.splice(pos, 1);  // 点已排的：取消
+    refreshSortRanks();
+    return;
+  }
+  if (sortOrder.length >= SKILLS.length) return;
+  sortOrder.push(idx);
+  refreshSortRanks();
+  if (sortOrder.length === SKILLS.length) {
+    if (cur < answers.length) answers[cur] = sortOrder.slice(); else answers.push(sortOrder.slice());
+    cur++;
+    if (cur < QUESTIONS.length) renderQ(); else showResult();
+  }
+}
+
+var capSel = [];  // 能力多选：勾选的能力索引集合
+
+function renderMultiQ() {
+  var box = document.getElementById("opts");
+  box.innerHTML = "";
+  capSel = (cur < answers.length && Array.isArray(answers[cur])) ? answers[cur].slice() : [];
+  CAPABILITIES.forEach(function (cp, idx) {
+    var btn = document.createElement("button");
+    btn.className = "cap-btn";
+    btn.innerHTML = '<span class="cap-check"></span><span class="cap-text"></span>';
+    btn.querySelector(".cap-text").textContent = cp.name;
+    btn.addEventListener("click", function () { capToggle(idx); });
+    box.appendChild(btn);
+  });
+  // 下一题按钮（多选需手动确认）
+  var nextBtn = document.createElement("button");
+  nextBtn.className = "btn wide cap-next";
+  nextBtn.textContent = "下一题 →";
+  nextBtn.addEventListener("click", function () {
+    if (cur < answers.length) answers[cur] = capSel.slice(); else answers.push(capSel.slice());
+    cur++;
+    if (cur < QUESTIONS.length) renderQ(); else showResult();
+  });
+  box.appendChild(nextBtn);
+  refreshCapRanks();
+}
+
+function refreshCapRanks() {
+  var box = document.getElementById("opts");
+  box.querySelectorAll(".cap-btn").forEach(function (b, i) {
+    var on = capSel.indexOf(i) >= 0;
+    b.className = "cap-btn" + (on ? " chosen" : "");
+    b.querySelector(".cap-check").textContent = on ? "✓" : "";
+  });
+  var nextBtn = box.querySelector(".cap-next");
+  if (nextBtn) nextBtn.textContent = capSel.length > 0 ? ("下一题 →（已选 " + capSel.length + " 项）") : "下一题 →";
+}
+
+function capToggle(idx) {
+  var p = capSel.indexOf(idx);
+  if (p >= 0) capSel.splice(p, 1); else capSel.push(idx);
+  refreshCapRanks();
+}
+
+function choose(v) {
+  if (cur < answers.length) answers[cur] = v; else answers.push(v);
+  cur++;
+  if (cur < QUESTIONS.length) renderQ(); else showResult();
+}
+
+// 上一题：回退并保留已选（高亮），可改选
+function prevQuestion() {
+  if (cur <= 0) return;
+  cur--;
+  renderQ();
+}
+
+// ============ 多部门加权计分（每题权重 × 程度乘数 → 6 部门契合度%） ============
+function resultFromAnswers() {
+  var raw = [0, 0, 0, 0, 0, 0];
+  answers.forEach(function (v, i) {
+    var q = QUESTIONS[i];
+    if (!q) return;
+    if (q.sort) {
+      if (!Array.isArray(v)) return;
+      v.forEach(function (skillIdx, pos) {
+        var sk = SKILLS[skillIdx];
+        if (sk) raw[sk.dept] += 6 - pos;
+      });
+      return;
+    }
+    if (q.multi) {
+      if (!Array.isArray(v)) return;
+      v.forEach(function (capIdx) {
+        var cp = CAPABILITIES[capIdx];
+        if (cp) raw[cp.dept] += 3;
+      });
+      return;
+    }
+    var opt = q.opts[v];
+    if (!opt) return;
+    for (var d = 0; d < 6; d++) raw[d] += opt.w[d];
+  });
+  var total = 0;
+  raw.forEach(function (x) { total += x; });
+  // 契合分：直接显示原始得分（一位小数），动态无固定上限；
+  // 条宽 = raw / max(raw) × 100（相对条，最佳契合满条）
+  var deptMatch, barPct;
+  var maxRaw = 0;
+  raw.forEach(function (x) { if (x > maxRaw) maxRaw = x; });
+  if (maxRaw <= 0) {
+    // 全选"不太像我"等零分场景：气质均分兜底（非全 0）
+    deptMatch = [8.3, 8.3, 8.3, 8.3, 8.3, 8.3];
+    barPct = [50, 50, 50, 50, 50, 50];
+  } else {
+    deptMatch = raw.map(function (x) { return Math.round(x * 10) / 10; });
+    barPct = raw.map(function (x) { return Math.round(x / maxRaw * 100); });
+  }
+  // 最佳契合部门用精确原始分决胜
+  var maxIdx = 0;
+  for (var i = 1; i < raw.length; i++) if (raw[i] > raw[maxIdx]) maxIdx = i;
+  return { idx: maxIdx, deptMatch: deptMatch, barPct: barPct, raw: raw, balanced: total <= 0 };
+}
+
+function fmtPct(x) {
+  return (x % 1 === 0) ? String(x) : x.toFixed(1);
+}
+
+function deptEmoji(i) {
+  return ["💡", "📋", "✍️", "🤝", "🎤", "🎨"][i];
+}
+
+// 把答案序列编码成 "ABCDE..."（12位，A-E 对应 5 档程度）
+function answersToStr() {
+  var labels = ["A", "B", "C", "D"];
+  return answers.map(function (v, i) {
+    var q = QUESTIONS[i];
+    if (Array.isArray(v)) {
+      if (q && q.multi) {
+        // 能力多选：6 位 0/1 位图（按能力索引）
+        var bits = [];
+        for (var b = 0; b < CAPABILITIES.length; b++) bits.push(v.indexOf(b) >= 0 ? "1" : "0");
+        return bits.join("");
+      }
+      return v.map(function (x) { return x + 1; }).join("");  // 排序：技能编号 1-6
+    }
+    return labels[v];
+  }).join("");
+}
+
+// 从链接参数还原答案序列；非法字符返回 null
+function answersFromStr(s) {
+  if (!s) return null;
+  var map = { A: 0, B: 1, C: 2, D: 3 };
+  var seq = [];
+  for (var i = 0; i < s.length && seq.length < QUESTIONS.length;) {
+    var q = QUESTIONS[seq.length];
+    if (q && q.sort) {
+      // 排序题：6 位数字（1-6 各出现一次）
+      var rest = s.slice(i);
+      if (rest.length < 6) return null;
+      var rankSeq = [], seen = {};
+      for (var k = 0; k < 6; k++) {
+        var num = parseInt(rest[k], 10);
+        if (isNaN(num) || num < 1 || num > 6 || seen[num]) return null;
+        seen[num] = true;
+        rankSeq.push(num - 1);
+      }
+      seq.push(rankSeq);
+      i += 6;
+      continue;
+    }
+    if (q && q.multi) {
+      // 能力多选：6 位 0/1 位图
+      var bits = s.slice(i, i + 6);
+      if (bits.length < 6) return null;
+      var capSeq = [];
+      for (var b = 0; b < 6; b++) {
+        if (bits[b] === "1") capSeq.push(b);
+        else if (bits[b] !== "0") return null;
+      }
+      seq.push(capSeq);
+      i += 6;
+      continue;
+    }
+    var v = map[s[i]];
+    if (v === undefined) return null;
+    seq.push(v);
+    i++;
+  }
+  return seq.length > 0 ? seq : null;
+}
+
+function showResult(key) {
+  var deptMatch, idx, balanced = false, rawArr = null, barPct = null;
+  if (key) {
+    idx = DEPTS.findIndex(function (d) { return d.key === key; });
+    if (idx < 0) idx = 0;
+    deptMatch = DEPTS.map(function () { return 0; });
+    deptMatch[idx] = 10;
+    barPct = DEPTS.map(function () { return 0; });
+    barPct[idx] = 100;
+  } else {
+    var r = resultFromAnswers();
+    idx = r.idx;
+    deptMatch = r.deptMatch;
+    balanced = r.balanced;
+    rawArr = r.raw;
+    barPct = r.barPct;
+  }
+  var d = DEPTS[idx];
+  currentKey = d.key;
+  currentCounts = deptMatch.slice();
+  if (!key) history.replaceState(null, "", location.pathname + "?a=" + answersToStr());
+
+  // 并列判断（用精确原始分，避免百分比四舍五入造成假并列）
+  var arr = rawArr || deptMatch;
+  var maxV = arr[idx];
+  var ties = [];
+  arr.forEach(function (c, i) { if (c === maxV && c > 0) ties.push(i); });
+  var isTie = ties.length > 1;
+
+  var html = "";
+  // 方案A：结果页只保留"结果图"（canvas 保存图），顶部只留简短标题
+  html += '<div class="result-head">';
+  html += '<div class="result-kicker">' + (balanced ? "均衡型选手" : (isTie ? "并列最佳契合" : "最佳契合部门")) + '</div>';
+  html += '<div class="result-name">' + d.dept + '</div>';
+  if (balanced) {
+    html += '<div class="tie-note">你这次的回答比较平均，说明你是"可塑性选手"——每个部门都值得试一试！</div>';
+  } else if (isTie) {
+    var other = ties.filter(function (i) { return i !== idx; }).map(function (i) { return DEPTS[i].dept; }).join("、");
+    html += '<div class="tie-note">你和 ' + other + ' 的契合度并列第一，是妥妥的"复合型选手"！</div>';
+  }
+  html += '</div>';
+
+  document.getElementById("share-card").innerHTML = html;
+  show("view-result");
+  setTimeout(function () {
+    document.querySelectorAll(".bar span").forEach(function (el) { el.style.width = el.getAttribute("data-w"); });
+  }, 80);
+  buildSaveImage(d, deptMatch, barPct);
+}
+
+// 自动生成"可长按保存"的结果图（手机相册保存走长按，绕过下载拦截）
+// 注意：file:// 本地打开时 canvas 画贴纸图会被污染（Tainted canvas），线上 https 同源正常
+function buildSaveImage(d, deptMatch, barPct) {
+  // 预加载 6 张部门图标（结果图排行用），全部就绪后再绘制
+  var icons = [];
+  var qrs = [];
+  var pending = DEPTS.length + QRCODES.length;
+  var fired = false;
+  var paint = function (img) {
+    if (fired) return;
+    fired = true;
+    try {
+      var canvas = drawResultCanvas(d, deptMatch, barPct, img, icons, qrs);
+      var el = document.getElementById("save-img");
+      el.src = canvas.toDataURL("image/png");
+      el.style.display = "block";
+      document.querySelector(".save-hint").style.display = "block";
+    } catch (e) {
+      hideSaveImage();
+    }
+  };
+  var fire = function () {
+    if (--pending > 0) return;
+    if (d.image) {
+      var img = new Image();
+      img.onload = function () { paint(img); };
+      img.onerror = function () { paint(null); };
+      img.src = d.image;
+    } else {
+      paint(null);
+    }
+  };
+  DEPTS.forEach(function (dp, i) {
+    var im = new Image();
+    im.onload = function () { icons[i] = im; fire(); };
+    im.onerror = function () { icons[i] = null; fire(); };
+    im.src = dp.icon || "";
+  });
+  QRCODES.forEach(function (qinfo, i) {
+    var im = new Image();
+    im.onload = function () { qrs[i] = im; fire(); };
+    im.onerror = function () { qrs[i] = null; fire(); };
+    im.src = qinfo.src || "";
+  });
+}
+
+function hideSaveImage() {
+  var el = document.getElementById("save-img");
+  var hint = document.querySelector(".save-hint");
+  if (el) el.style.display = "none";
+  if (hint) hint.style.display = "none";
+}
+
+function toast(text) {
+  var t = document.getElementById("toast");
+  t.textContent = text;
+  t.classList.add("show");
+  setTimeout(function () { t.classList.remove("show"); }, 1800);
+}
+
+function shuffleDisplayOrder() {
+  displayOrder = QUESTIONS.map(function () {
+    var arr = [0, 1, 2, 3];
+    for (var k = arr.length - 1; k > 0; k--) {
+      var j = Math.floor(Math.random() * (k + 1));
+      var tmp = arr[k]; arr[k] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  });
+}
+
+document.getElementById("btn-start").addEventListener("click", function () {
+  answers = [];
+  cur = 0;
+  currentKey = "";
+  history.replaceState(null, "", location.pathname);
+  shuffleDisplayOrder();
+  renderQ();
+  show("view-quiz");
+});
+
+var jf = document.getElementById("btn-join-jump");
+if (jf) jf.addEventListener("click", function () {
+  var el = document.getElementById("join-block");
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+document.getElementById("btn-retry").addEventListener("click", function () {
+  answers = [];
+  shuffleDisplayOrder();
+  cur = 0;
+  currentKey = "";
+  history.replaceState(null, "", location.pathname);
+  renderQ();
+  show("view-quiz");
+});
+
+document.getElementById("btn-home").addEventListener("click", function () {
+  answers = [];
+  currentKey = "";
+  history.replaceState(null, "", location.pathname);
+  show("view-home");
+});
+
+document.getElementById("btn-prev").addEventListener("click", prevQuestion);
+
+document.getElementById("btn-copy").addEventListener("click", function () {
+  var url;
+  if (location.origin === "null") {
+    url = location.href;
+  } else if (answers && answers.length === QUESTIONS.length) {
+    // 优先分享真实答题结果（编码完整答案序列，别人打开能看到真实分布）
+    url = location.origin + location.pathname + "?a=" + answersToStr();
+  } else {
+    url = location.origin + location.pathname + "?result=" + encodeURIComponent(currentKey);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function () { toast("链接已复制"); }).catch(function () { prompt("复制链接", url); });
+  } else {
+    prompt("复制链接", url);
+  }
+});
+
+function saveResultImage() {
+  var idx = DEPTS.findIndex(function (d) { return d.key === currentKey; });
+  if (idx < 0) idx = 0;
+  var d = DEPTS[idx];
+  var r = resultFromAnswers();
+  var draw = function (img) {
+    var canvas = drawResultCanvas(d, r.deptMatch, r.barPct, img);
+    canvas.toBlob(function (blob) {
+      if (!blob) {
+        toast("生成失败，请截图保存");
+        return;
+      }
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "朋辈部门检测-" + d.key + ".png";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      toast("结果图已生成");
+    }, "image/png");
+  };
+  if (d.image) {
+    var img = new Image();
+    img.onload = function () { draw(img); };
+    img.onerror = function () { draw(null); };
+    img.src = d.image;
+  } else {
+    draw(null);
+  }
+}
+
+// 1080x1500 结果图：最佳契合部门卡 + 六部门契合分
+function drawResultCanvas(d, deptMatch, barPct, img, icons, qrs) {
+  var canvas = document.createElement("canvas");
+  // 3x 分辨率输出（3240x4740）：二维码和文字更清晰，保存图质量更高
+  var DPR = 3;
+  canvas.width = 1080 * DPR;
+  canvas.height = 1580 * DPR;
+  var ctx = canvas.getContext("2d");
+  ctx.scale(DPR, DPR);
+  ctx.fillStyle = "#f7f5ef";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "rgba(189,61,55,.10)";
+  ctx.lineWidth = 2;
+  for (var x = 0; x < canvas.width; x += 48) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (var y = 0; y < canvas.height; y += 48) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  roundRect(ctx, 70, 70, 940, 1480, 38, "#fffdf7", "#ded7ca");
+  roundRect(ctx, 70, 70, 940, 430, 38, d.accent, d.accent);
+  ctx.fillStyle = "rgba(255,255,255,.16)";
+  ctx.beginPath(); ctx.arc(850, 110, 170, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(120, 470, 160, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "900 46px Microsoft YaHei";
+  ctx.fillText("朋辈部门人格 · 最佳契合部门", 120, 170);
+  ctx.font = "900 88px Microsoft YaHei";
+  ctx.fillText(d.dept, 120, 280);
+  ctx.font = "900 34px Microsoft YaHei";
+  var tagW = ctx.measureText(d.tag).width;
+  roundRect(ctx, 120, 330, tagW + 60, 72, 36, "#fffdf7", "#fffdf7");
+  ctx.fillStyle = d.accent;
+  ctx.fillText(d.tag, 150, 378);
+
+  var didx = DEPTS.indexOf(d);
+  ctx.save();
+  roundRect(ctx, 730, 150, 220, 220, 48, "#fffdf7", "#fffdf7");
+  ctx.clip();
+  if (img && img.width > 0) {
+    ctx.drawImage(img, 730, 150, 220, 220);
+  } else {
+    ctx.fillStyle = "#fffdf7";
+    ctx.fillRect(690, 150, 220, 220);
+    ctx.font = "96px Microsoft YaHei";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(deptEmoji(didx), 840, 260);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+  ctx.restore();
+
+  ctx.fillStyle = "#3d3832";
+  ctx.font = "500 36px Microsoft YaHei";
+  var y = 570;
+  d.desc.forEach(function (p) {
+    y = wrapCanvasText(ctx, p, 120, y, 840, 54);
+    y += 18;
+  });
+
+  ctx.strokeStyle = "#ded7ca";
+  ctx.setLineDash([12, 10]);
+  ctx.beginPath(); ctx.moveTo(120, y + 16); ctx.lineTo(960, y + 16); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 六部门契合分（条宽 = 分数/10，与数字直观对应）
+  y += 62;
+  ctx.fillStyle = "#25221e";
+  ctx.font = "900 38px Microsoft YaHei";
+  ctx.fillText("六部门契合分", 120, y);
+  var maxC = 1;
+  deptMatch.forEach(function (x) { if (x > maxC) maxC = x; });
+  var order = [0, 1, 2, 3, 4, 5].sort(function (a, b) { return deptMatch[b] - deptMatch[a]; });
+  order.forEach(function (i, rank) {
+    var c = deptMatch[i];
+    var bw = Math.round(c / maxC * 100);
+    y += 58;
+    // 布局：排名 → 图标 → 部门名
+    ctx.fillStyle = i === didx ? d.accent : "#25221e";
+    ctx.font = "700 30px Microsoft YaHei";
+    ctx.fillText((rank + 1) + ". ", 120, y);
+    var ico = icons && icons[i];
+    if (ico && ico.width > 0) {
+      ctx.drawImage(ico, 195, y - 28, 40, 40);
+    } else {
+      ctx.font = "700 30px Microsoft YaHei";
+      ctx.fillText(deptEmoji(i), 195, y);
+    }
+    ctx.fillStyle = i === didx ? d.accent : "#25221e";
+    ctx.font = "700 30px Microsoft YaHei";
+    ctx.fillText(DEPTS[i].dept, 252, y);
+    roundRect(ctx, 380, y - 22, 420, 14, 7, "#e8e0d3", "#e8e0d3");
+    if (bw > 0) roundRect(ctx, 380, y - 22, Math.max(4, 420 * bw / 100), 14, 7, DEPTS[i].accent, DEPTS[i].accent);
+    ctx.fillText(fmtPct(c) + "分", 850, y);
+  });
+
+  // 4 个二维码（缩小，右下角，无标题）
+  var qw = 105, qgap = 24, qx0 = 960 - (qw * 4 + qgap * 3);
+  var qy = 1340;
+  for (var qi = 0; qi < QRCODES.length; qi++) {
+    var qx = qx0 + qi * (qw + qgap);
+    var qimg = qrs && qrs[qi];
+    if (qimg && qimg.width > 0) {
+      ctx.drawImage(qimg, qx, qy, qw, qw);
+    } else {
+      roundRect(ctx, qx, qy, qw, qw, 10, "#e8e0d3", "#e8e0d3");
+    }
+    ctx.fillStyle = "#756f66";
+    ctx.font = "500 16px Microsoft YaHei";
+    ctx.textAlign = "center";
+    var lines = String(QRCODES[qi].label).split("\n");
+    for (var li = 0; li < lines.length; li++) {
+      ctx.fillText(lines[li], qx + qw / 2, qy + qw + 20 + li * 20);
+    }
+    ctx.textAlign = "left";
+  }
+  ctx.fillStyle = "#756f66";
+  ctx.font = "500 28px Microsoft YaHei";
+  ctx.fillText("朋辈心理健康服务队 · 部门专属检测", 120, 1520);
+  return canvas;
+}
+
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+  var line = "";
+  for (var i = 0; i < text.length; i++) {
+    var test = line + text[i];
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, x, y);
+      line = text[i];
+      y += lineHeight;
+    } else {
+      line = test;
+    }
+  }
+  if (line) {
+    ctx.fillText(line, x, y);
+    y += lineHeight;
+  }
+  return y;
+}
+
+function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); }
+}
+
+(function init() {
+  var params = new URLSearchParams(location.search);
+  // 优先：真实答案序列链接（?a=ABCBDAACBD）
+  var a = answersFromStr(params.get("a"));
+  if (a) {
+    answers = a;
+    showResult();
+    return;
+  }
+  // 兼容旧链接：?result=X 固定结果
+  var result = params.get("result");
+  if (result) showResult(result);
+})();
+</script>
+</body>
+</html>
