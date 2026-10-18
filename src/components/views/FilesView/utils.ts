@@ -68,23 +68,29 @@ export function parseWeeks(weeksStr: string, weeksList?: number[]): number[] {
   }
 
   // Match week range, e.g. "1-16周"
-  const match = weeksStr.match(/(\d+)[-~](\d+)/);
-  if (match) {
-    const start = parseInt(match[1]);
-    const end = parseInt(match[2]);
-    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
-  }
-
   // Match multiple weeks, e.g. "1周,3周,5周" or "1,3,5周"
-  const multiMatch = weeksStr.match(/(\d+)[,，]/g);
-  if (multiMatch) {
-    const weeks = multiMatch.map(m => parseInt(m.match(/\d+/)![0]));
-    // Check last number
-    const lastMatch = weeksStr.match(/[,，](\d+)周?$/);
-    if (lastMatch) {
-      weeks.push(parseInt(lastMatch[1]));
+  // 【修复】旧实现遇到第一个范围就 return，导致 "1-12,15-16周" 只解析出 1-12，丢掉 15、16 两周。
+  // 现改为按逗号分段逐段解析，每段可以是范围 "1-12" 也可以是单周 "5"，再合并去重排序。
+  const segments = weeksStr.split(/[,，、]/).map(s => s.trim()).filter(Boolean);
+  const weeks: number[] = [];
+  for (const segment of segments) {
+    const rangeMatch = segment.match(/(\d+)\s*[-~]\s*(\d+)/);
+    if (rangeMatch) {
+      const start = parseInt(rangeMatch[1]);
+      const end = parseInt(rangeMatch[2]);
+      if (start >= 1 && end >= start && end <= 30) {
+        for (let w = start; w <= end; w++) weeks.push(w);
+      }
+      continue;
     }
-    return weeks.sort((a, b) => a - b);
+    const singleWeek = segment.match(/(\d+)/);
+    if (singleWeek) {
+      const w = parseInt(singleWeek[1]);
+      if (w >= 1 && w <= 30) weeks.push(w);
+    }
+  }
+  if (weeks.length > 0) {
+    return Array.from(new Set(weeks)).sort((a, b) => a - b);
   }
 
   // 【修复】所有规则都没匹配上 → 返回空数组（原为兜底填满 18 周）
