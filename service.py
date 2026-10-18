@@ -16,6 +16,7 @@ from prompts.dense_wide_prompts import DENSE_WIDE_PROMPTS
 # 导入工具模块
 from utils.cleaner import clean_schedule_ultimate, enrich_footer_courses
 from utils.pdf_plumber_parser import parse_vertical_pdf_with_plumber
+from utils.practice_courses import merge_practice_records
 from utils.rule_parser import parse_by_rules
 from utils.image_utils import calculate_dynamic_timeout, auto_detect_schedule_type, encode_image_to_base64
 from utils.ai_client import create_ark_client, AI_MODEL, strip_thinking
@@ -201,8 +202,18 @@ def ocr_pdf():
         except Exception as e:
             logger.warning(f"PDF竖型规则识别失败: {e}")
 
+        # 读取文本层（横型解析与实践课程提取共用，只读一次）
+        pdf_text = ''
+        try:
+            import fitz as _fitz
+            _doc = _fitz.open(temp_pdf_path)
+            pdf_text = '\n'.join(p.get_text() for p in _doc)
+            _doc.close()
+        except Exception as e:
+            logger.warning(f"PDF文本层读取失败: {e}")
+
         # 竖型结果太少（可能是横型课表），尝试横型文本解析
-        if len(records) < 5:
+        if len(records) < 5 and pdf_text.strip():
             try:
                 import fitz
                 doc = fitz.open(temp_pdf_path)
@@ -215,6 +226,15 @@ def ocr_pdf():
                         records = h_records
             except Exception as e:
                 logger.warning(f"PDF横型规则识别失败: {e}")
+
+        # 页脚「实践课程：」不在课表表格里，竖型/横型课表都要单独补
+        try:
+            merged = merge_practice_records(pdf_text, records)
+            if len(merged) != len(records):
+                logger.info(f"实践课程合并: {len(merged) - len(records)} 条")
+            records = merged
+        except Exception as e:
+            logger.warning(f"实践课程合并失败: {e}")
 
         if records and len(records) > 0:
             logger.info(f"PDF本地规则识别成功: {len(records)} 条")
