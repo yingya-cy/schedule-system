@@ -111,21 +111,21 @@ describe('formatWeeks', () => {
     expect(formatWeeks([1, 3, 5, 7, 9, 11, 13, 15, 17, 18])).toBe('单(1-17)/(18)');
   });
 
-  it('puts parity-prefixed run first', () => {
-    expect(formatWeeks([1, 2, 4, 6, 8, 10, 12, 14, 16, 18])).toBe('双(4-18)/(1-2)');
+  it('keeps week 2 inside the even-week segment', () => {
+    expect(formatWeeks([1, 2, 4, 6, 8, 10, 12, 14, 16, 18])).toBe('(1)/双(2-18)');
   });
 
   it('handles two consecutive numbers without parity prefix', () => {
     expect(formatWeeks([17, 18])).toBe('(17-18)');
   });
 
-  it('handles multiple parity runs with single /', () => {
-    expect(formatWeeks([1, 3, 5, 7, 9, 12, 14, 16, 17])).toBe('单(1-9)双(12-16)/(17)');
+  it('separates every independent parity run with /', () => {
+    expect(formatWeeks([1, 3, 5, 7, 9, 12, 14, 16, 17])).toBe('单(1-9)/双(12-16)/(17)');
   });
 });
 
 describe('generateReverseScheduleWorkbook', () => {
-  it('uses chronological week groups without parity labels for section-specific cells', async () => {
+  it('uses compact, independently scoped segments for section-specific cells', async () => {
     const workbook = await excelExportService.generateReverseScheduleWorkbook({
       departments: ['Test Department'],
       people: [{
@@ -150,6 +150,101 @@ describe('generateReverseScheduleWorkbook', () => {
     expect(monday).toBeDefined();
     expect(monday!.getCell('J4').value).toBe(
       'Parity Student6(2)(4)(6-12)(15-17)/(1)(13-14)(18)'
+    );
+  });
+
+  it('does not omit week 2 when common free time is even weeks', async () => {
+    const workbook = await excelExportService.generateReverseScheduleWorkbook({
+      departments: ['Test Department'],
+      people: [{
+        name: 'Li',
+        department: 'Test Department',
+        courses: [{
+          weekday: 1,
+          sections: [9, 10],
+          weeks: [1, 3, 5, 7, 9, 11, 13, 15, 17],
+        }],
+      }],
+    });
+
+    const monday = workbook.getWorksheet('星期一');
+    expect(monday).toBeDefined();
+    expect(monday!.getCell('R4').value).toBe('Li11单(1-17)/双(2-18)');
+  });
+
+  it('omits separators between week clauses that share the same scope', async () => {
+    const workbook = await excelExportService.generateReverseScheduleWorkbook({
+      departments: ['Test Department'],
+      people: [{
+        name: 'Scope Reset',
+        department: 'Test Department',
+        courses: [
+          { weekday: 1, sections: [9, 10], weeks: [2, 3, 4, 6, 8, 10, 12, 14, 16] },
+          { weekday: 1, sections: [11], weeks: [3] },
+        ],
+      }],
+    });
+
+    expect(workbook.getWorksheet('星期一')!.getCell('R4').value).toBe(
+      'Scope Reset11双(2-16)/(1)单(5-17)(18)'
+    );
+  });
+
+  it('can keep the final two weeks as a shared segment', async () => {
+    const workbook = await excelExportService.generateReverseScheduleWorkbook({
+      departments: ['Test Department'],
+      people: [{
+        name: 'Example',
+        department: 'Test Department',
+        courses: [{
+          weekday: 1,
+          sections: [6, 7, 8],
+          weeks: [1, 3, 5, 7, 9, 11, 13, 15],
+        }],
+      }],
+    });
+
+    const monday = workbook.getWorksheet('星期一');
+    expect(monday).toBeDefined();
+    expect(monday!.getCell('J4').value).toBe(
+      'Example5(1-16)/6双(2-16)/(17-18)'
+    );
+  });
+
+  it('uses all shared weeks when that removes repeated section clauses', async () => {
+    const workbook = await excelExportService.generateReverseScheduleWorkbook({
+      departments: ['Test Department'],
+      people: [{
+        name: 'Compact',
+        department: 'Test Department',
+        courses: [{
+          weekday: 1,
+          sections: [9, 10],
+          weeks: [9, 10],
+        }],
+      }],
+    });
+
+    expect(workbook.getWorksheet('星期一')!.getCell('R4').value).toBe(
+      'Compact11(9-10)/(1-8)(11-18)'
+    );
+  });
+
+  it('keeps a single section difference compact in a three-section period', async () => {
+    const workbook = await excelExportService.generateReverseScheduleWorkbook({
+      departments: ['Test Department'],
+      people: [{
+        name: 'Compact',
+        department: 'Test Department',
+        courses: [
+          { weekday: 1, sections: [9, 10], weeks: [2, 3, 4, 5, 6, 7, 8, 9, 10] },
+          { weekday: 1, sections: [11], weeks: [10] },
+        ],
+      }],
+    });
+
+    expect(workbook.getWorksheet('星期一')!.getCell('R4').value).toBe(
+      'Compact11(2-9)/(1)(11-18)'
     );
   });
 

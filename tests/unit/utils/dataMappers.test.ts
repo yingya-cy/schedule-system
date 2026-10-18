@@ -76,6 +76,36 @@ describe('mapBackendDataToArray', () => {
   it('handles empty array', () => {
     expect(mapBackendDataToArray([])).toEqual([]);
   });
+
+  it('keeps military practice so availability rules can mark its weeks unavailable', () => {
+    const input: BackendCourseData[] = [
+      {
+        course_name: '军事实践',
+        weekday: 1,
+        section: '1-2节',
+        weeks_list: [13, 14],
+      },
+      {
+        course_name: '实践课程：军事实践■古浩嵩(共2周)/13-14周',
+        weekday: 1,
+        section: '1-2节',
+        weeks_list: [13, 14],
+      },
+      {
+        course_name: '高等数学',
+        weekday: 2,
+        section: '3-4节',
+        weeks_list: [1, 2],
+      },
+    ];
+
+    expect(mapBackendDataToArray(input)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ courseName: '军事实践', weeksList: [13, 14] }),
+      expect.objectContaining({ courseName: '实践课程：军事实践■古浩嵩(共2周)/13-14周', weeksList: [13, 14] }),
+      expect.objectContaining({ courseName: '高等数学' }),
+    ]));
+    expect(mapBackendDataToArray(input)).toHaveLength(3);
+  });
 });
 
 describe('mapFrontendDataToArray', () => {

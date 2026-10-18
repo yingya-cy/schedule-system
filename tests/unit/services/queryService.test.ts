@@ -68,6 +68,42 @@ describe('QueryService', () => {
       expect(result[0].free_people[0].name).toBe('李四');
     });
 
+    it('treats military practice weeks as unavailable for every day and section', async () => {
+      const schedules = [{ id: 1, name: '张三', department: '主任团' }];
+      mockExecute.mockResolvedValueOnce([schedules]);
+      mockExecute.mockResolvedValueOnce([[
+        {
+          schedule_id: 1,
+          course_name: '军事实践',
+          weekday: 1,
+          sections: [1, 2],
+          weeks: [13, 14],
+        },
+      ]]);
+
+      const result = await service.queryFreeTime({ week: 13, day: 5, section: 11 });
+
+      expect(result[0].free_people).toEqual([]);
+    });
+
+    it('does not let military practice affect weeks outside its range', async () => {
+      const schedules = [{ id: 1, name: '张三', department: '主任团' }];
+      mockExecute.mockResolvedValueOnce([schedules]);
+      mockExecute.mockResolvedValueOnce([[
+        {
+          schedule_id: 1,
+          course_name: '实践课程：军事实践■古浩嵩(共2周)/13-14周',
+          weekday: 1,
+          sections: [1, 2],
+          weeks: [13, 14],
+        },
+      ]]);
+
+      const result = await service.queryFreeTime({ week: 12, day: 5, section: 11 });
+
+      expect(result[0].free_people).toHaveLength(1);
+    });
+
     it('applies department filter', async () => {
       mockExecute.mockResolvedValueOnce([[]]); // empty because department filter
       await service.queryFreeTime({ week: 1, department: '网编部' });
@@ -153,6 +189,28 @@ describe('QueryService', () => {
       expect(result.total_schedules).toBe(1);
       expect(result.departments).toBeDefined();
       expect(result.people).toHaveLength(1);
+    });
+
+    it('expands military practice to all seven days and all eleven sections', async () => {
+      mockExecute.mockResolvedValueOnce([[
+        {
+          schedule_id: 1,
+          name: '张三',
+          department: '主任团',
+          course_name: '军事实践',
+          weekday: 1,
+          sections: [1, 2],
+          weeks: [13, 14],
+        },
+      ]]);
+
+      const result = await service.getAllFreeTimeData(1);
+      const courses = result.people[0].courses;
+
+      expect(courses).toHaveLength(7);
+      expect(courses.map(course => course.weekday)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+      expect(courses.every(course => course.sections.length === 11)).toBe(true);
+      expect(courses.every(course => course.weeks.join(',') === '13,14')).toBe(true);
     });
   });
 });
