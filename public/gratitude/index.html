@@ -298,6 +298,16 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation: none!important; transition: none!important; scroll-behavior: auto!important; } }
 
 /* NOTEBOOK_DESIGN_END */
+
+/* ===== 素材总览：桌面优先 ===== */
+body.mat-wide #app{max-width:min(1680px,96vw);}
+#s-materials .mat-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 22px 2px;}
+#s-materials .mat-filters{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:10px 22px 14px;border-bottom:1px solid #f0ebe3;}
+#s-materials .mat-filters input[type="search"],#s-materials .mat-filters select{padding:8px 11px;border:1.5px solid #ece7e0;border-radius:9px;background:#fff;font-size:13px;color:#3d3a35;outline:none;font-family:inherit;}
+#s-materials .mat-filters input[type="search"]{min-width:240px;}
+#s-materials .mat-filters input[type="search"]:focus,#s-materials .mat-filters select:focus{border-color:#2D6A4F;}
+#s-materials .mat-filters label{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#8d8578;margin:0;}
+#s-materials .mat-filters input[type="checkbox"]{width:15px;height:15px;margin:0;accent-color:#2D6A4F;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -445,7 +455,7 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
     </div>
   </div>
 
-  <!-- 素材总览 -->
+  <!-- 素材总览（按人分组） -->
   <div class="screen" id="s-materials">
     <div class="top">
       <span class="back" onclick="go('s-admin')">‹ 返回</span>
@@ -453,44 +463,18 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
       <p id="mat-sum">—</p>
     </div>
     <div class="body">
-      <div style="padding:12px 18px 4px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadMaterials()"><span data-icon="refresh"></span>刷新</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="exportZip()"><span data-icon="download"></span>导出全部 ZIP</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadMaterials()"><span data-icon="camera"></span>重新统计</button>
+      <div class="mat-toolbar">
+        <p id="mat-matches" role="status" style="margin:0 auto 0 0;font-size:12.5px;color:#8d8578;"></p>
+        <button class="btn ghost" style="font-size:12.5px;padding:8px 14px;width:auto;flex:none;" onclick="loadMaterials()"><span data-icon="refresh"></span>刷新</button>
+        <button class="btn ghost" style="font-size:12.5px;padding:8px 14px;width:auto;flex:none;" onclick="exportZip()"><span data-icon="download"></span>导出全部 ZIP</button>
       </div>
-      <div class="staff-filters">
-        <label class="staff-search">搜索<input type="search" id="mat-search" placeholder="姓名 / 学号" oninput="matPage=1;renderMaterials()"></label>
-        <label>类型<select id="mat-kind" onchange="matPage=1;renderMaterials()"><option value="all">全部</option><option value="image">图片</option><option value="video">视频</option><option value="audio">音频</option></select></label>
-        <label>第几天<select id="mat-day" onchange="matPage=1;renderMaterials()"><option value="all">全部</option></select></label>
+      <div class="mat-filters">
+        <input type="search" id="mat-search" placeholder="搜索 姓名 / 学号 / 班级" oninput="matPage=1;renderMaterials()">
         <label>校区<select id="mat-campus" onchange="matPage=1;renderMaterials()"><option value="all">全部</option><option value="河源">河源</option><option value="白云">白云</option></select></label>
-        <p id="mat-matches" role="status"></p>
+        <label><input type="checkbox" id="mat-only" onchange="matPage=1;renderMaterials()">只看有素材的</label>
       </div>
-      <div id="mat-list" style="padding:0 18px 0;"></div>
+      <div id="mat-list" style="padding:0 22px 0;"></div>
       <div id="mat-pager" style="padding:12px 18px 30px;display:flex;justify-content:center;align-items:center;gap:14px;font-size:13px;flex-wrap:wrap;"></div>
-    </div>
-  </div>
-
-  <!-- 名单管理 -->
-  <div class="screen" id="s-roster">
-    <div class="top">
-      <span class="back" onclick="go('s-admin')">‹ 返回</span>
-      <h1>报名名单</h1>
-      <p id="roster-sum">—</p>
-    </div>
-    <div class="body">
-      <div style="padding:12px 18px 4px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="document.getElementById('rosterIn').click()"><span data-icon="download"></span>导入名单</button>
-        <input type="file" id="rosterIn" accept=".xlsx,.xls,.csv" style="display:none" onchange="previewImport(this)">
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="addPersonPrompt()"><span data-icon="plus"></span>手动加人</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadRoster()"><span data-icon="refresh"></span>刷新</button>
-      </div>
-      <div style="padding:8px 18px 0;">
-        <input type="text" id="rosterSearch" placeholder="搜索姓名 / 学号 / 班级" oninput="rosterPage=1;renderRoster()"
-               style="width:100%;padding:10px 13px;border:1.5px solid #e0dad2;border-radius:11px;font-size:14px;font-family:inherit;background:#fff;outline:none;">
-      </div>
-      <div class="staff-filters roster-filters"><label>打卡进度<select id="roster-progress" onchange="rosterPage=1;renderRoster()"><option value="all">全部进度</option><option value="complete">全部完成</option><option value="partial">部分完成</option><option value="none">尚未开始</option></select></label><button type="button" class="btn ghost" id="roster-export-filtered" onclick="exportFiltered('roster')">导出筛选名单</button><p id="roster-matches" role="status"></p></div>
-      <div id="roster-list" style="padding:12px 18px 0;"></div>
-      <div id="roster-pager" style="padding:12px 18px 30px;display:flex;justify-content:center;align-items:center;gap:14px;font-size:13px;"></div>
     </div>
   </div>
 
@@ -636,6 +620,7 @@ async function mayLeave(){
   finally{leavePrompt=false;}
 }
 function go(id,opt={}){
+  document.body.classList.toggle('mat-wide', id==='s-materials');
   const navigate=()=>{
     if(id!==currentScreen){
       setHistory({screen:id},opt.replace);
@@ -1498,17 +1483,22 @@ async function submitScore(pid,advance=false){
 // ============ 评分结果 ============
 let SCORES = [];
 
-let MAT_ITEMS=[], MAT_STATS=null, matPage=1, MAT_PAGE_SIZE=48;
+let MAT_PEOPLE=[], MAT_UPS={}, MAT_STATS=null, MAT_META={total_days:21}, matPage=1, MAT_PAGE_SIZE=12;
 async function openMaterials(){ go('s-materials'); await loadMaterials(); }
 async function loadMaterials(){
   const box=document.getElementById('mat-list');
   if(box) box.innerHTML='<div class="empty">加载中…</div>';
   try{
-    const d=await api('/admin/materials');
-    MAT_ITEMS=d.items||[]; MAT_STATS=d.stats||{};
-    const sel=document.getElementById('mat-day');
-    if(sel && sel.options.length<=1){
-      for(let i=1;i<=21;i++){ const o=document.createElement('option'); o.value=String(i); o.textContent='Day '+i; sel.appendChild(o); }
+    const [listD, matD] = await Promise.all([api('/admin/list'), api('/admin/materials')]);
+    MAT_PEOPLE = listD.list || [];
+    MAT_META = { total_days: listD.total_days || 21 };
+    MAT_STATS = matD.stats || {};
+    MAT_UPS = {};
+    for(const u of (matD.items||[])){
+      (MAT_UPS[u.participant_id] = MAT_UPS[u.participant_id] || []).push(u);
+    }
+    for(const k in MAT_UPS){
+      MAT_UPS[k].sort(function(a,b){ return (a.day_no||0)-(b.day_no||0) || ((+a.id)-(+b.id)); });
     }
     matPage=1;
     renderMaterials();
@@ -1517,17 +1507,15 @@ async function loadMaterials(){
     if(box) box.innerHTML='<div class="empty">'+escapeHtml(e.message)+'</div>';
   }
 }
-function matFiltered(){
+function matPeopleFiltered(){
   const q=(document.getElementById('mat-search')?.value||'').trim().toLowerCase();
-  const kind=document.getElementById('mat-kind')?.value||'all';
-  const day=document.getElementById('mat-day')?.value||'all';
   const campus=document.getElementById('mat-campus')?.value||'all';
-  return MAT_ITEMS.filter(function(u){
-    if(kind!=='all' && (u.kind||'image')!==kind) return false;
-    if(day!=='all' && String(u.day_no)!==day) return false;
-    if(campus!=='all' && (u.campus||'')!==campus) return false;
+  const only=!!(document.getElementById('mat-only')?.checked);
+  return MAT_PEOPLE.filter(function(p){
+    if(campus!=='all' && (p.campus||'')!==campus) return false;
+    if(only && !((MAT_UPS[p.id]||[]).length)) return false;
     if(q){
-      const hay=((u.name||'')+' '+(u.student_id||'')).toLowerCase();
+      const hay=((p.name||'')+' '+(p.student_id||'')+' '+(p.class_name||'')+' '+(p.college||'')).toLowerCase();
       if(hay.indexOf(q)<0) return false;
     }
     return true;
@@ -1536,61 +1524,105 @@ function matFiltered(){
 function openMatViewer(src){
   openViewer(src, Array.from(document.querySelectorAll('#mat-list img')).map(function(im){return im.src;}));
 }
-function matCard(u){
-  const kind=u.kind||'image';
+function matImg(u){
+  const url=API+'/img/'+u.file_path;
+  return '<div style="position:relative;border-radius:10px;overflow:hidden;background:#f3efe8;aspect-ratio:1/1;">'
+    + '<img loading="lazy" src="'+url+'" alt="打卡图片" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in;display:block;" onclick="openMatViewer(this.src)">'
+    + '<span style="position:absolute;left:4px;top:4px;background:rgba(45,106,79,.82);color:#fff;font-size:10.5px;padding:1px 6px;border-radius:6px;">D'+escapeHtml(String(u.day_no))+'</span>'
+    + '</div>';
+}
+function matVideo(u){
   const url=API+'/img/'+u.file_path;
   const dl=API+'/download/'+u.file_path;
-  let media='';
-  if(kind==='image'){
-    media='<img loading="lazy" src="'+url+'" alt="打卡图片" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in;" onclick="openMatViewer(this.src)">';
-  }else if(kind==='video'){
-    media='<video src="'+url+'" controls preload="metadata" style="width:100%;height:100%;object-fit:contain;background:#000;"></video>';
-  }else if(kind==='audio'){
-    media='<div style="width:100%;padding:0 10px;text-align:center;"><div style="font-size:22px;margin-bottom:4px;">🎙️</div><audio src="'+url+'" controls style="width:100%;"></audio></div>';
+  return '<div style="background:#241f1b;border-radius:10px;padding:8px 10px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+    + '<span style="font-size:11px;color:#cbb9a6;">D'+escapeHtml(String(u.day_no))+' · 视频</span>'
+    + '<a href="'+dl+'" style="font-size:11px;color:#a8d5ba;text-decoration:none;">下载</a></div>'
+    + '<video src="'+url+'" controls preload="metadata" playsinline style="width:100%;max-height:240px;border-radius:8px;background:#000;display:block;"></video>'
+    + '</div>';
+}
+function matAudio(u){
+  const url=API+'/img/'+u.file_path;
+  const dl=API+'/download/'+u.file_path;
+  return '<div style="display:flex;align-items:center;gap:10px;background:#f7f4ee;border:1px solid #ece3d6;border-radius:10px;padding:8px 10px;">'
+    + '<span style="font-size:11px;color:#2D6A4F;white-space:nowrap;">D'+escapeHtml(String(u.day_no))+' 🎙️</span>'
+    + '<audio src="'+url+'" controls preload="none" style="flex:1;min-width:0;height:34px;"></audio>'
+    + '<a href="'+dl+'" style="font-size:11px;color:#7a6a58;text-decoration:none;white-space:nowrap;">下载</a>'
+    + '</div>';
+}
+function matPersonCard(p){
+  const ups = MAT_UPS[p.id] || [];
+  const imgs = ups.filter(function(u){ return (u.kind||'image')==='image'; });
+  const vids = ups.filter(function(u){ return u.kind==='video'; });
+  const auds = ups.filter(function(u){ return u.kind==='audio'; });
+  let media = '';
+  if(!ups.length){
+    media = '<div style="font-size:12.5px;color:#b9b1a6;padding:16px 0;text-align:center;">暂无素材</div>';
   }else{
-    media='<div style="font-size:12px;color:#999;">'+escapeHtml(kind)+'</div>';
+    if(imgs.length){
+      media += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px;">'
+        + imgs.map(matImg).join('') + '</div>';
+    }
+    if(vids.length || auds.length){
+      media += '<div style="display:flex;flex-direction:column;gap:8px;'+(imgs.length?'margin-top:10px;':'')+'">'
+        + vids.map(matVideo).join('') + auds.map(matAudio).join('') + '</div>';
+    }
   }
-  const kb=Math.round((+u.file_size||0)/1024);
-  const kindName={image:'图片',video:'视频',audio:'音频'}[kind]||kind;
-  return '<div style="background:#fff;border:1.5px solid #ece7e0;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;">'
-    + '<div style="height:132px;background:#f6f2ea;display:flex;align-items:center;justify-content:center;overflow:hidden;">'+media+'</div>'
-    + '<div style="padding:8px 10px 10px;font-size:12px;color:#555;line-height:1.6;">'
-    + '<b style="color:#2D6A4F;">'+escapeHtml(u.name||'—')+'</b> <span style="color:#aaa;">'+escapeHtml(u.student_id||'')+'</span><br>'
-    + 'Day '+escapeHtml(String(u.day_no==null?'—':u.day_no))+' · '+kindName+' · '+kb+' KB'
-    + '<div style="margin-top:6px;display:flex;gap:8px;">'
-    + '<a href="'+dl+'" style="font-size:11.5px;color:#2D6A4F;text-decoration:none;">下载</a>'
-    + '<a href="#" onclick="openDetail('+(+u.participant_id)+');return false;" style="font-size:11.5px;color:#7a6a58;text-decoration:none;">看此人</a>'
-    + '</div></div></div>';
+  const days = ups.reduce(function(acc,u){ if(u.day_no && acc.indexOf(u.day_no)<0) acc.push(u.day_no); return acc; }, []).length;
+  const tags = [];
+  if(imgs.length) tags.push(imgs.length+' 张图');
+  if(vids.length) tags.push(vids.length+' 段视频');
+  if(auds.length) tags.push(auds.length+' 段录音');
+  return '<article style="background:#fff;border:1.5px solid #ece7e0;border-radius:14px;padding:14px 15px 15px;display:flex;flex-direction:column;gap:12px;">'
+    + '<header style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
+    +   '<div style="min-width:0;">'
+    +     '<div style="font-size:15px;font-weight:700;color:#2b3a34;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+escapeHtml(p.name||'—')
+    +       '<span style="font-weight:400;font-size:12px;color:#a99f93;margin-left:7px;">'+escapeHtml(p.student_id||'')+'</span></div>'
+    +     '<div style="font-size:12px;color:#8d8578;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+    +       escapeHtml(p.class_name||p.college||'')+(p.campus?(' · '+escapeHtml(p.campus)):'')+'</div>'
+    +   '</div>'
+    +   '<div style="text-align:right;white-space:nowrap;">'
+    +     '<div style="font-size:11px;color:#7a6a58;">打卡 <b style="font-size:14px;color:#2D6A4F;">'+(p.days_done||0)+'</b> / '+MAT_META.total_days+'</div>'
+    +     (ups.length?('<div style="font-size:11px;color:#C97B54;margin-top:2px;">素材 '+ups.length+' 条 · '+tags.join(' / ')+'</div>'):'')
+    +   '</div>'
+    + '</header>'
+    + media
+    + '<footer style="display:flex;gap:14px;justify-content:flex-end;margin-top:auto;">'
+    +   '<a href="#" onclick="openDetail('+(+p.id)+');return false;" style="font-size:12px;color:#7a6a58;text-decoration:none;">看详情 ›</a>'
+    + '</footer>'
+    + '</article>';
 }
 function renderMaterials(){
   const box=document.getElementById('mat-list');
   if(!box) return;
-  const all=matFiltered();
-  const total=all.length;
+  const list=matPeopleFiltered();
+  const total=list.length;
   const pages=Math.max(1,Math.ceil(total/MAT_PAGE_SIZE));
   if(matPage>pages) matPage=pages;
+  if(matPage<1) matPage=1;
   const start=(matPage-1)*MAT_PAGE_SIZE;
-  const slice=all.slice(start,start+MAT_PAGE_SIZE);
+  const slice=list.slice(start,start+MAT_PAGE_SIZE);
   const st=MAT_STATS||{};
+  const withMat=MAT_PEOPLE.filter(function(p){ return (MAT_UPS[p.id]||[]).length>0; }).length;
   const sumEl=document.getElementById('mat-sum');
-  if(sumEl) sumEl.textContent='共 '+(st.total||0)+' 条素材 · 图片 '+(st.image||0)+' / 视频 '+(st.video||0)+' / 音频 '+(st.audio||0)+' · 涉及 '+(st.people||0)+' 人';
+  if(sumEl) sumEl.textContent='共 '+MAT_PEOPLE.length+' 人 · 已交素材 '+withMat+' 人 · 图片 '+(st.image||0)+' / 视频 '+(st.video||0)+' / 音频 '+(st.audio||0);
   const mEl=document.getElementById('mat-matches');
-  if(mEl) mEl.textContent = total===0 ? '没有符合条件的素材' : ('筛选出 '+total+' 条');
+  if(mEl) mEl.textContent='显示 '+total+' 人';
   box.innerHTML = total===0
-    ? '<div class="empty">没有素材</div>'
-    : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:12px;">'+slice.map(matCard).join('')+'</div>';
+    ? '<div class="empty">没有符合条件的人员</div>'
+    : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;">'+slice.map(matPersonCard).join('')+'</div>';
   const pager=document.getElementById('mat-pager');
   if(!pager) return;
-  if(pages<=1){ pager.innerHTML=''; return; }
+  if(total<=MAT_PAGE_SIZE){ pager.innerHTML=''; return; }
   pager.innerHTML='<button type="button" class="btn ghost" style="font-size:12px;padding:7px 12px;" onclick="matGo('+(matPage-1)+')" '+(matPage<=1?'disabled':'')+'>上一页</button>'
-    + '<span style="color:#7a6a58;">第 '+matPage+' / '+pages+' 页</span>'
+    + '<span style="color:#7a6a58;">第 '+matPage+' / '+pages+' 页（共 '+total+' 人）</span>'
     + '<button type="button" class="btn ghost" style="font-size:12px;padding:7px 12px;" onclick="matGo('+(matPage+1)+')" '+(matPage>=pages?'disabled':'')+'>下一页</button>';
 }
 function matGo(p){
-  const pages=Math.max(1,Math.ceil(matFiltered().length/MAT_PAGE_SIZE));
+  const pages=Math.max(1,Math.ceil(matPeopleFiltered().length/MAT_PAGE_SIZE));
   matPage=Math.min(pages,Math.max(1,p));
   renderMaterials();
-  window.scrollTo(0,0);
+  document.getElementById('mat-list').scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function openScores(){ go('s-scores'); await loadScores(); }
 
