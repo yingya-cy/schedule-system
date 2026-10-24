@@ -1830,15 +1830,6 @@ async function openDetail(pid,opt={}){
         </div>`;
 
       if(rec){
-        const items = [rec.item1, rec.item2, rec.item3].filter(Boolean);
-        if(items.length){
-          html += '<div style="font-size:12.5px;color:#444;line-height:1.75;">' +
-            items.map((t,i)=>`<div>${i+1}. ${t}</div>`).join('') + '</div>';
-        }
-        if(rec.action_text){
-          html += `<div style="margin-top:8px;padding:9px;background:#fdf6f2;border-radius:8px;font-size:12.5px;color:#8a6a4a;">
-            <b>感恩行为：</b>${rec.action_text}</div>`;
-        }
       }
 
       if(imgs.length){
