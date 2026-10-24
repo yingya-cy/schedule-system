@@ -1610,7 +1610,7 @@ function renderMaterials(){
   if(mEl) mEl.textContent='显示 '+total+' 人';
   box.innerHTML = total===0
     ? '<div class="empty">没有符合条件的人员</div>'
-    : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;">'+slice.map(matPersonCard).join('')+'</div>';
+    : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:start;">'+slice.map(matPersonCard).join('')+'</div>';
   const pager=document.getElementById('mat-pager');
   if(!pager) return;
   if(total<=MAT_PAGE_SIZE){ pager.innerHTML=''; return; }
