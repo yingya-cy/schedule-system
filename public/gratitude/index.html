@@ -526,6 +526,7 @@ const ICON_PATHS = {
   check:'M20 6 9 17l-5-5',
   camera:'M4 7h4l2-3h4l2 3h4v13H4Zm12 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
   video:'M3 6h12v12H3Zm12 4 6-3v10l-6-3',
+  audio:'M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3ZM5 11a7 7 0 0 0 14 0M12 18v3m-3 0h6',
   download:'M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5',
   close:'m6 6 12 12M18 6 6 18',
   refresh:'M20 7v5h-5M4 17v-5h5M19 9a7 7 0 0 0-12-4L4 8m1 7a7 7 0 0 0 12 4l3-3',
@@ -952,12 +953,17 @@ function renderFill(){
     </div>
     ${d.is_special?`
     <div class="field">
-      <label>② 感恩行为素材 <span class="opt">（视频 / 录音可选 · 录音 30 秒–3 分钟）</span></label>
+      <label>② 感恩行为素材 <span class="opt">（视频、录音各最多 1 个，可只传其一）</span></label>
       <div class="upload" onclick="document.getElementById('videoIn').click()" style="border-color:#F0C9A8;">
-        <div class="ic">${icon('video')}</div><div class="t1">点击上传视频或录音</div>
-        <div class="t2">感恩树 / 感恩行为 · mp4 / mp3 / m4a / wav · 音频不超过 30MB</div>
+        <div class="ic">${icon('video')}</div><div class="t1">上传视频</div>
+        <div class="t2">感恩树 / 感恩行为画面 · mp4 / mov · 15 秒–3 分钟 · 不超过 15MB</div>
       </div>
-      <input type="file" id="videoIn" accept="video/*,audio/*" style="display:none" onchange="onPickVideo(this)">
+      <input type="file" id="videoIn" accept="video/*" style="display:none" onchange="onPickVideo(this)">
+      <div class="upload" onclick="document.getElementById('audioIn').click()" style="border-color:#F0C9A8;margin-top:10px;">
+        <div class="ic">${icon('audio')}</div><div class="t1">上传录音</div>
+        <div class="t2">口述感谢 / 通话片段 · mp3 / m4a / wav / aac · 30 秒–3 分钟 · 不超过 30MB</div>
+      </div>
+      <input type="file" id="audioIn" accept="audio/*" style="display:none" onchange="onPickAudio(this)">
       <div class="thumbs" id="vidThumbs"></div>
     </div>`:''}
     <button class="btn acc" id="save-day" onclick="saveDay(${x.day_no}, ${d.is_special})">${icon('check')} 保存今天的感恩记录</button>
@@ -1033,30 +1039,54 @@ function onPickVideo(inp){
   if(savingDay||pickingFiles)return;
   const f = inp.files[0];
   if(!f){ return; }
-  const isAudio = (f.type||'').startsWith('audio/');
-  const limitMB = isAudio ? 30 : 15;
-  if(f.size > limitMB*1024*1024){ toast((isAudio?'录音':'视频')+'不能超过 '+limitMB+'MB'); inp.value=''; return; }
-  window.__vids = window.__vids || [];
-  for(const v of window.__vids)if(v.url?.startsWith('blob:'))URL.revokeObjectURL(v.url);
-  window.__vids = [{url:URL.createObjectURL(f), file:f, kind:isAudio?'audio':'video'}];   // 只保留一个
+  if(!(f.type||'').startsWith('video/')){ toast('请选择视频文件'); inp.value=''; return; }
+  if(f.size > 15*1024*1024){ toast('视频不能超过 15MB'); inp.value=''; return; }
+  window.__vids = (window.__vids||[]).filter(function(v){
+    if(v.kind==='video'){ if(v.url&&v.url.indexOf('blob:')===0)URL.revokeObjectURL(v.url); return false; }
+    return true;
+  });
+  window.__vids.push({url:URL.createObjectURL(f), file:f, kind:'video'});
   fillDirty=true;
   renderVidThumbs();
   syncFillControls();
   inp.value='';
-  toast(isAudio?'已选择录音':'已选择视频');
+  toast('已选择视频');
+}
+function onPickAudio(inp){
+  if(savingDay||pickingFiles)return;
+  const f = inp.files[0];
+  if(!f){ return; }
+  if(!(f.type||'').startsWith('audio/')){ toast('请选择音频文件'); inp.value=''; return; }
+  if(f.size > 30*1024*1024){ toast('录音不能超过 30MB'); inp.value=''; return; }
+  window.__vids = (window.__vids||[]).filter(function(v){
+    if(v.kind==='audio'){ if(v.url&&v.url.indexOf('blob:')===0)URL.revokeObjectURL(v.url); return false; }
+    return true;
+  });
+  window.__vids.push({url:URL.createObjectURL(f), file:f, kind:'audio'});
+  fillDirty=true;
+  renderVidThumbs();
+  syncFillControls();
+  inp.value='';
+  toast('已选择录音');
 }
 function renderVidThumbs(){
   const box=document.getElementById('vidThumbs');
   if(!box) return;
-  box.innerHTML=(window.__vids||[]).map((v,i)=>
-    `<div class="thumb ${v.uploadState==='error'?'upload-error':''}" style="background:#333;">
-       ${v.kind==="audio"?`<audio src="${v.url}" controls style="width:100%;margin-top:18px;"></audio>`:`<video src="${v.url}" style="width:100%;height:100%;object-fit:cover;" controls playsinline preload="metadata"></video>`}
-       ${fillContext?.editing?'<button type="button" class="x" aria-label="移除视频" onclick="delVid('+i+')">×</button>':''}</div>`).join('');
+  box.innerHTML=(window.__vids||[]).map(function(v,i){
+    const rm = (fillContext && fillContext.editing) ? '<button type="button" class="x" aria-label="移除素材" onclick="delVid('+i+')">×</button>' : '';
+    if(v.kind==='audio'){
+      return '<div style="position:relative;grid-column:1/-1;background:#222;border:1px solid #3a3a3a;border-radius:12px;padding:12px 14px;">'
+        + '<div style="font-size:12px;color:#9aa6a6;margin-bottom:8px;">录音素材' + (v.uploadState==='error'?'（上传失败，请重试）':'') + '</div>'
+        + '<audio src="'+v.url+'" controls style="width:100%;"></audio>' + rm + '</div>';
+    }
+    return '<div class="thumb ' + (v.uploadState==='error'?'upload-error':'') + '" style="background:#333;">'
+      + '<video src="'+v.url+'" style="width:100%;height:100%;object-fit:cover;" controls playsinline preload="metadata"></video>' + rm + '</div>';
+  }).join('');
   syncFillControls();
 }
 async function delVid(i){
   if(savingDay||pickingFiles||!fillContext?.editing)return;
-  if(!await showConfirm('移除这段视频？','保存后生效。',{okText:'移除',cancelText:'取消'}))return;
+  if(!await showConfirm('移除这段素材？','保存后生效。',{okText:'移除',cancelText:'取消'}))return;
   const [v]=window.__vids.splice(i,1);if(v.url.startsWith('blob:'))URL.revokeObjectURL(v.url);
   fillDirty=true;renderVidThumbs();
 }
