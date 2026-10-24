@@ -908,8 +908,8 @@ async function openFill(x,opt={}){
     const d=await api('/day/'+ME.id+'/'+x.day_no);
     if(request!==openRequest||currentScreen!=='s-fill')return;
     fillContext={x,d,editing:!x.done};fillDirty=false;
-    window.__imgs=(d.uploads||[]).filter(u=>u.kind!=='video').map(u=>({url:API+'/img/'+u.file_path,path:u.file_path,kind:'image'}));
-    window.__vids=(d.uploads||[]).filter(u=>u.kind==='video').map(u=>({url:API+'/img/'+u.file_path,path:u.file_path,kind:'video'}));
+    window.__imgs=(d.uploads||[]).filter(u=>u.kind==='image'||!u.kind).map(u=>({url:API+'/img/'+u.file_path,path:u.file_path,kind:'image'}));
+    window.__vids=(d.uploads||[]).filter(u=>u.kind==='video'||u.kind==='audio').map(u=>({url:API+'/img/'+u.file_path,path:u.file_path,kind:'video'}));
     renderFill();
   }catch(e){
     if(request!==openRequest||currentScreen!=='s-fill')return;
@@ -952,12 +952,12 @@ function renderFill(){
     </div>
     ${d.is_special?`
     <div class="field">
-      <label>② 感恩行为素材 <span class="opt">（视频可选 · 30秒内）</span></label>
+      <label>② 感恩行为素材 <span class="opt">（视频 / 录音可选 · 录音 30 秒–3 分钟）</span></label>
       <div class="upload" onclick="document.getElementById('videoIn').click()" style="border-color:#F0C9A8;">
-        <div class="ic">${icon('video')}</div><div class="t1">点击上传视频</div>
-        <div class="t2">感恩树 / 感恩行为 · mp4 · 不超过 15MB</div>
+        <div class="ic">${icon('video')}</div><div class="t1">点击上传视频或录音</div>
+        <div class="t2">感恩树 / 感恩行为 · mp4 / mp3 / m4a / wav · 音频不超过 30MB</div>
       </div>
-      <input type="file" id="videoIn" accept="video/*" style="display:none" onchange="onPickVideo(this)">
+      <input type="file" id="videoIn" accept="video/*,audio/*" style="display:none" onchange="onPickVideo(this)">
       <div class="thumbs" id="vidThumbs"></div>
     </div>`:''}
     <button class="btn acc" id="save-day" onclick="saveDay(${x.day_no}, ${d.is_special})">${icon('check')} 保存今天的感恩记录</button>
@@ -1033,22 +1033,24 @@ function onPickVideo(inp){
   if(savingDay||pickingFiles)return;
   const f = inp.files[0];
   if(!f){ return; }
-  if(f.size > 15*1024*1024){ toast('视频不能超过 15MB'); inp.value=''; return; }
+  const isAudio = (f.type||'').startsWith('audio/');
+  const limitMB = isAudio ? 30 : 15;
+  if(f.size > limitMB*1024*1024){ toast((isAudio?'录音':'视频')+'不能超过 '+limitMB+'MB'); inp.value=''; return; }
   window.__vids = window.__vids || [];
   for(const v of window.__vids)if(v.url?.startsWith('blob:'))URL.revokeObjectURL(v.url);
-  window.__vids = [{url:URL.createObjectURL(f), file:f, kind:'video'}];   // 只保留一个
+  window.__vids = [{url:URL.createObjectURL(f), file:f, kind:isAudio?'audio':'video'}];   // 只保留一个
   fillDirty=true;
   renderVidThumbs();
   syncFillControls();
   inp.value='';
-  toast('已选择视频');
+  toast(isAudio?'已选择录音':'已选择视频');
 }
 function renderVidThumbs(){
   const box=document.getElementById('vidThumbs');
   if(!box) return;
   box.innerHTML=(window.__vids||[]).map((v,i)=>
     `<div class="thumb ${v.uploadState==='error'?'upload-error':''}" style="background:#333;">
-       <video src="${v.url}" style="width:100%;height:100%;object-fit:cover;" controls playsinline preload="metadata"></video>
+       ${v.kind==="audio"?`<audio src="${v.url}" controls style="width:100%;margin-top:18px;"></audio>`:`<video src="${v.url}" style="width:100%;height:100%;object-fit:cover;" controls playsinline preload="metadata"></video>`}
        ${fillContext?.editing?'<button type="button" class="x" aria-label="移除视频" onclick="delVid('+i+')">×</button>':''}</div>`).join('');
   syncFillControls();
 }
@@ -1358,8 +1360,8 @@ async function openScore(pid, name,opt={}){
     const ups = upMap[n] || [];
     if(!ups.length) continue;
     hasAny = true;
-    const imgs = ups.filter(u=>u.kind!=='video');
-    const vids = ups.filter(u=>u.kind==='video');
+    const imgs = ups.filter(u=>u.kind==='image'||!u.kind);
+    const vids = ups.filter(u=>u.kind==='video'||u.kind==='audio');
     const D = String(n).padStart(2,'0');
     let inner = '';
     if(imgs.length){
