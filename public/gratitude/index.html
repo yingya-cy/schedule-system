@@ -410,6 +410,7 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openJudge()"><span data-icon="star"></span>评委打分</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openScores()"><span data-icon="chart"></span>评分结果</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openRoster()"><span data-icon="people"></span>名单管理</button>
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openMaterials()"><span data-icon="camera"></span>素材总览</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;color:#C97B54;" onclick="adminLogout()">退出管理</button>
       </div>
       <div class="staff-filters">
@@ -441,6 +442,31 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
                style="width:100%;padding:10px 13px;border:1.5px solid #e0dad2;border-radius:11px;font-size:14px;font-family:inherit;background:#fff;outline:none;">
       </div>
       <div id="scores-list" style="padding:12px 18px 30px;"></div>
+    </div>
+  </div>
+
+  <!-- 素材总览 -->
+  <div class="screen" id="s-materials">
+    <div class="top">
+      <span class="back" onclick="go('s-admin')">‹ 返回</span>
+      <h1>素材总览</h1>
+      <p id="mat-sum">—</p>
+    </div>
+    <div class="body">
+      <div style="padding:12px 18px 4px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadMaterials()"><span data-icon="refresh"></span>刷新</button>
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="exportZip()"><span data-icon="download"></span>导出全部 ZIP</button>
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadMaterials()"><span data-icon="camera"></span>重新统计</button>
+      </div>
+      <div class="staff-filters">
+        <label class="staff-search">搜索<input type="search" id="mat-search" placeholder="姓名 / 学号" oninput="matPage=1;renderMaterials()"></label>
+        <label>类型<select id="mat-kind" onchange="matPage=1;renderMaterials()"><option value="all">全部</option><option value="image">图片</option><option value="video">视频</option><option value="audio">音频</option></select></label>
+        <label>第几天<select id="mat-day" onchange="matPage=1;renderMaterials()"><option value="all">全部</option></select></label>
+        <label>校区<select id="mat-campus" onchange="matPage=1;renderMaterials()"><option value="all">全部</option><option value="河源">河源</option><option value="白云">白云</option></select></label>
+        <p id="mat-matches" role="status"></p>
+      </div>
+      <div id="mat-list" style="padding:0 18px 0;"></div>
+      <div id="mat-pager" style="padding:12px 18px 30px;display:flex;justify-content:center;align-items:center;gap:14px;font-size:13px;flex-wrap:wrap;"></div>
     </div>
   </div>
 
@@ -1472,6 +1498,100 @@ async function submitScore(pid,advance=false){
 // ============ 评分结果 ============
 let SCORES = [];
 
+let MAT_ITEMS=[], MAT_STATS=null, matPage=1, MAT_PAGE_SIZE=48;
+async function openMaterials(){ go('s-materials'); await loadMaterials(); }
+async function loadMaterials(){
+  const box=document.getElementById('mat-list');
+  if(box) box.innerHTML='<div class="empty">加载中…</div>';
+  try{
+    const d=await api('/admin/materials');
+    MAT_ITEMS=d.items||[]; MAT_STATS=d.stats||{};
+    const sel=document.getElementById('mat-day');
+    if(sel && sel.options.length<=1){
+      for(let i=1;i<=21;i++){ const o=document.createElement('option'); o.value=String(i); o.textContent='Day '+i; sel.appendChild(o); }
+    }
+    matPage=1;
+    renderMaterials();
+  }catch(e){
+    if(currentScreen!=='s-materials')return;
+    if(box) box.innerHTML='<div class="empty">'+escapeHtml(e.message)+'</div>';
+  }
+}
+function matFiltered(){
+  const q=(document.getElementById('mat-search')?.value||'').trim().toLowerCase();
+  const kind=document.getElementById('mat-kind')?.value||'all';
+  const day=document.getElementById('mat-day')?.value||'all';
+  const campus=document.getElementById('mat-campus')?.value||'all';
+  return MAT_ITEMS.filter(function(u){
+    if(kind!=='all' && (u.kind||'image')!==kind) return false;
+    if(day!=='all' && String(u.day_no)!==day) return false;
+    if(campus!=='all' && (u.campus||'')!==campus) return false;
+    if(q){
+      const hay=((u.name||'')+' '+(u.student_id||'')).toLowerCase();
+      if(hay.indexOf(q)<0) return false;
+    }
+    return true;
+  });
+}
+function openMatViewer(src){
+  openViewer(src, Array.from(document.querySelectorAll('#mat-list img')).map(function(im){return im.src;}));
+}
+function matCard(u){
+  const kind=u.kind||'image';
+  const url=API+'/img/'+u.file_path;
+  const dl=API+'/download/'+u.file_path;
+  let media='';
+  if(kind==='image'){
+    media='<img loading="lazy" src="'+url+'" alt="打卡图片" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in;" onclick="openMatViewer(this.src)">';
+  }else if(kind==='video'){
+    media='<video src="'+url+'" controls preload="metadata" style="width:100%;height:100%;object-fit:contain;background:#000;"></video>';
+  }else if(kind==='audio'){
+    media='<div style="width:100%;padding:0 10px;text-align:center;"><div style="font-size:22px;margin-bottom:4px;">🎙️</div><audio src="'+url+'" controls style="width:100%;"></audio></div>';
+  }else{
+    media='<div style="font-size:12px;color:#999;">'+escapeHtml(kind)+'</div>';
+  }
+  const kb=Math.round((+u.file_size||0)/1024);
+  const kindName={image:'图片',video:'视频',audio:'音频'}[kind]||kind;
+  return '<div style="background:#fff;border:1.5px solid #ece7e0;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;">'
+    + '<div style="height:132px;background:#f6f2ea;display:flex;align-items:center;justify-content:center;overflow:hidden;">'+media+'</div>'
+    + '<div style="padding:8px 10px 10px;font-size:12px;color:#555;line-height:1.6;">'
+    + '<b style="color:#2D6A4F;">'+escapeHtml(u.name||'—')+'</b> <span style="color:#aaa;">'+escapeHtml(u.student_id||'')+'</span><br>'
+    + 'Day '+escapeHtml(String(u.day_no==null?'—':u.day_no))+' · '+kindName+' · '+kb+' KB'
+    + '<div style="margin-top:6px;display:flex;gap:8px;">'
+    + '<a href="'+dl+'" style="font-size:11.5px;color:#2D6A4F;text-decoration:none;">下载</a>'
+    + '<a href="#" onclick="openDetail('+(+u.participant_id)+');return false;" style="font-size:11.5px;color:#7a6a58;text-decoration:none;">看此人</a>'
+    + '</div></div></div>';
+}
+function renderMaterials(){
+  const box=document.getElementById('mat-list');
+  if(!box) return;
+  const all=matFiltered();
+  const total=all.length;
+  const pages=Math.max(1,Math.ceil(total/MAT_PAGE_SIZE));
+  if(matPage>pages) matPage=pages;
+  const start=(matPage-1)*MAT_PAGE_SIZE;
+  const slice=all.slice(start,start+MAT_PAGE_SIZE);
+  const st=MAT_STATS||{};
+  const sumEl=document.getElementById('mat-sum');
+  if(sumEl) sumEl.textContent='共 '+(st.total||0)+' 条素材 · 图片 '+(st.image||0)+' / 视频 '+(st.video||0)+' / 音频 '+(st.audio||0)+' · 涉及 '+(st.people||0)+' 人';
+  const mEl=document.getElementById('mat-matches');
+  if(mEl) mEl.textContent = total===0 ? '没有符合条件的素材' : ('筛选出 '+total+' 条');
+  box.innerHTML = total===0
+    ? '<div class="empty">没有素材</div>'
+    : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:12px;">'+slice.map(matCard).join('')+'</div>';
+  const pager=document.getElementById('mat-pager');
+  if(!pager) return;
+  if(pages<=1){ pager.innerHTML=''; return; }
+  pager.innerHTML='<button type="button" class="btn ghost" style="font-size:12px;padding:7px 12px;" onclick="matGo('+(matPage-1)+')" '+(matPage<=1?'disabled':'')+'>上一页</button>'
+    + '<span style="color:#7a6a58;">第 '+matPage+' / '+pages+' 页</span>'
+    + '<button type="button" class="btn ghost" style="font-size:12px;padding:7px 12px;" onclick="matGo('+(matPage+1)+')" '+(matPage>=pages?'disabled':'')+'>下一页</button>';
+}
+function matGo(p){
+  const pages=Math.max(1,Math.ceil(matFiltered().length/MAT_PAGE_SIZE));
+  matPage=Math.min(pages,Math.max(1,p));
+  renderMaterials();
+  window.scrollTo(0,0);
+}
 async function openScores(){ go('s-scores'); await loadScores(); }
 
 async function loadScores(){
