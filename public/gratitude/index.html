@@ -744,14 +744,35 @@ function flyLeafToTree(dayno){
     tree.animate([{transform:'scale(1)'},{transform:'scale(1.07)'},{transform:'scale(1)'}],{duration:520,easing:'cubic-bezier(.3,.8,.3,1)'});
   },1780);
 }
-function savedFeedback(dayno){
+let leafStartTimer=0;
+function savedFeedback(dayno, prog){
   const el=document.getElementById('save-feedback');
-  clearTimeout(savedFeedbackTimer);
+  clearTimeout(savedFeedbackTimer);clearTimeout(leafStartTimer);
   el.classList.remove('on');
   void el.offsetWidth;
   el.classList.add('on');
-  flyLeafToTree(dayno);
-  savedFeedbackTimer=setTimeout(()=>el.classList.remove('on'),2200);
+  savedFeedbackTimer=setTimeout(()=>el.classList.remove('on'),2700);
+  // 顺序：先弹窗 → 再飞叶子 → 落树后进度条才走
+  const delay=prog?420:0;
+  leafStartTimer=setTimeout(()=>flyLeafToTree(dayno),delay);
+  if(prog)animateProgress(delay+1880,prog);
+}
+
+function animateProgress(at, s){
+  const doneEl=document.getElementById('p-done'), barEl=document.getElementById('p-bar');
+  if(!doneEl||!barEl)return;
+  setTimeout(()=>{
+    if(!doneEl.isConnected||!barEl.isConnected)return;
+    barEl.style.transition='width .78s cubic-bezier(.3,.85,.35,1)';
+    barEl.style.width=s.toPct+'%';
+    const from=s.fromDone, diff=s.toDone-s.fromDone, t0=performance.now(), dur=780;
+    (function tick(now){
+      const p=Math.min(1,(now-t0)/dur);
+      doneEl.textContent=Math.round(from+diff*p);
+      if(p<1)requestAnimationFrame(tick);
+      else setTimeout(()=>{barEl.style.transition='';},120);
+    })(t0);
+  }, at);
 }
 let previewMotionTimer=0;
 function previewCompletionMotion(){
@@ -1371,6 +1392,8 @@ async function saveDay(dayno,isSpecial){
       return;
     }
     status.textContent='正在保存记录…';
+    const prevDone=calendarSnapshot?calendarSnapshot.done_count:null;
+    const prevPct=calendarSnapshot?calendarSnapshot.progress:null;
     await api('/day',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({participant_id:ME.id,day_no:dayno,action_images:[...imgs,...vids].map(im=>im.path)})});
     calendarRequest++;
     if(calendarSnapshot){
@@ -1382,8 +1405,12 @@ async function saveDay(dayno,isSpecial){
     }
     fillDirty=false;savingDay=false;
     setHistory({screen:'s-days'},true);showScreen('s-days',true);
-    savedFeedback(dayno);
-    void refreshDays();
+    if(prevDone!=null){
+      document.getElementById('p-done').textContent=prevDone;
+      document.getElementById('p-bar').style.width=prevPct+'%';
+    }
+    savedFeedback(dayno, prevDone!=null?{fromDone:prevDone,toDone:calendarSnapshot.done_count,fromPct:prevPct,toPct:calendarSnapshot.progress}:null);
+    setTimeout(()=>{void refreshDays();},3400);
   }catch(e){status.textContent='记录未保存。'+e.message+'，已选文件保留，可重试。';}
   finally{
     savingDay=false;
