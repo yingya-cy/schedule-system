@@ -275,7 +275,8 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
 .save-feedback { position: fixed; top: 42%; left: 50%; transform: translate(-50%,-50%); color: var(--green); z-index: 400; text-align: center; pointer-events: none; }
 .save-feedback-note { padding: 24px 30px; background: #f8f3d8; border: 1px solid #e5ddb8; border-radius: 4px; box-shadow: 0 12px 50px #243c3525; opacity: 0; transform: translateY(8px) scale(.94); }
 .save-feedback .icon { width: 36px; height: 36px; display: block; margin: 0 auto 10px; }
-.save-feedback .save-spark { position: absolute; width: 34px; height: 34px; right: 18px; top: 12px; object-fit: contain; opacity: 0; pointer-events: none; }
+.save-feedback .save-spark { display: none; }  /* 由 .leaf-fly 接管飞行，避免双重叶子 */
+.leaf-fly { position: fixed; z-index: 900; pointer-events: none; object-fit: contain; will-change: transform, opacity; filter: drop-shadow(0 3px 3px #6b4a2022); transition: transform .9s cubic-bezier(.3,.75,.25,1), opacity .9s ease; }
 .modal-card { border-radius: 8px; }.modal-btn,.modal-field input { border-radius: 6px; }
 #image-viewer { border: 0; padding: 0; background: #182625; color: #fff; width: 100vw; height: 100dvh; max-width: none; max-height: none; }#image-viewer::backdrop { background: #182625; }
 .viewer-tools { display: flex; justify-content: space-between; align-items: center; padding: 18px; }.viewer-tools button,.viewer-arrow { width: 44px; height: 44px; color: #fff; background: transparent; border: 1px solid #ffffff40; border-radius: 6px; cursor: pointer; }
@@ -398,7 +399,6 @@ body {
 .thumb { animation: note-drop .25s cubic-bezier(.2,.75,.3,1) both; }
 .save-feedback.on .save-feedback-note { animation: feedback-note-in .34s 1.05s cubic-bezier(.2,.8,.3,1) both,saved-glow 1.15s 1.05s ease both; }
 .save-feedback.on .icon { animation: leaf-check .38s 1.12s cubic-bezier(.2,.8,.3,1) both; }
-.save-feedback.on .save-spark { animation: spark-to-tree 1s .05s cubic-bezier(.2,.65,.25,1) both; }
 .toast.on { transform: translateX(-50%) translateY(-4px); }
 
 @media(min-width:900px) {
@@ -696,23 +696,43 @@ let touchX=0;
 document.getElementById('image-viewer').addEventListener('touchstart',e=>touchX=e.changedTouches[0].clientX,{passive:true});
 document.getElementById('image-viewer').addEventListener('touchend',e=>{const delta=e.changedTouches[0].clientX-touchX;if(Math.abs(delta)>50)moveViewer(delta<0?1:-1);},{passive:true});
 let savedFeedbackTimer=0;
-function savedFeedback(){
+let leafFlyTimer=0;
+function flyLeafToTree(dayno){
+  if(!dayno)return;
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const cells=[...document.querySelectorAll('#daygrid .cell')];
+  const cell=cells.find(c=>String(c.dataset.day)===String(dayno));
+  const tree=document.querySelector('.gratitude-sapling-art');
+  if(!cell||!tree)return;
+  let cr=cell.getBoundingClientRect(),tr=tree.getBoundingClientRect();
+  if(tr.width<1||tr.height<1)return;
+  const size=26;
+  const ox=Math.min(Math.max(cr.right-size/2-8,size/2+4),innerWidth-size/2-4);
+  const oy=Math.min(Math.max(cr.top+size/2+6,size/2+4),innerHeight-size/2-4);
+  const tx=Math.min(Math.max(tr.left+tr.width*.5,size),innerWidth-size);
+  const ty=Math.min(Math.max(tr.top+tr.height*.45,size),innerHeight-size);
+  const idx=((dayno-1)%LEAF_FILES.length+LEAF_FILES.length)%LEAF_FILES.length;
+  const img=document.createElement('img');
+  img.src='assets/'+LEAF_FILES[idx];
+  img.alt='';img.className='leaf-fly';
+  img.style.width=size+'px';img.style.height=size+'px';
+  img.style.left=(ox-size/2)+'px';img.style.top=(oy-size/2)+'px';
+  img.style.opacity='1';
+  document.body.appendChild(img);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    img.style.transform='translate('+(tx-ox)+'px,'+(ty-oy)+'px) scale(.6) rotate(26deg)';
+    img.style.opacity='.12';
+  }));
+  clearTimeout(leafFlyTimer);
+  leafFlyTimer=setTimeout(()=>img.remove(),1150);
+}
+function savedFeedback(dayno){
   const el=document.getElementById('save-feedback');
   clearTimeout(savedFeedbackTimer);
   el.classList.remove('on');
   void el.offsetWidth;
-  const spark=el.querySelector('.save-spark');
-  const tree=document.querySelector('.gratitude-sapling-art');
-  if(spark&&tree){
-    const sparkRect=spark.getBoundingClientRect();
-    const treeRect=tree.getBoundingClientRect();
-    const sparkX=treeRect.left+treeRect.width/2-(sparkRect.left+sparkRect.width/2);
-    const sparkY=treeRect.top+treeRect.height/2-(sparkRect.top+sparkRect.height/2);
-    spark.style.setProperty('--spark-x',sparkX+'px');
-    spark.style.setProperty('--spark-y',sparkY+'px');
-    spark.style.setProperty('--spark-rotate',sparkX<0?'-20deg':'20deg');
-  }
   el.classList.add('on');
+  flyLeafToTree(dayno);
   savedFeedbackTimer=setTimeout(()=>el.classList.remove('on'),2200);
 }
 let previewMotionTimer=0;
@@ -726,7 +746,7 @@ function previewCompletionMotion(){
   target.classList.add('motion-preview');
   const state=target.querySelector('.s');
   if(state)state.textContent='微光已收集';
-  savedFeedback();
+  savedFeedback(target.dataset.day);
   previewMotionTimer=setTimeout(()=>{
     if(calendarSnapshot)renderDays(calendarSnapshot);
     button.disabled=false;
@@ -1063,6 +1083,7 @@ function renderDays(d){
     else if(x.is_future){cls+=' preview';st='预览';}
     if(x.is_today)cls+=' today';
     el.className=cls;
+    el.dataset.day=String(x.day_no);
     el.setAttribute('aria-label','第'+x.day_no+'天，'+st);
     el.setAttribute('aria-disabled',locked?'true':'false');
     const leafIndex=(x.day_no-1)%LEAF_FILES.length;
@@ -1341,8 +1362,9 @@ async function saveDay(dayno,isSpecial){
       calendarSnapshot.progress=Math.round(calendarSnapshot.done_count/calendarSnapshot.total*100);
       renderDays(calendarSnapshot);
     }
-    fillDirty=false;savingDay=false;savedFeedback();
+    fillDirty=false;savingDay=false;
     setHistory({screen:'s-days'},true);showScreen('s-days',true);
+    savedFeedback(dayno);
     void refreshDays();
   }catch(e){status.textContent='记录未保存。'+e.message+'，已选文件保留，可重试。';}
   finally{
