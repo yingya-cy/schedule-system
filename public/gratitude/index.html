@@ -745,6 +745,8 @@ function flyLeafToTree(dayno){
   },1520);
 }
 let leafStartTimer=0;
+let progressTimer=0, progressRAF=0, pendingProgress=null;
+
 function savedFeedback(dayno, prog){
   const el=document.getElementById('save-feedback');
   clearTimeout(savedFeedbackTimer);clearTimeout(leafStartTimer);
@@ -752,26 +754,40 @@ function savedFeedback(dayno, prog){
   void el.offsetWidth;
   el.classList.add('on');
   savedFeedbackTimer=setTimeout(()=>el.classList.remove('on'),2700);
-  // 顺序：先弹窗 → 再飞叶子 → 落树后进度条才走
-  // 弹窗先落定 0.75s，再飞叶子；叶子落树（含树的脉动）结束后，进度条才走
+  // 顺序：先弹窗 → 再飞叶子 → 落树脉动之后 → 进度条才走
   const delay=prog?750:0;
   leafStartTimer=setTimeout(()=>flyLeafToTree(dayno),delay);
   if(prog)animateProgress(delay+2140,prog);
 }
 
+// 页面切走 / 关闭 / 切后台时，立刻把动效落到终态，避免界面停在旧数字
+function settleFeedback(){
+  clearTimeout(leafStartTimer);clearTimeout(progressTimer);
+  if(progressRAF){cancelAnimationFrame(progressRAF);progressRAF=0;}
+  document.querySelectorAll('.leaf-fly').forEach(n=>n.remove());
+  const p=pendingProgress; pendingProgress=null;
+  if(!p)return;
+  if(p.bar&&p.bar.isConnected){p.bar.style.transition='';p.bar.style.width=p.toPct+'%';}
+  if(p.done&&p.done.isConnected){p.done.textContent=p.toDone;}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')settleFeedback();});
+window.addEventListener('pagehide',settleFeedback);
+
 function animateProgress(at, s){
   const doneEl=document.getElementById('p-done'), barEl=document.getElementById('p-bar');
   if(!doneEl||!barEl)return;
-  setTimeout(()=>{
-    if(!doneEl.isConnected||!barEl.isConnected)return;
+  pendingProgress={done:doneEl,bar:barEl,toDone:s.toDone,toPct:s.toPct};
+  clearTimeout(progressTimer);
+  progressTimer=setTimeout(()=>{
+    if(!doneEl.isConnected||!barEl.isConnected){pendingProgress=null;return;}
     barEl.style.transition='width .78s cubic-bezier(.3,.85,.35,1)';
     barEl.style.width=s.toPct+'%';
     const from=s.fromDone, diff=s.toDone-s.fromDone, t0=performance.now(), dur=780;
     (function tick(now){
       const p=Math.min(1,(now-t0)/dur);
       doneEl.textContent=Math.round(from+diff*p);
-      if(p<1)requestAnimationFrame(tick);
-      else setTimeout(()=>{barEl.style.transition='';},120);
+      if(p<1){progressRAF=requestAnimationFrame(tick);}
+      else{progressRAF=0;pendingProgress=null;setTimeout(()=>{barEl.style.transition='';},120);}
     })(t0);
   }, at);
 }
