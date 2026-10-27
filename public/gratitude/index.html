@@ -276,7 +276,8 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
 .save-feedback-note { padding: 24px 30px; background: #f8f3d8; border: 1px solid #e5ddb8; border-radius: 4px; box-shadow: 0 12px 50px #243c3525; opacity: 0; transform: translateY(8px) scale(.94); }
 .save-feedback .icon { width: 36px; height: 36px; display: block; margin: 0 auto 10px; }
 .save-feedback .save-spark { display: none; }  /* 由 .leaf-fly 接管飞行，避免双重叶子 */
-.leaf-fly { position: fixed; z-index: 900; pointer-events: none; object-fit: contain; will-change: transform, opacity; filter: drop-shadow(0 3px 3px #6b4a2022); transition: transform .9s cubic-bezier(.3,.75,.25,1), opacity .9s ease; }
+.leaf-fly { position: absolute; z-index: 520; pointer-events: none; object-fit: contain; will-change: transform, opacity; filter: drop-shadow(0 3px 3px #6b4a2022); }
+  #daygrid { position: relative; overflow: visible; }
 .modal-card { border-radius: 8px; }.modal-btn,.modal-field input { border-radius: 6px; }
 #image-viewer { border: 0; padding: 0; background: #182625; color: #fff; width: 100vw; height: 100dvh; max-width: none; max-height: none; }#image-viewer::backdrop { background: #182625; }
 .viewer-tools { display: flex; justify-content: space-between; align-items: center; padding: 18px; }.viewer-tools button,.viewer-arrow { width: 44px; height: 44px; color: #fff; background: transparent; border: 1px solid #ffffff40; border-radius: 6px; cursor: pointer; }
@@ -700,31 +701,48 @@ let leafFlyTimer=0;
 function flyLeafToTree(dayno){
   if(!dayno)return;
   if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  const cells=[...document.querySelectorAll('#daygrid .cell')];
-  const cell=cells.find(c=>String(c.dataset.day)===String(dayno));
+  const grid=document.getElementById('daygrid');
   const tree=document.querySelector('.gratitude-sapling-art');
-  if(!cell||!tree)return;
-  let cr=cell.getBoundingClientRect(),tr=tree.getBoundingClientRect();
+  if(!grid||!tree)return;
+  // 树在视口上方看不见时，同步把页面滑回顶部（叶子是内容坐标，滑动不影响轨迹）
+  if(tree.getBoundingClientRect().top<0)window.scrollTo({top:0,behavior:'smooth'});
+  const cell=[...grid.querySelectorAll('.cell')].find(c=>String(c.dataset.day)===String(dayno));
+  if(!cell)return;
+  const gr=grid.getBoundingClientRect();
+  const cr=cell.getBoundingClientRect();
+  const tr=tree.getBoundingClientRect();
   if(tr.width<1||tr.height<1)return;
-  const size=26;
-  const ox=Math.min(Math.max(cr.right-size/2-8,size/2+4),innerWidth-size/2-4);
-  const oy=Math.min(Math.max(cr.top+size/2+6,size/2+4),innerHeight-size/2-4);
-  const tx=Math.min(Math.max(tr.left+tr.width*.5,size),innerWidth-size);
-  const ty=Math.min(Math.max(tr.top+tr.height*.45,size),innerHeight-size);
+  const size=28;
+  const ox=cr.right-gr.left-size/2-8;
+  const oy=cr.top-gr.top+size/2+6;
+  const tx=tr.left-gr.left+tr.width*.5;
+  const ty=tr.top-gr.top+tr.height*.45;
+  const dx=tx-ox, dy=ty-oy;
   const idx=((dayno-1)%LEAF_FILES.length+LEAF_FILES.length)%LEAF_FILES.length;
   const img=document.createElement('img');
   img.src='assets/'+LEAF_FILES[idx];
   img.alt='';img.className='leaf-fly';
   img.style.width=size+'px';img.style.height=size+'px';
-  img.style.left=(ox-size/2)+'px';img.style.top=(oy-size/2)+'px';
-  img.style.opacity='1';
+  const sx=window.scrollX||0, sy=window.scrollY||0;
+  img.style.left=(gr.left+sx+ox-size/2)+'px';
+  img.style.top=(gr.top+sy+oy-size/2)+'px';
   document.body.appendChild(img);
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    img.style.transform='translate('+(tx-ox)+'px,'+(ty-oy)+'px) scale(.6) rotate(26deg)';
-    img.style.opacity='.12';
-  }));
+  img.animate([
+    { transform:'translate(0px,0px) scale(.7) rotate(-12deg)', opacity:0, offset:0 },
+    { transform:'translate(0px,-8px) scale(1.15) rotate(-3deg)', opacity:1, offset:.16 },
+    { transform:'translate('+(dx*.3)+'px,'+(dy*.26)+'px) scale(1.08) rotate(7deg)', opacity:1, offset:.44 },
+    { transform:'translate('+(dx*.62)+'px,'+(dy*.58)+'px) scale(.98) rotate(15deg)', opacity:1, offset:.68 },
+    { transform:'translate('+(dx*.86)+'px,'+(dy*.84)+'px) scale(.86) rotate(21deg)', opacity:1, offset:.85 },
+    { transform:'translate('+(dx*.99)+'px,'+(dy*.99)+'px) scale(.66) rotate(26deg)', opacity:1, offset:.95 },
+    { transform:'translate('+dx+'px,'+dy+'px) scale(.32) rotate(34deg)', opacity:0, offset:1 }
+  ], { duration:2000, easing:'cubic-bezier(.32,.06,.3,1)', fill:'forwards' });
   clearTimeout(leafFlyTimer);
-  leafFlyTimer=setTimeout(()=>img.remove(),1150);
+  leafFlyTimer=setTimeout(()=>img.remove(),2450);
+  // 叶子落树那一刻，树轻轻脉动一下
+  setTimeout(()=>{
+    if(!tree.isConnected)return;
+    tree.animate([{transform:'scale(1)'},{transform:'scale(1.07)'},{transform:'scale(1)'}],{duration:520,easing:'cubic-bezier(.3,.8,.3,1)'});
+  },1780);
 }
 function savedFeedback(dayno){
   const el=document.getElementById('save-feedback');
