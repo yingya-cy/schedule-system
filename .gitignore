@@ -118,3 +118,4 @@ dist-covered-*/
 # 环境变量历史副本（含密钥，禁止入库）
 .env.bak-*
 .env.*.bak
+.deploy/
