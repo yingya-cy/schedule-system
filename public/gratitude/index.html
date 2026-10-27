@@ -735,14 +735,14 @@ function flyLeafToTree(dayno){
     { transform:'translate('+(dx*.86)+'px,'+(dy*.84)+'px) scale(.86) rotate(21deg)', opacity:1, offset:.85 },
     { transform:'translate('+(dx*.99)+'px,'+(dy*.99)+'px) scale(.66) rotate(26deg)', opacity:1, offset:.95 },
     { transform:'translate('+dx+'px,'+dy+'px) scale(.32) rotate(34deg)', opacity:0, offset:1 }
-  ], { duration:2000, easing:'cubic-bezier(.32,.06,.3,1)', fill:'forwards' });
+  ], { duration:1700, easing:'cubic-bezier(.32,.06,.3,1)', fill:'forwards' });
   clearTimeout(leafFlyTimer);
-  leafFlyTimer=setTimeout(()=>img.remove(),2450);
+  leafFlyTimer=setTimeout(()=>img.remove(),2150);
   // 叶子落树那一刻，树轻轻脉动一下
   setTimeout(()=>{
     if(!tree.isConnected)return;
-    tree.animate([{transform:'scale(1)'},{transform:'scale(1.07)'},{transform:'scale(1)'}],{duration:520,easing:'cubic-bezier(.3,.8,.3,1)'});
-  },1780);
+    tree.animate([{transform:'scale(1)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:620,easing:'cubic-bezier(.3,.8,.3,1)'});
+  },1520);
 }
 let leafStartTimer=0;
 function savedFeedback(dayno, prog){
@@ -753,9 +753,10 @@ function savedFeedback(dayno, prog){
   el.classList.add('on');
   savedFeedbackTimer=setTimeout(()=>el.classList.remove('on'),2700);
   // 顺序：先弹窗 → 再飞叶子 → 落树后进度条才走
-  const delay=prog?420:0;
+  // 弹窗先落定 0.75s，再飞叶子；叶子落树（含树的脉动）结束后，进度条才走
+  const delay=prog?750:0;
   leafStartTimer=setTimeout(()=>flyLeafToTree(dayno),delay);
-  if(prog)animateProgress(delay+1880,prog);
+  if(prog)animateProgress(delay+2140,prog);
 }
 
 function animateProgress(at, s){
