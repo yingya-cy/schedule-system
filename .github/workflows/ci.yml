@@ -33,7 +33,7 @@ jobs:
           node-version: 22
           cache: 'npm'
       - run: npm ci
-      # 只跑单元测试；tests/integration/** 需要真实后端在跑，留给下面的 Integration Tests
+      # 只跑单元测试；tests/integration/** 需要真实后端，见文件末尾说明
       - name: Unit tests
         run: npx vitest run --exclude "tests/integration/**"
 
@@ -49,39 +49,6 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-  integration-tests:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    needs: unit-tests
-    # 这组用例需要真实后端进程在跑（会请求 /api/*），CI 里只起了 MySQL，
-    # 因此暂不阻塞流水线；真要跑需先启动 server.ts。
-    continue-on-error: true
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: ci-pass
-          MYSQL_DATABASE: schedule_system
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "mysqladmin ping -h localhost"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-      - run: npm ci
-      - name: Run integration tests
-        env:
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_USER: root
-          DB_PASSWORD: ci-pass
-          DB_NAME: schedule_system
-          JWT_SECRET: ci-test-secret
-        run: npm run test:integration
+# 注：tests/integration/** 需要在本地起后端（server.ts）与 MySQL 才能跑，
+# CI 里无法自足，故不在流水线中执行。需要时本地跑：
+#   npm run test:integration
