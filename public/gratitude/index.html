@@ -579,6 +579,29 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
   </div>
 
   <!-- 评分结果 -->
+  <div class="screen" id="s-roster">
+    <div class="top">
+      <span class="back" onclick="go('s-admin')">‹ 返回</span>
+      <h1>报名名单</h1>
+      <p id="roster-sum">—</p>
+    </div>
+    <div class="body">
+      <div style="padding:12px 18px 4px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="document.getElementById('rosterIn').click()"><span data-icon="download"></span>导入名单</button>
+        <input type="file" id="rosterIn" accept=".xlsx,.xls,.csv" style="display:none" onchange="previewImport(this)">
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="addPersonPrompt()"><span data-icon="plus"></span>手动加人</button>
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadRoster()"><span data-icon="refresh"></span>刷新</button>
+      </div>
+      <div style="padding:8px 18px 0;">
+        <input type="text" id="rosterSearch" placeholder="搜索姓名 / 学号 / 班级" oninput="rosterPage=1;renderRoster()"
+               style="width:100%;padding:10px 13px;border:1.5px solid #e0dad2;border-radius:11px;font-size:14px;font-family:inherit;background:#fff;outline:none;">
+      </div>
+      <div class="staff-filters roster-filters"><label>打卡进度<select id="roster-progress" onchange="rosterPage=1;renderRoster()"><option value="all">全部进度</option><option value="complete">全部完成</option><option value="partial">部分完成</option><option value="none">尚未开始</option></select></label><button type="button" class="btn ghost" id="roster-export-filtered" onclick="exportFiltered('roster')">导出筛选名单</button><p id="roster-matches" role="status"></p></div>
+      <div id="roster-list" style="padding:12px 18px 0;"></div>
+      <div id="roster-pager" style="padding:12px 18px 30px;display:flex;justify-content:center;align-items:center;gap:14px;font-size:13px;"></div>
+    </div>
+  </div>
+
   <div class="screen" id="s-scores">
     <div class="top">
       <span class="back" onclick="go('s-admin')">‹ 返回</span>
