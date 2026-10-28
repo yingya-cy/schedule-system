@@ -1,8 +1,9 @@
 name: Docker Build
 
+# 改成手动触发：镜像构建耗时 3-8 分钟，且依赖前端产物（dist 被 .gitignore 忽略），
+# 不适合随每次 push 跑。需要验证镜像能否构建时，到 Actions 页面手动 Run workflow。
 on:
-  push:
-    branches: [main, master]
+  workflow_dispatch:
 
 jobs:
   build-backend:
@@ -10,6 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      - run: npm ci
+      # backend.Dockerfile 里有 COPY dist/ ./dist/，而 dist 不在版本库里，必须先构建
+      - name: Build frontend (dist)
+        run: npm run build
       - name: Build backend Docker image
         run: docker build -f docker/backend.Dockerfile -t academic-ether-backend .
 
