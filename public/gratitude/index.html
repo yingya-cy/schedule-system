@@ -634,6 +634,7 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="toggleTestMode()" id="tmBtn">测试模式</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openJudge()"><span data-icon="star"></span>评委打分</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openScores()"><span data-icon="chart"></span>评分结果</button>
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openRank()"><span data-icon="trophy"></span>总排名</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openRoster()"><span data-icon="people"></span>名单管理</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;color:#C97B54;" onclick="adminLogout()">退出管理</button>
       </div>
@@ -691,6 +692,30 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
       <div id="scores-list" style="padding:12px 18px 30px;"></div>
     </div>
   </div>
+
+  <!-- 总分排名 -->
+  <div class="screen" id="s-rank">
+    <div class="top">
+      <span class="back" onclick="go('s-admin')">‹ 返回</span>
+      <h1>总分排名</h1>
+      <p id="rank-sum">—</p>
+    </div>
+    <div class="body">
+      <div style="padding:12px 18px 4px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="exportRanking()"><span data-icon="download"></span>导出排名</button>
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadRank()"><span data-icon="refresh"></span>刷新</button>
+      </div>
+      <div style="padding:8px 18px 0;">
+        <input type="text" id="rankSearch" placeholder="搜索姓名 / 学号 / 校区…" oninput="renderRank()"
+               style="width:100%;padding:10px 13px;border:1.5px solid #e0dad2;border-radius:11px;font-size:14px;font-family:inherit;background:#fff;outline:none;">
+      </div>
+      <div style="padding:10px 18px 0;font-size:12px;color:#8a9690;line-height:1.7;">
+        分数 = 去掉一个最高分和一个最低分后的平均分；每次补卡扣 2 分。前 6 名为获奖名单。
+      </div>
+      <div id="rank-list" style="padding:12px 18px 30px;"></div>
+    </div>
+  </div>
+
 
   <!-- 人员详情 -->
   <div class="screen" id="s-detail">
@@ -1979,6 +2004,71 @@ function adminPersonCard(x, rank){
     + '</footer>'
     + '</article>';
 }
+let RANK = { list: [], min_days: 18 };
+
+async function openRank(){ go('s-rank'); await loadRank(); }
+
+async function loadRank(){
+  document.getElementById('rank-list').innerHTML = '<div class="empty">加载中…</div>';
+  try{
+    const d = await api('/admin/ranking');
+    RANK.list = d.list || [];
+    RANK.min_days = d.min_days || 18;
+    const scored = RANK.list.filter(x=>x.judge_count>0).length;
+    document.getElementById('rank-sum').textContent =
+      `参评 ${RANK.list.length} 人 · 已有分数 ${scored} 人 · 门槛 ${RANK.min_days} 天 · v${BUILD_VERSION}`;
+    renderRank();
+  }catch(e){
+    document.getElementById('rank-list').innerHTML = '<div class="empty">加载失败：'+e.message+'</div>';
+  }
+}
+
+function renderRank(){
+  const q = (document.getElementById('rankSearch').value||'').trim();
+  const all = RANK.list;
+  const list = q ? all.filter(x => (x.name||'').includes(q) || (x.student_id||'').includes(q) || (x.campus||'').includes(q)) : all;
+  const box = document.getElementById('rank-list');
+  if(!list.length){ box.innerHTML = '<div class="empty">'+(q?'没有匹配':'还没有可排名的数据')+'</div>'; return; }
+
+  box.innerHTML = list.map(x=>{
+    const top6 = x.judge_count > 0 && x.rank <= 6;
+    const un = x.judge_count === 0;
+    const badge = top6 ? '<span style="background:#c97b54;color:#fff;border-radius:6px;padding:1px 7px;font-size:11px;margin-left:6px;">获奖</span>' : '';
+    const chips = [];
+    chips.push(`打卡 ${x.days_done} 天`);
+    chips.push(`参评 ${x.judge_count} 人`);
+    if(x.makeup) chips.push(`补卡 ${x.makeup} 次 −${x.deduct}`);
+    return `<div style="background:#fff;border:1px solid #ece6dc;border-radius:13px;padding:13px 15px;margin-bottom:10px;${un?'opacity:.62;':''}">
+      <div style="display:flex;align-items:baseline;gap:10px;">
+        <span style="font-family:Georgia,serif;font-size:20px;color:${top6?'#c97b54':'#9aa7a0'};min-width:34px;">${x.rank}</span>
+        <span style="font-size:15px;font-weight:700;color:#243c35;">${x.name||''}</span>
+        <span style="font-size:12px;color:#8a9690;">${x.student_id||''}</span>${badge}
+        <span style="margin-left:auto;font-family:Georgia,serif;font-size:19px;color:#2e5c8a;">${un?'—':x.final}</span>
+      </div>
+      <div style="margin-top:6px;font-size:12px;color:#7d8a83;">
+        ${[x.campus||'', x.class_name||''].filter(Boolean).join(' · ')}<br>
+        ${chips.join(' · ')}${un?' · 尚未评分':(x.trimmed?' · 已裁极值':'')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function exportRanking(){
+  try{
+    toast('导出排名…');
+    const r = await fetch(API+'/admin/ranking/export', {headers:{'x-admin-token': adminToken()}});
+    if(r.status === 401){ localStorage.removeItem('gratitude_admin_token'); go('s-adminlogin'); throw new Error('登录已过期'); }
+    if(!r.ok) throw new Error('导出失败('+r.status+')');
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '感恩打卡_总分排名.xlsx';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+    toast('已导出');
+  }catch(e){ toast(e.message); }
+}
+
 async function openScores(){ go('s-scores'); await loadScores(); }
 
 async function loadScores(){
