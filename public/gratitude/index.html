@@ -636,6 +636,7 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openScores()"><span data-icon="chart"></span>评分结果</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openRank()"><span data-icon="trophy"></span>总排名</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openRoster()"><span data-icon="people"></span>名单管理</button>
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="generateSlices()"><span data-icon="grid"></span>生成分片</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;color:#C97B54;" onclick="adminLogout()">退出管理</button>
       </div>
       <div class="staff-filters">
@@ -826,7 +827,9 @@ const ICON_PATHS = {
   edit:'m15 4 5 5-11 11H4v-5Zm-1 1 5 5',
   star:'m12 3 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z',
   chart:'M4 3v18h17M8 16v-5m5 5V6m5 10v-8'
-};
+,
+    trophy: 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4ZM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3',
+    grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'};
 function icon(name){return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+(ICON_PATHS[name]||ICON_PATHS.leaf)+'"/></svg>';}
 document.querySelectorAll('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));
 document.querySelectorAll('#s-admin .body > div:first-child,#s-roster .body > div:first-child,#s-scores .body > div:first-child').forEach(el=>el.classList.add('staff-tools'));
@@ -2382,6 +2385,28 @@ async function doImport(inp){
     await loadAdmin();
   }catch(e){ toast('导入失败：'+e.message); }
   inp.value='';
+}
+
+async function generateSlices(){
+  try{
+    toast('检查参评人数…');
+    const pre = await api('/admin/slices/generate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ dry: true })
+    });
+    const dist = pre.dist || {};
+    const detail = Object.keys(dist).sort((a,b)=>a-b).map(k=>`第 ${k} 份 ${dist[k]} 人`).join('，');
+    const okc = await showConfirm('生成评分分片？',
+      `将有 ${pre.eligible} 人参与评分，分成 ${pre.slices} 份，平均每份约 ${Math.round(pre.eligible / pre.slices)} 人。\n\n${detail}\n\n注意：生成会覆盖现有分片，已打的分不受影响。`,
+      { okText:'生成', cancelText:'取消' });
+    if(!okc) return;
+    const r = await api('/admin/slices/generate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({})
+    });
+    toast(`已生成：${r.eligible} 人分 ${r.slices} 份`);
+    if(typeof loadAdmin === 'function') await loadAdmin();
+  }catch(e){ toast(e.message); }
 }
 
 async function exportScoreDetail(){
