@@ -629,6 +629,7 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
       <div style="padding:12px 18px 4px;display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="exportExcel()"><span data-icon="download"></span>导出 Excel</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="exportZip()"><span data-icon="download"></span>导出打包(ZIP)</button>
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="exportScoreDetail()"><span data-icon="download"></span>导出评分明细</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadAdmin()"><span data-icon="refresh"></span>刷新</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="toggleTestMode()" id="tmBtn">测试模式</button>
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openJudge()"><span data-icon="star"></span>评委打分</button>
@@ -2291,6 +2292,22 @@ async function doImport(inp){
     await loadAdmin();
   }catch(e){ toast('导入失败：'+e.message); }
   inp.value='';
+}
+
+async function exportScoreDetail(){
+  try{
+    toast('导出评分明细…');
+    const r = await fetch(API+'/admin/scores-detail/export', {headers:{'x-admin-token': adminToken()}});
+    if(r.status === 401){ localStorage.removeItem('gratitude_admin_token'); go('s-adminlogin'); throw new Error('登录已过期，请重新登录'); }
+    if(!r.ok) throw new Error('导出失败('+r.status+')');
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '感恩打卡_评分明细.xlsx';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+    toast('已导出');
+  }catch(e){ toast(e.message); }
 }
 
 async function exportExcel(){
