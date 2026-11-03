@@ -262,6 +262,7 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
 .judge-actions .btn { width: auto; min-height: 44px; padding: 8px; font-size: 12px; }
 #judge-next { flex: 1; }#judge-refresh { width: 44px; flex: 0 0 44px; }
 .judge-row.participant-row { grid-template-columns: minmax(0,1fr) auto auto; margin-bottom: 10px; }.judge-row > span:not(.participant-name) { font-size: 11px; white-space: nowrap; }.judge-state { color: var(--green); }
+.score-hint { margin: 2px 0 12px; font-size: 12px; line-height: 1.65; color: #6f8177; }
 .score-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }.score-actions .btn { padding: 8px; font-size: 13px; }
 #score-status { padding: 12px 0; }
 .back { border-bottom: 1px dashed #9eb2b0; padding-bottom: 2px; }
@@ -1779,15 +1780,15 @@ async function openScore(pid, name,opt={}){
     </div>
     ${previewHtml}
     <section class="score-inputs"><h2>本次评分</h2>
-    <div class="field"><label>① 真实性 <span class="opt">0-30分</span></label>
+    <div class="field"><label>① 真实性 <span class="opt">0-30分</span></label><p class="score-hint">素材与文字描述一致，能体现真实场景细节</p>
       <input type="number" inputmode="numeric" min="0" max="30" step="1" id="sc1" placeholder="0-30" value="${现有.score_real??''}"></div>
-    <div class="field"><label>② 主题契合度 <span class="opt">0-25分</span></label>
+    <div class="field"><label>② 主题契合度 <span class="opt">0-25分</span></label><p class="score-hint">紧扣「感恩 / 暖心」，情感表达明确不跑偏</p>
       <input type="number" inputmode="numeric" min="0" max="25" step="1" id="sc2" placeholder="0-25" value="${现有.score_theme??''}"></div>
-    <div class="field"><label>③ 素材质量 <span class="opt">0-15分</span></label>
+    <div class="field"><label>③ 素材质量 <span class="opt">0-15分</span></label><p class="score-hint">照片清晰 / 视频流畅 / 录音无杂音，符合格式要求</p>
       <input type="number" inputmode="numeric" min="0" max="15" step="1" id="sc3" placeholder="0-15" value="${现有.score_quality??''}"></div>
-    <div class="field"><label>④ 文字完整性 <span class="opt">0-15分</span></label>
+    <div class="field"><label>④ 文字完整性 <span class="opt">0-15分</span></label><p class="score-hint">故事背景与感恩表达齐全，语言表达真挚</p>
       <input type="number" inputmode="numeric" min="0" max="15" step="1" id="sc4" placeholder="0-15" value="${现有.score_text??''}"></div>
-    <div class="field"><label>⑤ 创意性 <span class="opt">0-15分</span></label>
+    <div class="field"><label>⑤ 创意性 <span class="opt">0-15分</span></label><p class="score-hint">多素材组合（照片+录音、视频+文字注解）、视角新颖；感恩树制作有特色且美观，鼓励结合涂鸦与色彩表达</p>
       <input type="number" inputmode="numeric" min="0" max="15" step="1" id="sc5" placeholder="0-15" value="${现有.score_creative??''}"></div>
     <div class="field"><label>评语 <span class="opt">（可选）</span></label>
       <textarea rows="3" id="sc6" placeholder="简短评语…">${escapeHtml(现有.comment||'')}</textarea></div>
