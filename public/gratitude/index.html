@@ -493,6 +493,21 @@ body.mat-wide .staff-filters{display:flex !important;grid-template-columns:none 
 body.mat-wide .staff-filters label{white-space:nowrap;}
 body.mat-wide .staff-filters .btn{width:auto !important;flex:0 0 auto !important;}
 body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !important;}
+
+#jscore-form .score-summary{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:#5c7268;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e6e0d6;}
+#jscore-form .score-gallery{margin-bottom:22px;}
+#jscore-form .score-gallery h2,#jscore-form .score-inputs h2{margin:0 0 10px;font-size:16px;}
+#jscore-form .score-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:10px;}
+#jscore-form .score-actions{display:flex;gap:10px;margin-top:6px;}
+#jscore-form .score-actions .btn{flex:1 1 0;width:auto;margin:0;}
+</style>
+<style id="judge-ui-css">
+.judge-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.judge-toolbar .btn{flex:0 0 auto;width:auto;padding:9px 16px;margin:0}
+#jl-list .judge-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left}
+#jl-list .judge-row .participant-name{font-weight:600}
+#jl-list .judge-row .participant-meta{display:block;font-size:11px;color:#94a89a;margin-top:2px;font-weight:400}
+#jl-list .judge-row .judge-state{font-size:12px;color:#C97B54;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -522,6 +537,7 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
       <p class="login-meta">
         活动时间：<span id="login-range">11月6日 — 11月26日</span> · 共21天
         <span class="login-support">第21天支持图片、视频或录音素材</span>
+        <p class="login-support" style="margin-top:10px;"><a href="?judge=1" style="color:#6f8177;text-decoration:underline;">我是评委，进入评分 →</a></p>
       </p>
       <p style="text-align:center;font-size:10px;color:#ddd;margin-top:8px;">
         <span id="build-time">—</span>
@@ -700,6 +716,47 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
       </div>
       <div id="judge-list" style="padding:0 18px 30px;"></div>
     </div>
+  </div>
+
+
+  <!-- 评委端 -->
+  <div class="screen" id="s-jlogin">
+    <div class="top">
+      <h1>评委登录</h1>
+      <p>请填写本人姓名与学号，系统会按你所在部门分配评分名单</p>
+    </div>
+    <div class="body">
+      <div class="form">
+        <div class="field"><label>姓名</label><input id="jl-name" placeholder="请输入姓名" autocomplete="name"></div>
+        <div class="field"><label>学号</label><input id="jl-sid" placeholder="请输入学号" inputmode="numeric" autocomplete="off"></div>
+        <button type="button" class="btn pri" id="jl-login-btn" onclick="doJLogin()">进入评分</button>
+        <p id="jl-status" class="inline-status" role="status"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="s-jlist">
+    <div class="top">
+      <h1>我的评分名单</h1>
+      <p id="jl-meta">—</p>
+    </div>
+    <div class="body">
+      <div class="judge-toolbar">
+        <button type="button" class="btn ghost" onclick="loadJList()">刷新</button>
+        <button type="button" class="btn acc" onclick="openNextJ()">下一位未评</button>
+        <button type="button" class="btn ghost" onclick="jLogout()">退出</button>
+      </div>
+      <div id="jl-list"></div>
+    </div>
+  </div>
+
+  <div class="screen" id="s-jscore">
+    <div class="top">
+      <button type="button" class="back" onclick="go('s-jlist')">‹ 返回名单</button>
+      <h1 id="jscore-title">打分</h1>
+      <p id="jscore-sub">—</p>
+    </div>
+    <div class="body"><div class="form" id="jscore-form"></div></div>
   </div>
 
   <!-- 打分弹层 -->
@@ -1100,6 +1157,12 @@ function showStaffEntry(){
 
 (async function init(){
   try{
+    // 评委模式：?judge=1
+    if(isJudgeMode()){
+      INFO = await api('/info').catch(()=>({start_date:'2026-11-06',end_date:'2026-11-26'}));
+      await openJLogin();
+      return;
+    }
     // 工作人员模式：直接进管理端，不用先过学生登录
     if(isStaffMode()){
       INFO = await api('/info').catch(()=>({start_date:'2026-11-06',end_date:'2026-11-26'}));
@@ -2273,6 +2336,155 @@ async function exportCSV(){
     toast('已导出');
   }catch(e){toast(e.message);}
 }
+
+// ============ 评委端（?judge=1）============
+function isJudgeMode(){ return /[?&]judge=1\b/.test(location.search); }
+const JTOKEN_KEY='gratitude_judge_token', JME_KEY='gratitude_judge_me';
+let JME=null, JLIST=[], JLOADING=false, JERR='', JREQ=0, JSCORE_CTX=null, JSAVING=false;
+
+function jToken(){ return localStorage.getItem(JTOKEN_KEY)||''; }
+async function jApi(path,opt={}){
+  const r = await fetch(API+path, { ...opt, headers: { ...(opt.headers||{}), 'x-judge-token': jToken(), ...(opt.body?{'Content-Type':'application/json'}:{}) } });
+  let body=null; try{ body=await r.json(); }catch(_){}
+  if(r.status===401){ localStorage.removeItem(JTOKEN_KEY); localStorage.removeItem(JME_KEY); JME=null; go('s-jlogin'); throw new Error('评委身份已过期，请重新登录'); }
+  if(!r.ok || !body || body.success===false) throw new Error((body&&body.error)||('请求失败('+r.status+')'));
+  return body.data;
+}
+
+async function openJLogin(){
+  const saved=localStorage.getItem(JME_KEY);
+  if(jToken() && saved){
+    try{ JME=JSON.parse(saved); go('s-jlist'); await loadJList(); return; }catch(_){ /* 落到登录页 */ }
+  }
+  go('s-jlogin');
+}
+
+async function doJLogin(){
+  const btn=document.getElementById('jl-login-btn');
+  if(btn.disabled)return;
+  const name=document.getElementById('jl-name').value.trim();
+  const sid=document.getElementById('jl-sid').value.trim();
+  const st=document.getElementById('jl-status');
+  if(!name||!sid){ st.textContent='请填写姓名和学号'; return; }
+  btn.disabled=true; const old=btn.textContent; btn.textContent='正在进入…'; st.textContent='';
+  try{
+    const d=await (await fetch(API+'/judge/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,student_id:sid})})).json();
+    if(!d.success) throw new Error(d.error||'登录失败');
+    localStorage.setItem(JTOKEN_KEY,d.data.token);
+    JME={id:d.data.id,name:d.data.name,dept:d.data.dept,slice_no:d.data.slice_no};
+    localStorage.setItem(JME_KEY,JSON.stringify(JME));
+    go('s-jlist'); await loadJList();
+  }catch(e){ st.textContent=e.message; }
+  finally{ btn.disabled=false; btn.textContent=old; }
+}
+
+async function jLogout(){
+  try{ await jApi('/judge/logout',{method:'POST'}); }catch(_){}
+  localStorage.removeItem(JTOKEN_KEY); localStorage.removeItem(JME_KEY); JME=null;
+  go('s-jlogin'); toast('已退出评分');
+}
+
+async function loadJList(){
+  if(!JME) return;
+  const req=++JREQ; JLOADING=true; JERR=''; renderJList();
+  try{
+    const d=await jApi('/judge/list');
+    if(req!==JREQ)return;
+    JLIST=d.list||[]; JLOADING=false; renderJList();
+  }catch(e){ if(req!==JREQ)return; JLOADING=false; JERR=e.message; renderJList(); }
+}
+
+function renderJList(){
+  const meta=document.getElementById('jl-meta');
+  const box=document.getElementById('jl-list');
+  if(!box) return;
+  if(JLOADING||JERR){
+    meta.textContent = JLOADING?'正在加载名单…':'名单加载失败';
+    box.innerHTML = '<p class="inline-status">'+escapeHtml(JLOADING?'请稍候…':JERR)+'</p>'+(JERR?'<button type="button" class="btn ghost" onclick="loadJList()">重试</button>':'');
+    return;
+  }
+  const done=JLIST.filter(p=>p.scored).length;
+  meta.textContent = (JME?JME.dept+' · ':'')+'共 '+JLIST.length+' 人，已评 '+done+' 人，还剩 '+(JLIST.length-done)+' 人';
+  box.innerHTML = JLIST.length
+    ? JLIST.map(p=>'<button type="button" class="judge-row participant-row" onclick="openJScore('+p.id+')"><span class="participant-name">'+escapeHtml(p.name)+'<span class="participant-meta">'+escapeHtml(p.student_id)+' · '+escapeHtml(p.class_name||p.college||'')+'</span></span><span>'+p.days_done+' 天</span><span class="judge-state">'+(p.scored?('已评 '+p.my_total):'未评')+'</span></button>').join('')
+    : '<div class="empty">名单还没生成，请联系管理员先做分片</div>';
+}
+
+function openNextJ(){
+  if(!JLIST.length) return;
+  const next=JLIST.find(p=>!p.scored);
+  if(next) void openJScore(next.id); else toast('你负责的名单已全部评完 🎉');
+}
+
+async function openJScore(pid){
+  if(!JME) return;
+  const p=JLIST.find(x=>x.id===pid);
+  go('s-jscore');
+  document.getElementById('jscore-title').textContent = p?p.name:('#'+pid);
+  document.getElementById('jscore-sub').textContent = '评委：'+JME.name+'（'+JME.dept+'）';
+  const form=document.getElementById('jscore-form');
+  form.innerHTML='<p class="inline-status" aria-busy="true">正在打开该同学的记录…</p>';
+  let d;
+  try{ d=await jApi('/judge/detail/'+pid); }
+  catch(e){ form.innerHTML='<p class="inline-status">'+escapeHtml(e.message)+'</p>'; return; }
+  const pt=d.participant||{}, days=d.days||[], ups=d.uploads||[], mine=d.my_score||{};
+  JSCORE_CTX={pid, name:pt.name};
+
+  const upMap={};
+  for(const u of ups){ (upMap[u.day_no]=upMap[u.day_no]||[]).push(u); }
+  let gallery='<section class="score-gallery"><h2>成长记录</h2><div class="score-gallery-grid">';
+  let any=false;
+  for(let n=1;n<=21;n++){
+    const list=upMap[n]||[]; if(!list.length) continue; any=true;
+    const imgs=list.filter(u=>u.kind==='image'||!u.kind);
+    const audios=list.filter(u=>u.kind==='audio');
+    const videos=list.filter(u=>u.kind==='video');
+    let inner=imgs.map((u,i)=>`<img src="${API}/img/${u.file_path}" alt="第${n}天图片" onclick="openViewer(this.src,Array.from(document.querySelectorAll('.score-gallery img')).map(im=>im.src))" style="width:100%;height:72px;object-fit:cover;border-radius:6px;cursor:zoom-in;${i>0?'margin-top:4px;':''}">`).join('');
+    if(audios.length) inner+=audios.map(u=>`<audio controls preload="none" src="${API}/img/${u.file_path}" style="width:100%;margin-top:4px;height:32px;"></audio>`).join('');
+    if(videos.length) inner+=videos.map(u=>`<div onclick="window.open('${API}/img/${u.file_path}','_blank')" style="margin-top:4px;height:34px;background:#333;color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;">▶ 视频</div>`).join('');
+    gallery+=`<div style="background:#fff;border:1.5px solid #ece7e0;border-radius:9px;padding:5px;"><div style="font-size:10px;color:#C97B54;font-weight:600;margin-bottom:4px;">D${String(n).padStart(2,'0')}</div>${inner}</div>`;
+  }
+  gallery+='</div>'+(any?'':'<div class="empty">该同学还没有上传素材</div>')+'</section>';
+
+  form.innerHTML=`
+    <div class="score-summary"><div>打卡天数：<b>${days.length} / 21</b></div><div>${escapeHtml(pt.student_id||'')} · ${escapeHtml(pt.class_name||pt.college||'')}</div></div>
+    ${gallery}
+    <section class="score-inputs"><h2>本次评分</h2>
+    <div class="field"><label>① 真实性 <span class="opt">0-30分</span></label><p class="score-hint">素材与文字描述一致，能体现真实场景细节</p>
+      <input type="number" inputmode="numeric" min="0" max="30" step="1" id="jc1" placeholder="0-30" value="${mine.score_real??''}"></div>
+    <div class="field"><label>② 主题契合度 <span class="opt">0-25分</span></label><p class="score-hint">紧扣「感恩 / 暖心」，情感表达明确不跑偏</p>
+      <input type="number" inputmode="numeric" min="0" max="25" step="1" id="jc2" placeholder="0-25" value="${mine.score_theme??''}"></div>
+    <div class="field"><label>③ 素材质量 <span class="opt">0-15分</span></label><p class="score-hint">照片清晰 / 视频流畅 / 录音无杂音，符合格式要求</p>
+      <input type="number" inputmode="numeric" min="0" max="15" step="1" id="jc3" placeholder="0-15" value="${mine.score_quality??''}"></div>
+    <div class="field"><label>④ 文字完整性 <span class="opt">0-15分</span></label><p class="score-hint">故事背景与感恩表达齐全，语言表达真挚</p>
+      <input type="number" inputmode="numeric" min="0" max="15" step="1" id="jc4" placeholder="0-15" value="${mine.score_text??''}"></div>
+    <div class="field"><label>⑤ 创意性 <span class="opt">0-15分</span></label><p class="score-hint">多素材组合、视角新颖；感恩树制作有特色且美观</p>
+      <input type="number" inputmode="numeric" min="0" max="15" step="1" id="jc5" placeholder="0-15" value="${mine.score_creative??''}"></div>
+    <div class="field"><label>评语 <span class="opt">（可选）</span></label><textarea rows="3" id="jc6" placeholder="简短评语…">${escapeHtml(mine.comment||'')}</textarea></div>
+    <div class="score-actions"><button type="button" class="btn acc" onclick="submitJScore(false)">提交评分</button><button type="button" class="btn ghost" onclick="submitJScore(true)">保存并下一位</button></div>
+    <p id="jscore-status" class="inline-status" role="status"></p>
+    </section>`;
+}
+
+async function submitJScore(goNext){
+  if(!JSCORE_CTX||JSAVING) return;
+  const st=document.getElementById('jscore-status');
+  const get=id=>{ const v=document.getElementById(id).value.trim(); return v===''?null:Number(v); };
+  const payload={participant_id:JSCORE_CTX.pid, real:get('jc1'), theme:get('jc2'), quality:get('jc3'), text:get('jc4'), creative:get('jc5'), comment:document.getElementById('jc6').value.trim()};
+  for(const [k,label] of [['real','真实性'],['theme','主题契合度'],['quality','素材质量'],['text','文字完整性'],['creative','创意性']]){
+    if(payload[k]===null||!Number.isFinite(payload[k])){ st.textContent='请填写「'+label+'」的分数'; return; }
+  }
+  JSAVING=true; st.textContent='正在保存…';
+  try{
+    const d=await jApi('/judge/score',{method:'POST',body:JSON.stringify(payload)});
+    const p=JLIST.find(x=>x.id===JSCORE_CTX.pid); if(p){ p.scored=true; p.my_total=d.total; }
+    toast('已保存：'+d.total+' 分');
+    if(goNext){ const nx=JLIST.find(x=>!x.scored); if(nx){ await openJScore(nx.id); } else { renderJList(); go('s-jlist'); toast('名单已全部评完 🎉'); } }
+    else { renderJList(); go('s-jlist'); }
+  }catch(e){ st.textContent=e.message; }
+  finally{ JSAVING=false; }
+}
+
 </script>
 </body>
 </html>
