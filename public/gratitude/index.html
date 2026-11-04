@@ -922,7 +922,7 @@ let savedFeedbackTimer=0;
 let leafFlyTimer=0;
 function flyLeafToTree(dayno){
   if(!dayno)return;
-  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const reduced=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const grid=document.getElementById('daygrid');
   const tree=document.querySelector('.gratitude-sapling-art');
   if(!grid||!tree)return;
@@ -945,6 +945,20 @@ function flyLeafToTree(dayno){
   img.src='assets/'+LEAF_FILES[idx];
   img.alt='';img.className='leaf-fly';
   img.style.width=size+'px';img.style.height=size+'px';
+  if(reduced){
+    // 尊重「减少动效」：不做飞行，只在树的位置淡入淡出一次 + 树自己呼吸一下
+    const imgR=document.createElement('img');
+    imgR.src='assets/'+LEAF_FILES[((dayno-1)%LEAF_FILES.length+LEAF_FILES.length)%LEAF_FILES.length];
+    imgR.alt='';imgR.className='leaf-fly';
+    imgR.style.width='26px';imgR.style.height='26px';
+    imgR.style.left=(tr.left+window.scrollX+tr.width*.5-13)+'px';
+    imgR.style.top=(tr.top+window.scrollY+tr.height*.45-13)+'px';
+    document.body.appendChild(imgR);
+    imgR.animate([{opacity:0},{opacity:1},{opacity:0}],{duration:900,easing:'ease-in-out'});
+    setTimeout(()=>imgR.remove(),1000);
+    tree.animate([{opacity:.6},{opacity:1}],{duration:520,easing:'ease-out'});
+    return;
+  }
   const sx=window.scrollX||0, sy=window.scrollY||0;
   img.style.left=(gr.left+sx+ox-size/2)+'px';
   img.style.top=(gr.top+sy+oy-size/2)+'px';
@@ -1298,7 +1312,7 @@ async function showPendingReminder(){
 
 function openDayForFix(dayNo){
   const cell = [...document.querySelectorAll('#daygrid .cell')].find(x => Number(x.dataset.day) === dayNo);
-  if (cell && !cell.getAttribute('aria-disabled')) { cell.click(); return; }
+  if (cell && String(cell.getAttribute('aria-disabled')) !== 'true') { cell.click(); return; }
   toast('这一天现在不能补拍，等它开放了再来');
 }
 async function openCommentModal(dayNo){
