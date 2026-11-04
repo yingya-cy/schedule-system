@@ -500,25 +500,6 @@ app.get('/api/admin/materials', adminOnly, async (req, res) => {
   } catch (e) { fail(res, e.message, 500); }
 });
 
-// ============ 10. 评委打分 ============
-app.post('/api/admin/score', adminOnly, async (req, res) => {
-  try {
-    const { participant_id, judge_name, score_real, score_theme, score_quality, score_text, score_creative, comment } = req.body;
-    if (!participant_id || !judge_name) return fail(res, '缺少参数');
-
-    await pool.execute(`
-      INSERT INTO gratitude_scores
-        (participant_id, judge_name, score_real, score_theme, score_quality, score_text, score_creative, comment)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        score_real=VALUES(score_real), score_theme=VALUES(score_theme),
-        score_quality=VALUES(score_quality), score_text=VALUES(score_text),
-        score_creative=VALUES(score_creative), comment=VALUES(comment), updated_at=NOW()
-    `, [participant_id, judge_name, score_real || 0, score_theme || 0, score_quality || 0, score_text || 0, score_creative || 0, comment || null]);
-    ok(res, { saved: true });
-  } catch (e) { fail(res, e.message, 500); }
-});
-
 // ============ 11. 排名（总分） ============
 app.get('/api/admin/rank', adminOnly, async (req, res) => {
   try {

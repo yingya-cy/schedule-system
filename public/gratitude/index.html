@@ -678,7 +678,6 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
         <div class="tool-group">
           <span class="tool-group-label">评分</span>
           <div class="tool-row">
-            <button class="btn ghost tool" onclick="openJudge()"><span data-icon="star"></span>评委打分</button>
             <button class="btn ghost tool" onclick="openScores()"><span data-icon="chart"></span>评分结果</button>
             <button class="btn ghost tool" onclick="openRank()"><span data-icon="trophy"></span>总排名</button>
             <button class="btn ghost tool" onclick="generateSlices()"><span data-icon="grid"></span>生成分片</button>
@@ -826,23 +825,6 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
     <div class="body" id="dt-body"></div>
   </div>
 
-  <!-- 评委打分 -->
-  <div class="screen" id="s-judge">
-    <div class="top">
-      <span class="back" onclick="go('s-admin')">‹ 返回</span>
-      <h1>评委打分</h1>
-      <p id="judge-info">—</p>
-    </div>
-    <div class="body">
-      <div style="padding:14px 18px;">
-        <div class="field"><label for="j-name">评委姓名</label><input type="text" id="j-name" placeholder="请输入您的姓名" oninput="renderJudgeList()"></div>
-        <div class="judge-actions"><label><input type="checkbox" id="judge-unscored" onchange="renderJudgeList()">仅未评分</label><button type="button" class="btn ghost" id="judge-next" onclick="openNextUnscored()">下一位未评分</button><button type="button" class="btn ghost" id="judge-refresh" aria-label="刷新评分名单" onclick="loadJudgeList()"><span data-icon="refresh"></span></button></div>
-      </div>
-      <div id="judge-list" style="padding:0 18px 30px;"></div>
-    </div>
-  </div>
-
-
   <!-- 评委端 -->
   <div class="screen" id="s-jlogin">
     <div class="top">
@@ -884,17 +866,6 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
   </div>
 
   <!-- 打分弹层 -->
-  <div class="screen" id="s-score">
-    <div class="top">
-      <button type="button" class="back" onclick="go('s-judge',{restore:true,replace:true})">‹ 返回</button>
-      <h1 id="score-title">打分</h1>
-      <p id="score-sub">—</p>
-    </div>
-    <div class="body">
-      <div class="form" id="score-form"></div>
-    </div>
-  </div>
-
   <div class="toast" id="toast"></div>
   <div class="save-feedback" id="save-feedback" role="status" aria-live="polite"><div class="save-feedback-note"><span data-icon="check"></span>今天的温暖，已收好</div><img class="save-spark" src="assets/gratitude-leaf-sticker.webp" loading="lazy" decoding="async" alt=""></div>
   <dialog id="image-viewer" aria-label="图片查看器">
@@ -1122,8 +1093,7 @@ document.addEventListener('keydown', (e)=>{
 });
 
 let currentScreen='s-login', fillDirty=false, savingDay=false, pickingFiles=false;
-let scoreContext=null,scoreDirty=false,scoreSaving=false,scoreRequest=0,JUDGE_LIST=[];
-let judgeListRequest=0,judgeLoading=false,judgeLoadError='';
+let scoreDirty=false,scoreSaving=false;
 let fillContext=null, openRequest=0, leavePrompt=false, pendingPop=null, allowPop=false;
 const screenScroll={};
 let historyIndex=0;
@@ -1135,7 +1105,6 @@ setHistory({screen:currentScreen},true);
 function showScreen(id,restore=false){
   screenScroll[currentScreen]=scrollY;
   if(currentScreen==='s-fill' && id!=='s-fill')clearDraft();
-  if(currentScreen==='s-score'&&id!=='s-score'){scoreDirty=false;scoreContext=null;scoreRequest++;}
   currentScreen=id;
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   document.getElementById(id).classList.add('on');
@@ -1182,14 +1151,13 @@ window.addEventListener('popstate',async e=>{
   }
   const viewer=document.getElementById('image-viewer');
   if(viewer.open && !e.state?.viewer)viewer.close();
-  const changedPerson=target==='s-detail'&&e.state?.pid!==DETAIL_PID||target==='s-score'&&e.state?.pid!==scoreContext?.pid;
+  const changedPerson=target==='s-detail'&&e.state?.pid!==DETAIL_PID;
   if(target===currentScreen&&!changedPerson)return;
   if(!allowPop && (currentScreen==='s-fill'&&(fillDirty||savingDay||pickingFiles)||currentScreen==='s-score'&&(scoreDirty||scoreSaving))){
     pendingPop={target,delta:delta||-1};history.go(-(delta||-1));return;
   }
   allowPop=false;
   if(target==='s-detail'&&e.state?.pid){void openDetail(e.state.pid,{fromHistory:true,source:e.state.source});return;}
-  if(target==='s-score'&&e.state?.pid){void openScore(e.state.pid,null,{fromHistory:true});return;}
   if(target==='s-fill'){
     const day=DAYS.find(day=>day.day_no===e.state?.day);
     if(day){void openFill(day,{fromHistory:true});return;}
@@ -1999,174 +1967,6 @@ async function refreshTmBtn(){
     if(b) b.style.background = cfg.test_mode==='1' ? '#eef7f0' : '#fff';
     if(b) b.style.borderColor = cfg.test_mode==='1' ? '#A8D5BA' : '#e0dad2';
   }catch(e){}
-}
-
-// ============ 评委打分 ============
-async function openJudge(){
-  document.getElementById('j-name').value = localStorage.getItem('judge_name')||'';
-  go('s-judge');
-  await loadJudgeList();
-}
-async function loadJudgeList(){
-  const request=++judgeListRequest;
-  judgeLoading=true;judgeLoadError='';renderJudgeList();
-  try{
-    const d=await api('/admin/list');
-    let list=d.list||[];
-    if(!list.every(p=>Array.isArray(p.judges))){
-      const scores=await api('/admin/scores');
-      list=list.map(p=>({...p,judges:(scores.list?.find(s=>s.id===p.id)?.judges||[]).map(j=>j.judge_name)}));
-    }
-    if(request!==judgeListRequest)return;
-    JUDGE_LIST=list;judgeLoading=false;renderJudgeList();
-  }catch(e){if(request!==judgeListRequest)return;judgeLoading=false;judgeLoadError=e.message;renderJudgeList();}
-}
-function hasJudge(person,name){return (person.judges||[]).some(j=>String(j).trim()===name);}
-function renderJudgeList(){
-  const name=document.getElementById('j-name').value.trim();
-  if(name)localStorage.setItem('judge_name',name);
-  document.getElementById('judge-refresh').disabled=judgeLoading;
-  document.getElementById('judge-unscored').disabled=judgeLoading||!!judgeLoadError;
-  if(judgeLoading||judgeLoadError){
-    document.getElementById('judge-next').disabled=true;
-    document.getElementById('judge-info').textContent=judgeLoading?'正在更新评分进度…':'评分名单暂未更新';
-    document.getElementById('judge-list').innerHTML='<p class="inline-status">'+(judgeLoading?'正在加载评分名单…':escapeHtml(judgeLoadError))+'</p>'+(judgeLoadError?'<button type="button" class="btn ghost" onclick="loadJudgeList()">'+icon('refresh')+'重试加载</button>':'');return;
-  }
-  const done=JUDGE_LIST.filter(p=>hasJudge(p,name)).length;
-  document.getElementById('judge-info').textContent=name?'已评 '+done+' / '+JUDGE_LIST.length+' 人 · 还有 '+(JUDGE_LIST.length-done)+' 人':'共 '+JUDGE_LIST.length+' 位参与者';
-  const list=document.getElementById('judge-unscored').checked?JUDGE_LIST.filter(p=>!hasJudge(p,name)):JUDGE_LIST;
-  document.getElementById('judge-next').disabled=!name||done===JUDGE_LIST.length;
-  document.getElementById('judge-list').innerHTML=list.length?list.map(p=>'<button type="button" class="judge-row participant-row" onclick="openScore('+p.id+')"><span class="participant-name">'+escapeHtml(p.name)+'<span class="participant-meta">'+escapeHtml(p.student_id)+' · '+escapeHtml(p.class_name||'')+'</span></span><span>'+p.days_done+' 天</span><span class="judge-state">'+(name&&hasJudge(p,name)?'已评分':'未评分')+'</span></button>').join(''):'<div class="empty">没有待评分的人员</div>';
-}
-function nextUnscored(afterId){
-  const name=document.getElementById('j-name').value.trim();
-  const index=JUDGE_LIST.findIndex(p=>p.id===afterId);
-  return JUDGE_LIST.slice(index+1).concat(JUDGE_LIST.slice(0,index+1)).find(p=>!hasJudge(p,name));
-}
-function openNextUnscored(){
-  if(judgeLoading||judgeLoadError)return;
-  if(!document.getElementById('j-name').value.trim())return toast('请填写评委姓名');
-  const next=nextUnscored();
-  if(next)void openScore(next.id);else toast('本轮评分已完成');
-}
-async function openScore(pid, name,opt={}){
-  if(judgeLoading||judgeLoadError)return;
-  const jn = document.getElementById('j-name').value.trim();
-  if(!jn){ toast('请先填评委姓名'); return; }
-  if(scoreSaving)return;
-  if(scoreDirty&&!await mayLeave())return;
-  scoreDirty=false;
-  localStorage.setItem('judge_name', jn);
-  name=name||JUDGE_LIST.find(p=>p.id===pid)?.name||'';
-  if(opt.fromHistory)showScreen('s-score',true);else go('s-score');
-  setHistory({screen:'s-score',pid},true);
-  const request=++scoreRequest;
-  document.getElementById('score-title').textContent = name;
-  document.getElementById('score-sub').textContent = '评委：' + jn;
-
-  // 拉该人详情
-  document.getElementById('score-form').innerHTML='<p class="inline-status" aria-busy="true">正在打开评分记录…</p>';
-  let detail;
-  try{detail=await api('/admin/detail/'+pid);}
-  catch(e){
-    if(request!==scoreRequest||currentScreen!=='s-score')return;
-    document.getElementById('score-form').innerHTML='<p class="inline-status">'+escapeHtml(e.message)+'</p><button type="button" class="btn ghost" onclick="openScore('+pid+')">'+icon('refresh')+'重新打开</button>';return;
-  }
-  if(request!==scoreRequest||currentScreen!=='s-score')return;
-  scoreContext={pid,name,judge:jn};
-
-  const 现有 = (detail?.scores||[]).find(s=>s.judge_name===jn) || {};
-
-  // 构建该人的 21 天图片预览
-  const dayMap = {};
-  for(const x of (detail?.days||[])) dayMap[x.day_no] = x;
-  const upMap = {};
-  for(const u of (detail?.uploads||[])){ (upMap[u.day_no] = upMap[u.day_no]||[]).push(u); }
-
-  let previewHtml = '<section class="score-gallery"><h2>成长记录</h2>';
-  previewHtml += '<div class="score-gallery-grid">';
-  let hasAny = false;
-  for(let n=1;n<=21;n++){
-    const ups = upMap[n] || [];
-    if(!ups.length) continue;
-    hasAny = true;
-    const imgs = ups.filter(u=>u.kind==='image'||!u.kind);
-    const vids = ups.filter(u=>u.kind==='video'||u.kind==='audio');
-    const D = String(n).padStart(2,'0');
-    let inner = '';
-    if(imgs.length){
-      inner = imgs.map((u,i)=>`<img src="${API}/img/${u.file_path}" alt="第${n}天打卡图片" onclick="openViewer(this.src,Array.from(document.querySelectorAll('.score-gallery img')).map(im=>im.src))"
-        style="width:100%;height:72px;object-fit:cover;border-radius:6px;cursor:zoom-in;${i>0?'margin-top:4px;':''}">`).join('');
-    }
-    if(vids.length){
-      inner += vids.map(u=>`<div onclick="window.open('${API}/img/${u.file_path}','_blank')"
-        style="margin-top:4px;height:34px;background:#333;color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;">${icon('video')} 视频</div>`).join('');
-    }
-    previewHtml += `<div style="background:#fff;border:1.5px solid #ece7e0;border-radius:9px;padding:5px;">
-      <div style="font-size:10px;color:#C97B54;font-weight:600;margin-bottom:4px;">D${D}</div>
-      ${inner}
-    </div>`;
-  }
-  previewHtml += '</div>';
-  if(!hasAny) previewHtml += '<div class="empty">该同学还没有上传图片</div>';
-  previewHtml += '</section>';
-
-  document.getElementById('score-form').innerHTML = `
-    <div class="score-summary">
-      <div>打卡天数：<b>${(detail?.days||[]).length} / 21</b></div>
-      <div>评委：${escapeHtml(jn)}</div>
-    </div>
-    ${previewHtml}
-    <section class="score-inputs"><h2>本次评分</h2>
-    <div class="field"><label>① 真实性 <span class="opt">0-30分</span></label><p class="score-hint">素材与文字描述一致，能体现真实场景细节</p>
-      <input type="number" inputmode="numeric" min="0" max="30" step="1" id="sc1" placeholder="0-30" value="${现有.score_real??''}"></div>
-    <div class="field"><label>② 主题契合度 <span class="opt">0-25分</span></label><p class="score-hint">紧扣「感恩 / 暖心」，情感表达明确不跑偏</p>
-      <input type="number" inputmode="numeric" min="0" max="25" step="1" id="sc2" placeholder="0-25" value="${现有.score_theme??''}"></div>
-    <div class="field"><label>③ 素材质量 <span class="opt">0-15分</span></label><p class="score-hint">照片清晰 / 视频流畅 / 录音无杂音，符合格式要求</p>
-      <input type="number" inputmode="numeric" min="0" max="15" step="1" id="sc3" placeholder="0-15" value="${现有.score_quality??''}"></div>
-    <div class="field"><label>④ 文字完整性 <span class="opt">0-15分</span></label><p class="score-hint">故事背景与感恩表达齐全，语言表达真挚</p>
-      <input type="number" inputmode="numeric" min="0" max="15" step="1" id="sc4" placeholder="0-15" value="${现有.score_text??''}"></div>
-    <div class="field"><label>⑤ 创意性 <span class="opt">0-15分</span></label><p class="score-hint">多素材组合（照片+录音、视频+文字注解）、视角新颖；感恩树制作有特色且美观，鼓励结合涂鸦与色彩表达</p>
-      <input type="number" inputmode="numeric" min="0" max="15" step="1" id="sc5" placeholder="0-15" value="${现有.score_creative??''}"></div>
-    <div class="field"><label>评语 <span class="opt">（可选）</span></label>
-      <textarea rows="3" id="sc6" placeholder="简短评语…">${escapeHtml(现有.comment||'')}</textarea></div>
-    <div class="score-actions"><button type="button" class="btn acc" id="score-submit" onclick="submitScore(${pid})">提交评分</button><button type="button" class="btn ghost" id="score-next" onclick="submitScore(${pid},true)">保存并下一位</button></div>
-    <p id="score-status" class="inline-status" role="status"></p>
-    </section>
-  `;
-  document.getElementById('score-form').oninput=()=>{scoreDirty=true;};
-}
-
-async function submitScore(pid,advance=false){
-  if(scoreSaving||scoreContext?.pid!==pid)return;
-  const jn=scoreContext.judge,status=document.getElementById('score-status');
-  const values=[1,2,3,4,5].map(i=>document.getElementById('sc'+i).value.trim()),limits=[30,25,15,15,15];
-  const invalid=values.findIndex((value,i)=>value===''||!Number.isInteger(+value)||+value<0||+value>limits[i]);
-  if(invalid>=0){status.textContent='第 '+(invalid+1)+' 项须填写 0–'+limits[invalid]+' 的整数分数。';document.getElementById('sc'+(invalid+1)).focus();return;}
-  const g=id=>+document.getElementById(id).value;
-  const body={
-    participant_id:pid, judge_name:jn,
-    score_real:g('sc1'),score_theme:g('sc2'),score_quality:g('sc3'),score_text:g('sc4'),score_creative:g('sc5'),
-    comment:document.getElementById('sc6').value.trim(),
-  };
-  scoreSaving=true;status.textContent='正在提交评分…';
-  const controls=[...document.querySelectorAll('#score-form input,#score-form textarea,#score-form button')];controls.forEach(el=>el.disabled=true);
-  let saved=false;
-  try{
-    await api('/admin/score',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    saved=true;scoreDirty=false;
-    judgeListRequest++;judgeLoading=false;judgeLoadError='';
-    for(const list of [JUDGE_LIST,ADMIN_LIST]){
-      const person=list.find(p=>p.id===pid);if(person){person.judges=person.judges||[];if(!hasJudge(person,jn))person.judges.push(jn);}
-    }
-  }catch(e){status.textContent='评分未提交，内容已保留。'+e.message+'，可重试。';}
-  finally{scoreSaving=false;controls.forEach(el=>el.disabled=false);}
-  if(saved){
-    renderJudgeList();renderAdmin();toast('评分已提交');
-    const next=advance?nextUnscored(pid):null;
-    if(next){void openScore(next.id);window.scrollTo(0,0);}
-    else{go('s-judge',{restore:true,replace:true});if(advance)toast('本轮评分已完成');}
-  }
 }
 
 // ============ 评分结果 ============
