@@ -1195,6 +1195,32 @@ app.post('/api/admin/ai/digest/run', adminOnly, async (req, res) => {
   } catch (e) { fail(res, e.message, 500); }
 });
 
+app.get('/api/admin/ai/candidates', adminOnly, async (req, res) => {
+  try {
+    const date = String(req.query.date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail(res, '日期格式应为 YYYY-MM-DD');
+    const list = await q(`SELECT x.file_path, x.excerpt, x.chars, x.day_no, x.participant_id,
+                                 p.name, p.student_id
+                            FROM (
+                              SELECT g.participant_id, g.day_no, g.file_path, g.excerpt, g.chars,
+                                     ROW_NUMBER() OVER (PARTITION BY g.participant_id, g.day_no ORDER BY g.chars DESC) AS rn
+                                FROM gratitude_quality g
+                                JOIN gratitude_days d ON d.participant_id = g.participant_id AND d.day_no = g.day_no
+                               WHERE d.log_date = ? AND g.grade = '优秀'
+                            ) x
+                            JOIN gratitude_participants p ON p.id = x.participant_id
+                           WHERE x.rn = 1
+                           ORDER BY x.chars DESC
+                           LIMIT 200`, [date]);
+    const stats = await q(`SELECT g.grade, COUNT(DISTINCT CONCAT(g.participant_id, '-', g.day_no)) AS n
+                             FROM gratitude_quality g
+                             JOIN gratitude_days d ON d.participant_id = g.participant_id AND d.day_no = g.day_no
+                            WHERE d.log_date = ?
+                            GROUP BY g.grade`, [date]);
+    ok(res, { list, stats });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
 app.get('/api/admin/ai/comments', adminOnly, async (req, res) => {
   try {
     const date = String(req.query.date || '').slice(0, 10);
