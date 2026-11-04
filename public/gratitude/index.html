@@ -275,6 +275,20 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
 .qh-body b{display:block;font-size:13px;color:#3f5a4b;margin-bottom:3px;font-weight:600}
 .qh-body p{margin:0;font-size:13.5px;line-height:1.6;color:#5b6f62}
 .qh-x{flex:0 0 auto;align-self:center;border:1px solid #d8e2d8;background:#fff;color:#4c7a5e;border-radius:9px;padding:6px 10px;font-size:12.5px;cursor:pointer}
+/* ===== 管理端工具条分组 ===== */
+.admin-tools{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;padding:14px 18px 12px;border-bottom:1px solid rgba(36,60,53,.08)}
+.tool-group{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tool-group--end{margin-left:auto}
+.tool-group-label{font-size:11px;letter-spacing:.1em;color:#8a9a90;padding-left:2px}
+.tool-row{display:flex;gap:8px;flex-wrap:wrap}
+.tool-row .btn{flex:0 0 auto;width:auto;padding:8px 12px;font-size:12px}
+.tool-row .tool-quit{color:#c97b54}
+@media (max-width:620px){
+  .admin-tools{gap:12px;padding:12px 14px 10px}
+  .tool-group{flex:1 1 100%}
+  .tool-group--end{margin-left:0}
+  .tool-row .btn{padding:7px 10px;font-size:12px}
+}
 .score-hint { margin: 2px 0 12px; font-size: 12px; line-height: 1.65; color: #6f8177; }
 .score-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }.score-actions .btn { padding: 8px; font-size: 13px; }
 #score-status { padding: 12px 0; }
@@ -645,19 +659,38 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
       <p id="admin-ver" style="margin:3px 0 0;font-size:10px;color:#ddd;">—</p>
     </div>
     <div class="body">
-      <div style="padding:12px 18px 4px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="exportExcel()"><span data-icon="download"></span>导出 Excel</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="exportZip()"><span data-icon="download"></span>导出打包(ZIP)</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="exportScoreDetail()"><span data-icon="download"></span>导出评分明细</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadAdmin()"><span data-icon="refresh"></span>刷新</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="toggleTestMode()" id="tmBtn">测试模式</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openJudge()"><span data-icon="star"></span>评委打分</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openScores()"><span data-icon="chart"></span>评分结果</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openRank()"><span data-icon="trophy"></span>总排名</button>
-        <!-- AI 简报入口暂停上线（2026-11-04 用户要求），后台代码保留，需要时取消注释即可 -->
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="openRoster()"><span data-icon="people"></span>名单管理</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="generateSlices()"><span data-icon="grid"></span>生成分片</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;color:#C97B54;" onclick="adminLogout()">退出管理</button>
+      <div class="admin-tools">
+        <div class="tool-group">
+          <span class="tool-group-label">导出</span>
+          <div class="tool-row">
+            <button class="btn ghost tool" onclick="exportExcel()"><span data-icon="download"></span>Excel</button>
+            <button class="btn ghost tool" onclick="exportZip()"><span data-icon="download"></span>打包 ZIP</button>
+            <button class="btn ghost tool" onclick="exportScoreDetail()"><span data-icon="download"></span>评分明细</button>
+          </div>
+        </div>
+        <div class="tool-group">
+          <span class="tool-group-label">评分</span>
+          <div class="tool-row">
+            <button class="btn ghost tool" onclick="openJudge()"><span data-icon="star"></span>评委打分</button>
+            <button class="btn ghost tool" onclick="openScores()"><span data-icon="chart"></span>评分结果</button>
+            <button class="btn ghost tool" onclick="openRank()"><span data-icon="trophy"></span>总排名</button>
+            <button class="btn ghost tool" onclick="generateSlices()"><span data-icon="grid"></span>生成分片</button>
+          </div>
+        </div>
+        <div class="tool-group">
+          <span class="tool-group-label">名单</span>
+          <div class="tool-row">
+            <button class="btn ghost tool" onclick="openRoster()"><span data-icon="people"></span>名单管理</button>
+          </div>
+        </div>
+        <div class="tool-group tool-group--end">
+          <span class="tool-group-label">系统</span>
+          <div class="tool-row">
+            <button class="btn ghost tool" onclick="loadAdmin()"><span data-icon="refresh"></span>刷新</button>
+            <button class="btn ghost tool" onclick="toggleTestMode()" id="tmBtn">测试模式</button>
+            <button class="btn ghost tool tool-quit" onclick="adminLogout()">退出</button>
+          </div>
+        </div>
       </div>
       <div class="staff-filters">
         <label class="staff-search">搜索<input type="search" id="admin-search" placeholder="姓名 / 学号 / 班级" oninput="adminPage=1;renderAdmin()"></label>
