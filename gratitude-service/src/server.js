@@ -14,6 +14,22 @@ import { registerJudgeRoutes } from './judge.mjs';
 import { aiReady, runDaily, generateCommentFor } from './ai-digest.mjs';
 import { gradeAndStore } from './ai-quality.mjs';
 
+// 质量检测并发闸门：后台检测最多同时跑 2 个，避免晚间集中保存把视觉模型打满
+const _qWait = [];
+let _qBusy = 0;
+function enqueueQuality(task) {
+  return new Promise((resolve) => {
+    _qWait.push(() => task().then(resolve).catch(() => resolve(null)));
+    const pump = () => {
+      if (_qBusy >= 2 || !_qWait.length) return;
+      _qBusy++;
+      const fn = _qWait.shift();
+      fn().finally(() => { _qBusy--; pump(); });
+    };
+    pump();
+  });
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ============ 校区归一化（支持多校区写法）============
@@ -349,12 +365,14 @@ app.post('/api/day', async (req, res) => {
         action_images=VALUES(action_images), updated_at=NOW()
     `, [participant_id, day_no, d.date, imgsArr.length ? JSON.stringify(imgsArr) : null]);
 
-    // 便签质量检测（同步，带 8 秒预算；不阻塞保存本身，失败降级为不提醒）
-    let quality = null;
-    try {
-      quality = await gradeAndStore({ pid: participant_id, dayno: day_no, upDir: UP_DIR, relPaths: keepPaths, budgetMs: 8000 });
-    } catch (_) {}
-    ok(res, { day_no, saved: true, images: keepPaths.length, quality });
+    // 便签质量检测：改为异步后台跑，保存立即返回（用户体验优先，2026-11-04）
+    // 结果只落库供管理端筛“优秀便签”，不再当场打断学生
+    if (keepPaths.length) {
+      enqueueQuality(() =>
+        gradeAndStore({ pid: participant_id, dayno: day_no, upDir: UP_DIR, relPaths: keepPaths, budgetMs: 20000 })
+      );
+    }
+    ok(res, { day_no, saved: true, images: keepPaths.length });
     // 异步生成一句回应，不阻塞保存
     // AI 评语功能暂停上线：改为手动触发，不再在保存打卡时自动调用（2026-11-04 用户要求）
     // if (aiReady()) generateCommentFor(participant_id, day_no).catch(() => {});
