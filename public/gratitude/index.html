@@ -1282,7 +1282,6 @@ async function showPendingReminder(){
   const day = days[0];
   const text = CMT_REMINDER[day];
   delete CMT_REMINDER[day];
-  remMark(day);
   let goFix = false;
   try {
     goFix = await showModal({
@@ -1291,7 +1290,8 @@ async function showPendingReminder(){
       okText: '去补一张',
       cancelText: '知道了',
     });
-  } catch (e) {}
+  } catch (e) { CMT_REMINDER[day] = text; return; }
+  remMark(day);   // 只有真正弹过、用户处理过才记为已读
   if (goFix) openDayForFix(Number(day));
   setTimeout(() => { void showPendingReminder(); }, 350);
 }

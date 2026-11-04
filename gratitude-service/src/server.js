@@ -373,7 +373,14 @@ app.post('/api/day', async (req, res) => {
           pid: participant_id, dayno: day_no, upDir: UP_DIR, relPaths: keepPaths, budgetMs: 20000,
         });
         // 判定完成后顺手生成一句：差劲→提醒，普通/优秀→评语（2026-11-04 用户设计）
-        if (g && !g.pending && g.day_grade) {
+        if (!g || g.pending || !g.day_grade) return g;
+        if (g.day_grade === '差劲' && g.reminder && g.reminder.msg) {
+          // 差劲档：用按原因码分好的固定文案，措辞与问题一致，也省一次模型调用
+          await q(`INSERT INTO gratitude_comments (participant_id, day_no, grade, kind, comment)
+                   VALUES (?,?,?,?,?)
+                   ON DUPLICATE KEY UPDATE grade=VALUES(grade), kind=VALUES(kind), comment=VALUES(comment), hidden=0`,
+            [participant_id, day_no, '差劲', 'reminder', g.reminder.msg]).catch(() => {});
+        } else {
           await generateCommentFor(participant_id, day_no, { grade: g.day_grade }).catch(() => {});
         }
         return g;
