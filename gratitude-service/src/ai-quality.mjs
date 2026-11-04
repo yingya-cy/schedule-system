@@ -8,22 +8,24 @@ const VISION_MODEL = process.env.AI_VISION_MODEL || 'deepseek-flash';
 
 export const GRADE = { GOOD: '优秀', NORMAL: '普通', POOR: '差劲' };
 
-const QUALITY_PROMPT = `你在一场校园"21天感恩打卡"活动里做便签质量检测。图片应当是一张手写便签（通常是手写或打印的三件感恩小事的照片）。
+const QUALITY_PROMPT = `你在一场校园"21天感恩打卡"活动里做便签识别与质量检测。图片应当是一张手写或打印的便签，上面写着当天三件感恩小事。
 
-请判断这张图属于哪一档，只输出一个 JSON 对象，不要解释、不要代码块。
+请一次完成两件事：先把便签上的文字读出来，再判断这一天的质量档次。只输出一个 JSON 对象，不要解释、不要代码块。
 
-判定标准：
+判档标准：
 - 优秀：写了具体的事（做了什么、和谁、什么场景），并且有细节或真实感受，读起来像本人自己写的，不是套话。
 - 普通：写了具体的事，但很短、很平，只有一句话，没有展开。
 - 差劲：满足任一条即算——图片里没有可辨认的文字；文字过少或只有状态词（如"今天很开心""还行""一般""累"）；明显是空话套话、复制粘贴；内容与感恩无关。
 
-另外判断 text_ok：图片里是否存在可辨认的文字内容。
-
 输出格式：
-{"text_ok": true, "grade": "优秀", "chars": 42, "excerpt": "摘出最能代表这张便签的 10-40 字原文", "reason": "12 字以内的判档理由"}
+{"text_ok": true, "items": ["第一件事（不超过20字）","第二件事","第三件事"], "mood": "温暖", "quote": "便签里最有画面感的一句原话，逐字抄",
+ "grade": "优秀", "chars": 42, "excerpt": "能代表这张便签的10-40字原文", "reason": "12字以内的判档理由"}
 
-其中 grade 只能是"优秀""普通""差劲"之一；text_ok 为 false 时 excerpt 留空、chars 填 0。
-直接给出 JSON，不要写分析过程；excerpt 里不要出现英文引号，改写中文引号或不用引号。`;
+要求：
+- items 按便签顺序，最多 3 条；看不清的条目写 "[看不清]"；没有文字时 items 为空数组、mood 与 quote 留空、chars 填 0、excerpt 留空；
+- mood 只能从 温暖/平静/感动/疲惫/开心 里选一个；
+- grade 只能是"优秀""普通""差劲"之一；excerpt 里不要出现英文引号，改写中文引号或不用引号；
+- 直接给出 JSON，不要写分析过程。`;
 
 function jsonObj(text) {
   if (!text) return null;
@@ -45,7 +47,7 @@ async function chat(messages, opt = {}) {
       const r = await fetch(BASE + '/chat/completions', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages, temperature: temp, max_tokens: maxTokens }),
+        body: JSON.stringify({ model, messages, temperature: temp, max_tokens: maxTokens, thinking: { type: 'disabled' } }),
         signal: ac.signal,
       });
       if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + (await r.text()).slice(0, 160));
@@ -79,12 +81,18 @@ export async function gradeOne(absPath) {
     if (!d) return null;
     const grade = [GRADE.GOOD, GRADE.NORMAL, GRADE.POOR].includes(d.grade) ? d.grade : GRADE.NORMAL;
     const textOk = d.text_ok === true && !(d.grade === GRADE.POOR && (d.chars || 0) === 0);
+    const items = Array.isArray(d.items)
+      ? d.items.map((x) => String(x || '').trim()).filter((x) => x && x !== '[看不清]').slice(0, 3)
+      : [];
     return {
       text_ok: textOk,
       grade,
       chars: Number(d.chars) || 0,
       excerpt: String(d.excerpt || '').slice(0, 120),
       reason: String(d.reason || '').slice(0, 30),
+      items,
+      mood: String(d.mood || '').slice(0, 10),
+      quote: String(d.quote || '').slice(0, 200),
     };
   } catch {
     return null;
@@ -151,6 +159,17 @@ export async function gradeAndStore({ pid, dayno, upDir, relPaths, budgetMs = 80
                excerpt=VALUES(excerpt), reason=VALUES(reason), model=VALUES(model), created_at=NOW()`,
       [pid, dayno, rel, r.grade, r.text_ok ? 1 : 0, r.chars, r.excerpt, r.reason, VISION_MODEL]);
   }
+  // 同一次调用顺手把 OCR 结果落库，避免后续评语/简报再读一遍图
+  const withText = done.find((x) => x.text_ok && (x.items?.length || x.quote));
+  if (withText) {
+    try {
+      await q(`INSERT INTO gratitude_ocr (participant_id, day_no, items_json, mood, quote, model)
+               VALUES (?,?,?,?,?,?)
+               ON DUPLICATE KEY UPDATE items_json=VALUES(items_json), mood=VALUES(mood), quote=VALUES(quote), model=VALUES(model)`,
+        [pid, dayno, JSON.stringify(withText.items || []), withText.mood || '', withText.quote || '', VISION_MODEL]);
+    } catch { /* 落 OCR 失败不影响主流程 */ }
+  }
+
   if (!done.length) return { pending: true, reminder: null, items: [] };
 
   const rank = { [GRADE.GOOD]: 3, [GRADE.NORMAL]: 2, [GRADE.POOR]: 1 };
