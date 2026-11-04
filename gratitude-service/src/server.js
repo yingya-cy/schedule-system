@@ -350,7 +350,8 @@ app.post('/api/day', async (req, res) => {
 
     ok(res, { day_no, saved: true, images: keepPaths.length });
     // 异步生成一句回应，不阻塞保存
-    if (aiReady()) generateCommentFor(participant_id, day_no).catch(() => {});
+    // AI 评语功能暂停上线：改为手动触发，不再在保存打卡时自动调用（2026-11-04 用户要求）
+    // if (aiReady()) generateCommentFor(participant_id, day_no).catch(() => {});
   } catch (e) { fail(res, e.message, 500); }
 });
 
@@ -1112,6 +1113,19 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'gratitud
 
 
 // ============ 15. AI：每日简报 & 逐条评语 ============
+app.get('/api/comment/unread/:pid', async (req, res) => {
+  try {
+    const pid = +req.params.pid;
+    const rows = await q(`SELECT c.day_no, c.comment, d.log_date
+                            FROM gratitude_comments c
+                            LEFT JOIN gratitude_days d
+                              ON d.participant_id=c.participant_id AND d.day_no=c.day_no
+                           WHERE c.participant_id=? AND c.hidden=0
+                           ORDER BY c.day_no DESC LIMIT 21`, [pid]);
+    ok(res, { list: rows });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
 app.get('/api/comment/:pid/:dayno', async (req, res) => {
   try {
     const pid = +req.params.pid, dayno = +req.params.dayno;
