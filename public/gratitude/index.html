@@ -957,10 +957,18 @@ if(TRACE_ON){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
   setTimeout(boot,600);
 }
+function forceAnimOn(){
+  try{
+    const a=new URLSearchParams(location.search).get('anim');
+    if(a==='on'||a==='full'||a==='1') localStorage.setItem('gforceanim','1');
+    if(a==='off'||a==='0') localStorage.removeItem('gforceanim');
+    return localStorage.getItem('gforceanim')==='1';
+  }catch(e){return false;}
+}
 function flyLeafToTree(dayno){
   T('fly 进入 day='+dayno);
   if(!dayno){T('  × dayno 为空');return;}
-  const reduced=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const reduced=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches) && !forceAnimOn();
   const grid=document.getElementById('daygrid');
   const tree=document.querySelector('.gratitude-sapling-art');
   T('  reduced='+reduced+' vp='+innerWidth+'x'+innerHeight+' grid='+!!grid+' tree='+!!tree);
@@ -975,7 +983,7 @@ function flyLeafToTree(dayno){
   const tr=tree.getBoundingClientRect();
   T('  tree='+Math.round(tr.width)+'x'+Math.round(tr.height)+' cell@'+Math.round(cr.top));
   if(tr.width<1||tr.height<1){T('  × 树尺寸为 0');return;}
-  const size=28;
+  const size=44;
   const vh=window.innerHeight||document.documentElement.clientHeight||800;
   const vw=window.innerWidth||document.documentElement.clientWidth||400;
   let sxv=cr.right-16, syv=cr.top+cell.offsetHeight*0.5;
@@ -992,19 +1000,25 @@ function flyLeafToTree(dayno){
   const img=document.createElement('img');
   img.src='assets/'+LEAF_FILES[idx];
   img.alt='';img.className='leaf-fly';
+  img.style.filter='drop-shadow(0 6px 10px rgba(40,60,50,.35))';
   img.style.width=size+'px';img.style.height=size+'px';
   if(reduced){
     // 尊重「减少动效」：不做飞行，只在树的位置淡入淡出一次 + 树自己呼吸一下
     const imgR=document.createElement('img');
     imgR.src='assets/'+LEAF_FILES[((dayno-1)%LEAF_FILES.length+LEAF_FILES.length)%LEAF_FILES.length];
     imgR.alt='';imgR.className='leaf-fly';
-    imgR.style.width='26px';imgR.style.height='26px';
-    imgR.style.left=(tr.left+window.scrollX+tr.width*.5-13)+'px';
-    imgR.style.top=(tr.top+window.scrollY+tr.height*.45-13)+'px';
+    imgR.style.width='40px';imgR.style.height='40px';
+    imgR.style.filter='drop-shadow(0 6px 10px rgba(40,60,50,.35))';
+    imgR.style.left=(tr.left+window.scrollX+tr.width*.5-20)+'px';
+    imgR.style.top=(tr.top+window.scrollY+tr.height*.42-20)+'px';
     document.body.appendChild(imgR);
-    imgR.animate([{opacity:0},{opacity:1},{opacity:0}],{duration:900,easing:'ease-in-out'});
-    setTimeout(()=>imgR.remove(),1000);
-    tree.animate([{opacity:.6},{opacity:1}],{duration:520,easing:'ease-out'});
+    imgR.animate([{opacity:0,transform:'translateY(10px) scale(.85)'},
+                  {opacity:1,transform:'translateY(0) scale(1.12)',offset:.45},
+                  {opacity:1,transform:'translateY(-6px) scale(1)',offset:.7},
+                  {opacity:0,transform:'translateY(-14px) scale(.9)'}],
+                 {duration:1200,easing:'ease-in-out'});
+    setTimeout(()=>imgR.remove(),1350);
+    tree.animate([{transform:'scale(1)'},{transform:'scale(1.08)',offset:.5},{transform:'scale(1)'}],{duration:760,easing:'ease-out'});
     return;
   }
   const sx=window.scrollX||0, sy=window.scrollY||0;
@@ -1481,7 +1495,7 @@ async function loadDays(){
   const request=++calendarRequest;
   const d = await api('/days/'+ME.id);
   if(request!==calendarRequest||!ME)return;
-  calendarSnapshot=d;renderDays(d);
+  calendarSnapshot=d;renderDays(d);__animProbe();
 }
 const LEAF_FILES=['gratitude-leaf-sticker.webp','gratitude-leaf-sticker-olive.webp','gratitude-leaf-sticker-red.webp','gratitude-leaf-sticker-ginkgo.webp','gratitude-leaf-sticker-oak.webp','gratitude-leaf-sticker-linden.webp','gratitude-leaf-sticker-birch.webp'];
 const LEAF_TURNS=[-9,5,-3,8,-6,3,-7];
@@ -1803,6 +1817,14 @@ function uploadFile(im,dayno,index,total){
     const fd=new FormData();fd.append('file',im.file);fd.append('participant_id',ME.id);fd.append('day_no',dayno);
     xhr.send(fd);
   });
+}
+function __animProbe(){
+  try{
+    const qs=new URLSearchParams(location.search);
+    if(!qs.has('anim'))return;
+    const n=+qs.get('anim')||7;
+    setTimeout(()=>{ T('probe 手动播放 day='+n); try{flyLeafToTree(n);}catch(e){T('  × 异常 '+e.message);} },1200);
+  }catch(e){}
 }
 async function refreshDays(){
   const box=document.getElementById('days-status');
