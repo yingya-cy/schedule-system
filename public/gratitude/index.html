@@ -931,17 +931,20 @@ function T(msg){
     let box=document.getElementById('trace-box');
     if(!box){
       box=document.createElement('div');box.id='trace-box';
-      box.style.cssText='position:fixed;right:6px;top:6px;z-index:99999;max-width:300px;max-height:70vh;overflow:auto;background:#111d;color:#cfe;font:11px/1.5 ui-monospace,Consolas,monospace;padding:8px 10px;border-radius:8px;white-space:pre-wrap;pointer-events:none';
+      box.style.cssText='position:fixed;left:0;right:0;top:0;z-index:2147483000;max-height:46vh;overflow:auto;background:#0b0b0b;color:#9fe8b0;font:12px/1.6 ui-monospace,Consolas,monospace;padding:10px 12px;border-bottom:3px solid #e2574c;white-space:pre-wrap;pointer-events:none';
       document.body.appendChild(box);
     }
     box.textContent='trace '+window.__trace.length+'\n'+window.__trace.slice(-14).join('\n');
   }catch(e){}
 }
 if(TRACE_ON){
-  document.addEventListener('DOMContentLoaded',()=>{
+  const boot=()=>{
     T('boot vp='+innerWidth+'x'+innerHeight+' dpr='+(window.devicePixelRatio||1)+
       ' reduced='+(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches));
-  });
+    try{console.log('[trace] on');}catch(e){}
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+  setTimeout(boot,600);
 }
 function flyLeafToTree(dayno){
   T('fly 进入 day='+dayno);
