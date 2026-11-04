@@ -216,6 +216,9 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
 .cell .d { font-size: 10px; color: #7d856a; }.cell .n { font: italic 28px/1.2 Georgia,serif; margin: 4px 0 7px; color: var(--ink); }
 .cell .s { font-size: 10px; display: flex; align-items: center; gap: 4px; color: #7c886c; }.cell .s .icon { width: 12px; height: 12px; }
 .cell .day-leaf-art { position: absolute; top: 29px; right: 5px; width: 35px; height: 35px; object-fit: contain; pointer-events: none; transform: rotate(var(--leaf-turn,0deg)); filter: drop-shadow(0 2px 1px #ad72432b); }
+.cell .cmt-badge { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%; background: #e2574c; border: 2px solid #fdfbf3; box-shadow: 0 2px 4px #0000002e; z-index: 6; cursor: pointer; animation: cmtPulse 2.6s ease-in-out infinite; }
+@keyframes cmtPulse { 0%, 100% { box-shadow: 0 0 0 0 #e2574c66, 0 2px 4px #0000002e; } 50% { box-shadow: 0 0 0 4px #e2574c00, 0 2px 4px #0000002e; } }
+@media (prefers-reduced-motion: reduce) { .cell .cmt-badge { animation: none; } }
 .cell.done { background: #e4ece1; border-color: #cedbca; }.cell.done::after { background: linear-gradient(135deg,#c7d9c2 50%,var(--paper) 50%); }
 .cell.done .s,.cell.done .n { color: var(--green); }
 .cell.today { background: #fce9df; border: 2px solid var(--accent); padding: 10px; }
@@ -1207,6 +1210,52 @@ function showForm(title, fields, opt){
     .then(r=>r.ok ? r.values : null);
 }
 
+// ============ 打卡评语红点（生成后不打扰，下次进入仍可见）============
+let CMT_BY_DAY = {};
+function cmtSeenKey(){ return 'gratitude_cmt_seen_' + (ME ? ME.id : 'anon'); }
+function cmtSeen(){
+  try { return new Set((JSON.parse(localStorage.getItem(cmtSeenKey()) || '[]') || []).map(String)); }
+  catch (e) { return new Set(); }
+}
+function cmtMark(dayNo){
+  const set = cmtSeen(); set.add(String(dayNo));
+  try { localStorage.setItem(cmtSeenKey(), JSON.stringify(Array.from(set))); } catch (e) {}
+}
+function paintCommentDots(){
+  document.querySelectorAll('#daygrid .cell').forEach(el => {
+    const old = el.querySelector('.cmt-badge'); if (old) old.remove();
+    const day = el.dataset.day;
+    if (!CMT_BY_DAY[day]) return;
+    const b = document.createElement('span');
+    b.className = 'cmt-badge';
+    b.title = '有一条新回应';
+    b.setAttribute('role', 'button');
+    b.setAttribute('aria-label', '查看第' + day + '天的回应');
+    b.onclick = ev => { ev.stopPropagation(); ev.preventDefault(); void openCommentModal(day); };
+    el.appendChild(b);
+  });
+}
+async function loadCommentDots(){
+  if (!ME) return;
+  try {
+    const r = await api('/comment/unread/' + ME.id);
+    const seen = cmtSeen();
+    CMT_BY_DAY = {};
+    ((r && r.list) || []).forEach(it => {
+      if (!seen.has(String(it.day_no))) CMT_BY_DAY[String(it.day_no)] = it.comment;
+    });
+    paintCommentDots();
+  } catch (e) { /* 静默：没有评语不影响打卡 */ }
+}
+async function openCommentModal(dayNo){
+  const text = CMT_BY_DAY[dayNo];
+  if (!text) return;
+  try { await showModal({ title: '来自朋辈伙伴', message: text, okText: '知道了', cancelText: '关闭' }); } catch (e) {}
+  cmtMark(dayNo);
+  delete CMT_BY_DAY[dayNo];
+  paintCommentDots();
+}
+
 async function api(path,opt){
   opt = opt || {};
   // 管理端请求自动带 token
@@ -1377,6 +1426,7 @@ function renderDays(d){
     el.onclick=()=>{ if(locked){toast('还没到这一天哦～');return;} openFill(x); };
     g.appendChild(el);
   });
+  void loadCommentDots();
 }
 
 // ============ 填写页 ============
