@@ -368,9 +368,16 @@ app.post('/api/day', async (req, res) => {
     // 便签质量检测：改为异步后台跑，保存立即返回（用户体验优先，2026-11-04）
     // 结果只落库供管理端筛“优秀便签”，不再当场打断学生
     if (keepPaths.length) {
-      enqueueQuality(() =>
-        gradeAndStore({ pid: participant_id, dayno: day_no, upDir: UP_DIR, relPaths: keepPaths, budgetMs: 20000 })
-      );
+      enqueueQuality(async () => {
+        const g = await gradeAndStore({
+          pid: participant_id, dayno: day_no, upDir: UP_DIR, relPaths: keepPaths, budgetMs: 20000,
+        });
+        // 判定完成后顺手生成一句：差劲→提醒，普通/优秀→评语（2026-11-04 用户设计）
+        if (g && !g.pending && g.day_grade) {
+          await generateCommentFor(participant_id, day_no, { grade: g.day_grade }).catch(() => {});
+        }
+        return g;
+      });
     }
     ok(res, { day_no, saved: true, images: keepPaths.length });
     // 异步生成一句回应，不阻塞保存
@@ -1140,7 +1147,7 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'gratitud
 app.get('/api/comment/unread/:pid', async (req, res) => {
   try {
     const pid = +req.params.pid;
-    const rows = await q(`SELECT c.day_no, c.comment, d.log_date
+    const rows = await q(`SELECT c.day_no, c.comment, c.grade, c.kind, d.log_date
                             FROM gratitude_comments c
                             LEFT JOIN gratitude_days d
                               ON d.participant_id=c.participant_id AND d.day_no=c.day_no

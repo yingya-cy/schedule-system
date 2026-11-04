@@ -155,16 +155,71 @@ export async function generateComments(records) {
   return out;
 }
 
-export async function generateCommentFor(pid, day) {
+export async function generateCommentFor(pid, day, opts = {}) {
+  const { grade = '', force = false } = opts;
+  const kind = grade === '差劲' ? 'reminder' : 'comment';
   const hit = await q1('SELECT * FROM gratitude_comments WHERE participant_id=? AND day_no=?', [pid, day]);
-  if (hit) return { ...hit, cached: true };
+  if (hit && !force && (hit.kind || 'comment') === kind) return { ...hit, cached: true };
   const ocr = await ensureOcr(pid, day);
-  const m = await generateComments([{ pid, day, items: ocr?.items || [], mood: ocr?.mood || '' }]);
-  const comment = m.get(pid) || '这一天被你记下来了，很好。';
-  await q(`INSERT INTO gratitude_comments (participant_id, day_no, comment, model) VALUES (?,?,?,?)
-           ON DUPLICATE KEY UPDATE comment=VALUES(comment), model=VALUES(model)`, [pid, day, comment, TEXT_MODEL]);
-  return { participant_id: pid, day_no: day, comment, cached: false };
+  const items = Array.isArray(ocr?.items) ? ocr.items : [];
+  const sys = kind === 'reminder' ? REMINDER_SYS : COMMENT_SYS_ONE;
+  const user = `这一天写下的小事（图片转录）：\n` +
+    (items.length ? items.map((x) => `· ${x}`).join('\n') : '（这张便签没有可辨认的文字）') +
+    `\n\n质量档位：${grade || '未判定'}`;
+  let comment = '';
+  try {
+    const { text } = await chat([
+      { role: 'system', content: sys },
+      { role: 'user', content: user },
+    ], { maxTokens: 1200, temp: 0.8 });
+    comment = String(text || '').trim()
+      .replace(/^["「]|["」]$/g, '')
+      .replace(/^\s*\d+\s*[.、）)]\s*/gm, '')
+      .replace(/\n{2,}/g, '\n').trim().slice(0, 240);
+  } catch { /* 失败用兜底 */ }
+  if (!comment) comment = kind === 'reminder' ? '这一天还是被你记下来了，方便的话可以补一句当时具体发生了什么。' : '这一天被你记下来了，很好。';
+  await q(`INSERT INTO gratitude_comments (participant_id, day_no, grade, kind, comment, model)
+           VALUES (?,?,?,?,?,?)
+           ON DUPLICATE KEY UPDATE comment=VALUES(comment), grade=VALUES(grade), kind=VALUES(kind),
+             hidden=0, model=VALUES(model), created_at=NOW()`,
+    [pid, day, grade || '', kind, comment, TEXT_MODEL]);
+  return { participant_id: pid, day_no: day, comment, kind, grade, cached: false };
 }
+
+const COMMENT_SYS_ONE = `你是"微光拾暖·艺绘感恩"21天感恩成长记活动里负责回应的朋辈伙伴。
+学生刚提交当天打卡，便签上写下了自己的三件小事（从照片转录，可能有识别误差）。
+
+请为这一天写两三句回应（30-60字）：
+1. 像熟识的同学随口接的一句，语气轻、近、有余温，可以有一点具体的画面、想象，或者一点轻的玩笑；
+2. 【硬性】不要提问、不要追问，全文不出现问号，也不要用"……吗""……呢""……吧？"收尾；但不要因此写成四平八稳的总结——把关心写成具体的观察、画面或轻轻的理解，句子要有细节、有温度，不要像公文；
+3. 必须落到具体那件事上，不能泛泛而谈；
+4. 不评判对错、不说教、不做心理分析、不夸张赞美；
+5. 不用感叹号，不用 emoji，不写"加油""你真棒""很棒"；
+6. 只写一段连贯的话，不要分条、不要编号、不要罗列、不要换行；
+7. 如果内容明显是识别错误或看不清，就写一句不依赖细节的温和回应。`;
+
+const SHARE_PROMPT = `你在为"微光拾暖·艺绘感恩"21天感恩成长记活动写每日匿名分享，发到打卡群里。
+
+下面是今天被评为"优秀"的 %n 条便签摘录（已匿名，不含姓名学号）：
+%s
+
+请把它们整理成一段可以直接发群的文字：
+1. 篇幅 120-220 字，一到两段，不要分条编号；
+2. 挑 2-4 条最有画面感的，用短引号原样引用原话（一字不改），每条后面可以跟一句很轻的点评或联想；
+3. 开头不要写"今天有 N 位同学"这类报数，直接从一件具体的事起笔；
+4. 不出现姓名、学号、班级、校区、部门等身份信息，也不要写"某同学说"这类标签；
+5. 【硬性】不要提问、不要邀请回应，全文不出现问号；不用感叹号；不用 emoji；
+6. 不要过度抒情，像群里熟识的人随手发的一段。`;
+
+const REMINDER_SYS = `你是"微光拾暖·艺绘感恩"21天感恩成长记活动里的朋辈伙伴。学生提交的便签内容偏薄——可能写得少、只有一句状态词，或者照片里的文字没看清。
+
+请写两句提醒（30-50字）：
+1. 先轻轻接住（这一天还是被你记下来了），再给一个具体可做的小建议，比如补一句"当时发生了什么、和谁在一起、心里什么感觉"；
+2. 如果像是没看清，就提醒方便时重拍一张更清楚的；
+3. 【硬性】不要提问、不要追问，全文不出现问号，也不要用"……吗""……呢""……吧？"收尾；
+4. 不评判、不批评、不说教、不做心理分析，不写"加油""要用心"这类话；
+5. 不用感叹号，不用 emoji，不说"重新写一遍""不及格"；
+6. 直接给文字，不要标题、不要分点，不要用引号包裹整段。`;
 
 const DIGEST_PROMPT = `你是"微光拾暖·艺绘感恩"21天感恩成长记的活动主编。
 今天共 %n 位同学完成打卡。下面是每位同学当天打卡后收到的回应（每条对应该同学写下的三件小事）：
@@ -199,11 +254,43 @@ const DIGEST_PROMPT_FEW = `你是"微光拾暖·艺绘感恩"21天感恩成长�
 
 export async function buildDigest(dateStr) {
   const rows = await q(
-    `SELECT d.participant_id, d.day_no, c.comment, o.quote, o.items_json
+    `SELECT d.participant_id, d.day_no, g.grade, c.comment, o.quote, o.items_json
        FROM gratitude_days d
+       LEFT JOIN gratitude_quality g ON g.participant_id=d.participant_id AND g.day_no=d.day_no
        LEFT JOIN gratitude_comments c ON c.participant_id=d.participant_id AND c.day_no=d.day_no
        LEFT JOIN gratitude_ocr o ON o.participant_id=d.participant_id AND o.day_no=d.day_no
       WHERE d.log_date=?`, [dateStr]);
+  if (!rows.length) return null;
+
+  // 优秀优先（AI 挑稿：从当天优秀记录里择 2-4 条做匿名分享）
+  const good = rows.filter((r) => r.grade === '优秀');
+  const pool = good.length ? good : rows.filter((r) => r.grade === '普通');
+  const picked = (pool.length ? pool : rows).slice(0, 5);
+  if (good.length || pool.length) {
+    const excerptOf = (r) => {
+      const q = String(r.quote || '').trim();
+      if (q) return q;
+      const its = safeArr(r.items_json);
+      if (its.length) return String(its[0]).trim();
+      return String(r.comment || '').trim();
+    };
+    const lines = picked.map((r, i) => `${i + 1}. ${excerptOf(r)}`).filter((x) => x.length > 3);
+    if (lines.length) {
+      const shareBody = SHARE_PROMPT
+        .replace('%n', () => String(good.length || pool.length))
+        .replace('%s', () => lines.join('\n'));
+      const { text } = await chat([{ role: 'user', content: shareBody }], { maxTokens: 4000, temp: 0.75 });
+      const shareText = String(text || '').trim();
+      if (shareText) {
+        await q(`INSERT INTO gratitude_digests (digest_date, participants, items_count, digest_text, quote, model)
+                 VALUES (?,?,?,?,?,?)
+                 ON DUPLICATE KEY UPDATE participants=VALUES(participants), items_count=VALUES(items_count),
+                   digest_text=VALUES(digest_text), quote=VALUES(quote), model=VALUES(model)`,
+          [dateStr, rows.length, lines.length, shareText, String(picked[0]?.quote || ''), TEXT_MODEL]);
+        return { date: dateStr, mode: 'share', participants: rows.length, good: good.length, picked: lines.length, digest: shareText };
+      }
+    }
+  }
   const lines = [];
   const quotes = [];
   const items = [];

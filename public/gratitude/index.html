@@ -1234,6 +1234,16 @@ function showForm(title, fields, opt){
 
 // ============ 打卡评语红点（生成后不打扰，下次进入仍可见）============
 let CMT_BY_DAY = {};
+let CMT_REMINDER = {};
+function remSeenKey(){ return 'gratitude_rem_seen_' + (ME ? ME.id : 'anon'); }
+function remSeen(){
+  try { return new Set((JSON.parse(localStorage.getItem(remSeenKey()) || '[]') || []).map(String)); }
+  catch (e) { return new Set(); }
+}
+function remMark(dayNo){
+  const set = remSeen(); set.add(String(dayNo));
+  try { localStorage.setItem(remSeenKey(), JSON.stringify(Array.from(set))); } catch (e) {}
+}
 function cmtSeenKey(){ return 'gratitude_cmt_seen_' + (ME ? ME.id : 'anon'); }
 function cmtSeen(){
   try { return new Set((JSON.parse(localStorage.getItem(cmtSeenKey()) || '[]') || []).map(String)); }
@@ -1261,13 +1271,46 @@ async function loadCommentDots(){
   if (!ME) return;
   try {
     const r = await api('/comment/unread/' + ME.id);
-    const seen = cmtSeen();
-    CMT_BY_DAY = {};
+    const seen = cmtSeen(), rseen = remSeen();
+    CMT_BY_DAY = {}; CMT_REMINDER = {};
     ((r && r.list) || []).forEach(it => {
-      if (!seen.has(String(it.day_no))) CMT_BY_DAY[String(it.day_no)] = it.comment;
+      const d = String(it.day_no);
+      if ((it.kind || 'comment') === 'reminder') {
+        if (!rseen.has(d)) CMT_REMINDER[d] = it.comment;
+      } else if (!seen.has(d)) {
+        CMT_BY_DAY[d] = it.comment;
+      }
     });
     paintCommentDots();
+    void showPendingReminder();
   } catch (e) { /* 静默：没有评语不影响打卡 */ }
+}
+
+// 差劲建议：下次进入时弹一次，可选去补拍
+async function showPendingReminder(){
+  const days = Object.keys(CMT_REMINDER);
+  if (!days.length) return;
+  const day = days[0];
+  const text = CMT_REMINDER[day];
+  delete CMT_REMINDER[day];
+  remMark(day);
+  let goFix = false;
+  try {
+    goFix = await showModal({
+      title: '第 ' + day + ' 天的小提醒',
+      message: text,
+      okText: '去补一张',
+      cancelText: '知道了',
+    });
+  } catch (e) {}
+  if (goFix) openDayForFix(Number(day));
+  setTimeout(() => { void showPendingReminder(); }, 350);
+}
+
+function openDayForFix(dayNo){
+  const cell = [...document.querySelectorAll('#daygrid .cell')].find(x => Number(x.dataset.day) === dayNo);
+  if (cell && !cell.getAttribute('aria-disabled')) { cell.click(); return; }
+  toast('这一天现在不能补拍，等它开放了再来');
 }
 async function openCommentModal(dayNo){
   const text = CMT_BY_DAY[dayNo];
