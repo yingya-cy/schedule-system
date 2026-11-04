@@ -11,6 +11,7 @@ import { ZipArchive } from 'archiver';
 import crypto from 'crypto';
 import { summarizeWorklist } from './admin-worklist.mjs';
 import { registerJudgeRoutes } from './judge.mjs';
+import { aiReady, runDaily, generateCommentFor } from './ai-digest.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -348,6 +349,8 @@ app.post('/api/day', async (req, res) => {
     `, [participant_id, day_no, d.date, imgsArr.length ? JSON.stringify(imgsArr) : null]);
 
     ok(res, { day_no, saved: true, images: keepPaths.length });
+    // 异步生成一句回应，不阻塞保存
+    if (aiReady()) generateCommentFor(participant_id, day_no).catch(() => {});
   } catch (e) { fail(res, e.message, 500); }
 });
 
@@ -1106,6 +1109,77 @@ app.get('/api/admin/scores/export', adminOnly, async (req, res) => {
 registerJudgeRoutes(app, { q, q1, ok, fail, adminOnly, todayStr, ExcelJS });
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'gratitude' }));
+
+
+// ============ 15. AI：每日简报 & 逐条评语 ============
+app.get('/api/comment/:pid/:dayno', async (req, res) => {
+  try {
+    const pid = +req.params.pid, dayno = +req.params.dayno;
+    const row = await q1('SELECT comment, hidden FROM gratitude_comments WHERE participant_id=? AND day_no=?', [pid, dayno]);
+    if (!row || row.hidden) return ok(res, { comment: '' });
+    ok(res, { comment: row.comment });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+app.get('/api/admin/ai/status', adminOnly, async (req, res) => {
+  try {
+    const [o, c, d] = await Promise.all([
+      q1('SELECT COUNT(*) n FROM gratitude_ocr'),
+      q1('SELECT COUNT(*) n FROM gratitude_comments'),
+      q1('SELECT COUNT(*) n FROM gratitude_digests'),
+    ]);
+    ok(res, { ready: aiReady(), ocr: o.n, comments: c.n, digests: d.n });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+app.get('/api/admin/ai/digests', adminOnly, async (req, res) => {
+  try {
+    const rows = await q(`SELECT digest_date, participants, items_count, digest_text, quote, created_at
+                            FROM gratitude_digests ORDER BY digest_date DESC LIMIT 60`);
+    ok(res, { list: rows });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+app.post('/api/admin/ai/digest/run', adminOnly, async (req, res) => {
+  try {
+    const date = String((req.body || {}).date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail(res, '日期格式应为 YYYY-MM-DD');
+    if (!aiReady()) return fail(res, 'AI 未配置');
+    const stats = await runDaily(date);
+    ok(res, stats);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+app.get('/api/admin/ai/comments', adminOnly, async (req, res) => {
+  try {
+    const date = String(req.query.date || '').slice(0, 10);
+    const where = date ? 'WHERE d.log_date=?' : '';
+    const params = date ? [date] : [];
+    const rows = await q(`SELECT c.participant_id, c.day_no, c.comment, c.hidden, p.name, p.student_id, d.log_date
+                            FROM gratitude_comments c
+                            JOIN gratitude_participants p ON p.id=c.participant_id
+                            LEFT JOIN gratitude_days d ON d.participant_id=c.participant_id AND d.day_no=c.day_no
+                            ${where}
+                           ORDER BY d.log_date DESC, c.participant_id LIMIT 500`, params);
+    ok(res, { list: rows });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+app.post('/api/admin/ai/comment/hide', adminOnly, async (req, res) => {
+  try {
+    const { participant_id, day_no, hidden } = req.body || {};
+    await q('UPDATE gratitude_comments SET hidden=? WHERE participant_id=? AND day_no=?', [hidden ? 1 : 0, +participant_id, +day_no]);
+    ok(res, { done: true });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+app.post('/api/admin/ai/comment/run', adminOnly, async (req, res) => {
+  try {
+    const { participant_id, day_no } = req.body || {};
+    const r = await generateCommentFor(+participant_id, +day_no);
+    ok(res, r);
+  } catch (e) { fail(res, e.message, 500); }
+});
 
 // ============ 全局异常处理（防进程崩溃）============
 process.on('uncaughtException', (e) => {
