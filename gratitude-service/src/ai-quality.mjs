@@ -19,12 +19,17 @@ const QUALITY_PROMPT = `你在一场校园"21天感恩打卡"活动里做便签�
 
 输出格式：
 {"text_ok": true, "items": ["第一件事（不超过20字）","第二件事","第三件事"], "mood": "温暖", "quote": "便签里最有画面感的一句原话，逐字抄",
- "grade": "优秀", "chars": 42, "excerpt": "能代表这张便签的10-40字原文", "reason": "12字以内的判档理由"}
+ "grade": "优秀", "reason_code": "ok", "chars": 42, "excerpt": "能代表这张便签的10-40字原文", "reason": "12字以内的判档理由"}
 
 要求：
 - items 按便签顺序，最多 3 条；看不清的条目写 "[看不清]"；没有文字时 items 为空数组、mood 与 quote 留空、chars 填 0、excerpt 留空；
 - mood 只能从 温暖/平静/感动/疲惫/开心 里选一个；
 - grade 只能是"优秀""普通""差劲"之一；excerpt 里不要出现英文引号，改写中文引号或不用引号；
+- reason_code 只能是以下四个之一，用来区分"差劲"的具体原因（优秀/普通时填 ok）：
+  · no_text：图片模糊、太暗、角度歪，人已经没法辨认上面的字；
+  · off_topic：图片本身不是当天的感恩便签（例如代码截图、聊天记录、风景照、网络图片），或文字内容与感恩无关；
+  · too_brief：确实是便签，但只有状态词或一句话，明显敷衍；
+  · ok：判定为优秀或普通。
 - 直接给出 JSON，不要写分析过程。`;
 
 function jsonObj(text) {
@@ -90,6 +95,7 @@ export async function gradeOne(absPath) {
       chars: Number(d.chars) || 0,
       excerpt: String(d.excerpt || '').slice(0, 120),
       reason: String(d.reason || '').slice(0, 30),
+      reason_code: String(d.reason_code || '').slice(0, 16),
       items,
       mood: String(d.mood || '').slice(0, 10),
       quote: String(d.quote || '').slice(0, 200),
@@ -118,11 +124,15 @@ export async function gradeImages(absPaths) {
   };
 }
 
-/** 给学生的提醒文案：只在"没文字"或"差劲"时返回 */
+/** 给学生的提醒文案：只在"没文字"或"差劲"时返回，按原因分三种说法 */
 export function reminderFor(result) {
   if (!result) return null;
-  if (!result.text_ok) {
+  const code = result.reason_code || '';
+  if (code === 'no_text' || (!result.text_ok && code !== 'off_topic')) {
     return { type: 'no_text', msg: '这张便签没太看清，可能是光线或者角度问题，方便的话重拍一张更清楚的～' };
+  }
+  if (code === 'off_topic') {
+    return { type: 'off_topic', msg: '这张看起来不是当天的感恩便签（像是截图或别的照片），方便的话换成写着三件小事的便签照片～' };
   }
   const g = result.day_grade || result.grade;
   if (g === GRADE.POOR) {
@@ -153,11 +163,11 @@ export async function gradeAndStore({ pid, dayno, upDir, relPaths, budgetMs = 80
   for (const [rel, r] of pairs) {
     if (!r) continue;
     done.push(r);
-    await q(`INSERT INTO gratitude_quality (participant_id, day_no, file_path, grade, text_ok, chars, excerpt, reason, model)
-             VALUES (?,?,?,?,?,?,?,?,?)
+    await q(`INSERT INTO gratitude_quality (participant_id, day_no, file_path, grade, text_ok, chars, excerpt, reason, reason_code, model)
+             VALUES (?,?,?,?,?,?,?,?,?,?)
              ON DUPLICATE KEY UPDATE grade=VALUES(grade), text_ok=VALUES(text_ok), chars=VALUES(chars),
-               excerpt=VALUES(excerpt), reason=VALUES(reason), model=VALUES(model), created_at=NOW()`,
-      [pid, dayno, rel, r.grade, r.text_ok ? 1 : 0, r.chars, r.excerpt, r.reason, VISION_MODEL]);
+               excerpt=VALUES(excerpt), reason=VALUES(reason), reason_code=VALUES(reason_code), model=VALUES(model), created_at=NOW()`,
+      [pid, dayno, rel, r.grade, r.text_ok ? 1 : 0, r.chars, r.excerpt, r.reason, r.reason_code || '', VISION_MODEL]);
   }
   // 同一次调用顺手把 OCR 结果落库，避免后续评语/简报再读一遍图
   const withText = done.find((x) => x.text_ok && (x.items?.length || x.quote));
@@ -179,6 +189,7 @@ export async function gradeAndStore({ pid, dayno, upDir, relPaths, budgetMs = 80
     text_ok: done.some((x) => x.text_ok),
     excerpt: top.excerpt,
     reason: top.reason,
+    reason_code: top.reason_code || '',
     items: done.map((x) => ({ grade: x.grade, text_ok: x.text_ok, chars: x.chars, excerpt: x.excerpt })),
     pending: done.length < imgs.length,
   };

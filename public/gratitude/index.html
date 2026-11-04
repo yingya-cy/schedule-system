@@ -266,15 +266,6 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
 .judge-actions .btn { width: auto; min-height: 44px; padding: 8px; font-size: 12px; }
 #judge-next { flex: 1; }#judge-refresh { width: 44px; flex: 0 0 44px; }
 .judge-row.participant-row { grid-template-columns: minmax(0,1fr) auto auto; margin-bottom: 10px; }.judge-row > span:not(.participant-name) { font-size: 11px; white-space: nowrap; }.judge-state { color: var(--green); }
-.quality-hint{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);width:min(430px,92vw);z-index:900;display:flex;gap:10px;align-items:flex-start;padding:14px 14px 12px;border-radius:16px;background:#fffdf4;border:1px solid #e6dfc8;box-shadow:0 12px 30px rgba(40,60,50,.22);animation:qh-in .26s ease}
-@keyframes qh-in{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}
-.quality-hint.out{opacity:0;transform:translate(-50%,10px);transition:all .26s}
-.qh-badge{flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:#eef3e8;color:#4c7a5e;display:grid;place-items:center}
-.qh-badge svg{width:17px;height:17px}
-.qh-body{flex:1;min-width:0}
-.qh-body b{display:block;font-size:13px;color:#3f5a4b;margin-bottom:3px;font-weight:600}
-.qh-body p{margin:0;font-size:13.5px;line-height:1.6;color:#5b6f62}
-.qh-x{flex:0 0 auto;align-self:center;border:1px solid #d8e2d8;background:#fff;color:#4c7a5e;border-radius:9px;padding:6px 10px;font-size:12.5px;cursor:pointer}
 /* ===== 管理端工具条分组 ===== */
 /* ===== 每日分享：优秀候选卡片 ===== */
 .cand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
@@ -995,31 +986,6 @@ function showCommentToast(text){
   showCommentToast._t=setTimeout(()=>box.classList.remove('on'),12000);
 }
 
-// 保存后轮询换取 AI 评语（生成需要几秒，最多等 ~30 秒）
-function qualityHint(msg){
-  const old=document.getElementById('quality-hint'); if(old) old.remove();
-  const el=document.createElement('div');
-  el.id='quality-hint';
-  el.className='quality-hint';
-  el.innerHTML='<span class="qh-badge">'+icon('leaf')+'</span><div class="qh-body"><b>一个小提醒</b><p>'+escapeHtml(msg)+'</p></div><button type="button" class="qh-x" aria-label="知道了">知道了</button>';
-  document.body.appendChild(el);
-  const close=()=>{el.classList.add('out');setTimeout(()=>{el.remove();},260);};
-  el.querySelector('.qh-x').onclick=close;
-  setTimeout(close,15000);
-}
-
-function fetchCommentFor(pid,dayno){
-  let left=12;
-  const tick=async()=>{
-    try{
-      const r=await api('/comment/'+pid+'/'+dayno);
-      if(r&&r.comment){ showCommentToast(r.comment); return; }
-    }catch(e){}
-    if(left-->0) setTimeout(tick,2600);
-  };
-  setTimeout(tick,1600);
-}
-
 function savedFeedback(dayno, prog){
   const el=document.getElementById('save-feedback');
   clearTimeout(savedFeedbackTimer);clearTimeout(leafStartTimer);
@@ -1310,6 +1276,7 @@ async function loadCommentDots(){
 
 // 差劲建议：下次进入时弹一次，可选去补拍
 async function showPendingReminder(){
+  if(Date.now() < (window.__remSuppressUntil||0)) return;
   const days = Object.keys(CMT_REMINDER);
   if (!days.length) return;
   const day = days[0];
@@ -1825,8 +1792,7 @@ async function saveDay(dayno,isSpecial){
       document.getElementById('p-bar').style.width=prevPct+'%';
     }
     savedFeedback(dayno, prevDone!=null?{fromDone:prevDone,toDone:calendarSnapshot.done_count,fromPct:prevPct,toPct:calendarSnapshot.progress}:null);
-    if(savedRes&&savedRes.quality&&savedRes.quality.reminder){qualityHint(savedRes.quality.reminder.msg);}
-    fetchCommentFor(ME.id, dayno);
+    window.__remSuppressUntil = Date.now() + 120000;
     setTimeout(()=>{void refreshDays();},3400);
   }catch(e){status.textContent='记录未保存。'+e.message+'，已选文件保留，可重试。';}
   finally{
