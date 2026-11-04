@@ -937,6 +937,12 @@ function T(msg){
     box.textContent='trace '+window.__trace.length+'\n'+window.__trace.slice(-14).join('\n');
   }catch(e){}
 }
+if(TRACE_ON){
+  document.addEventListener('DOMContentLoaded',()=>{
+    T('boot vp='+innerWidth+'x'+innerHeight+' dpr='+(window.devicePixelRatio||1)+
+      ' reduced='+(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches));
+  });
+}
 function flyLeafToTree(dayno){
   T('fly 进入 day='+dayno);
   if(!dayno){T('  × dayno 为空');return;}
