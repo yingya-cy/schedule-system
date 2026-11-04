@@ -920,23 +920,51 @@ document.getElementById('image-viewer').addEventListener('touchstart',e=>touchX=
 document.getElementById('image-viewer').addEventListener('touchend',e=>{const delta=e.changedTouches[0].clientX-touchX;if(Math.abs(delta)>50)moveViewer(delta<0?1:-1);},{passive:true});
 let savedFeedbackTimer=0;
 let leafFlyTimer=0;
+// ===== 诊断开关：URL 带 ?trace=1 时在右上角显示动画执行日志（正式使用无任何影响）=====
+const TRACE_ON=(()=>{try{return new URLSearchParams(location.search).has('trace');}catch(e){return false;}})();
+function T(msg){
+  if(!TRACE_ON)return;
+  try{
+    window.__trace=window.__trace||[];
+    const t=new Date(); const stamp=String(t.getSeconds()).padStart(2,'0')+'.'+String(t.getMilliseconds()).padStart(3,'0');
+    window.__trace.push(stamp+' '+msg);
+    let box=document.getElementById('trace-box');
+    if(!box){
+      box=document.createElement('div');box.id='trace-box';
+      box.style.cssText='position:fixed;right:6px;top:6px;z-index:99999;max-width:300px;max-height:70vh;overflow:auto;background:#111d;color:#cfe;font:11px/1.5 ui-monospace,Consolas,monospace;padding:8px 10px;border-radius:8px;white-space:pre-wrap;pointer-events:none';
+      document.body.appendChild(box);
+    }
+    box.textContent='trace '+window.__trace.length+'\n'+window.__trace.slice(-14).join('\n');
+  }catch(e){}
+}
 function flyLeafToTree(dayno){
-  if(!dayno)return;
+  T('fly 进入 day='+dayno);
+  if(!dayno){T('  × dayno 为空');return;}
   const reduced=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const grid=document.getElementById('daygrid');
   const tree=document.querySelector('.gratitude-sapling-art');
-  if(!grid||!tree)return;
+  T('  reduced='+reduced+' vp='+innerWidth+'x'+innerHeight+' grid='+!!grid+' tree='+!!tree);
+  if(!grid||!tree){T('  × grid/tree 缺失');return;}
   // 树在视口上方看不见时，同步把页面滑回顶部（叶子是内容坐标，滑动不影响轨迹）
-  if(tree.getBoundingClientRect().top<0)window.scrollTo({top:0,behavior:'smooth'});
+  if(tree.getBoundingClientRect().top<0)window.scrollTo(0,0);
   const cell=[...grid.querySelectorAll('.cell')].find(c=>String(c.dataset.day)===String(dayno));
-  if(!cell)return;
+  T('  cell='+(cell?'yes':'no'));
+  if(!cell){T('  × 找不到第 '+dayno+' 天的格子');return;}
   const gr=grid.getBoundingClientRect();
   const cr=cell.getBoundingClientRect();
   const tr=tree.getBoundingClientRect();
-  if(tr.width<1||tr.height<1)return;
+  T('  tree='+Math.round(tr.width)+'x'+Math.round(tr.height)+' cell@'+Math.round(cr.top));
+  if(tr.width<1||tr.height<1){T('  × 树尺寸为 0');return;}
   const size=28;
-  const ox=cr.right-gr.left-size/2-8;
-  const oy=cr.top-gr.top+size/2+6;
+  const vh=window.innerHeight||document.documentElement.clientHeight||800;
+  const vw=window.innerWidth||document.documentElement.clientWidth||400;
+  let sxv=cr.right-16, syv=cr.top+cell.offsetHeight*0.5;
+  if(syv>vh-46)syv=vh-46;
+  if(syv<40)syv=40;
+  if(sxv>vw-24)sxv=vw-24;
+  if(sxv<24)sxv=24;
+  const ox=sxv-gr.left-size/2;
+  const oy=syv-gr.top-size/2;
   const tx=tr.left-gr.left+tr.width*.5;
   const ty=tr.top-gr.top+tr.height*.45;
   const dx=tx-ox, dy=ty-oy;
@@ -963,6 +991,7 @@ function flyLeafToTree(dayno){
   img.style.left=(gr.left+sx+ox-size/2)+'px';
   img.style.top=(gr.top+sy+oy-size/2)+'px';
   document.body.appendChild(img);
+  T('  叶子已插入 @'+Math.round(img.getBoundingClientRect().left)+','+Math.round(img.getBoundingClientRect().top));
   img.animate([
     { transform:'translate(0px,0px) scale(.7) rotate(-12deg)', opacity:0, offset:0 },
     { transform:'translate(0px,-8px) scale(1.15) rotate(-3deg)', opacity:1, offset:.16 },
@@ -978,6 +1007,7 @@ function flyLeafToTree(dayno){
   setTimeout(()=>{
     if(!tree.isConnected)return;
     tree.animate([{transform:'scale(1)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:620,easing:'cubic-bezier(.3,.8,.3,1)'});
+    T('  树脉动');
   },1520);
 }
 let leafStartTimer=0;
@@ -1009,6 +1039,7 @@ function savedFeedback(dayno, prog){
   savedFeedbackTimer=setTimeout(()=>el.classList.remove('on'),2700);
   // 顺序：先弹窗 → 再飞叶子 → 落树脉动之后 → 进度条才走
   const delay=prog?750:0;
+  T('savedFeedback day='+dayno+' prog='+(prog?'yes':'no')+' delay='+delay);
   leafStartTimer=setTimeout(()=>flyLeafToTree(dayno),delay);
   if(prog)animateProgress(delay+2140,prog);
 }
