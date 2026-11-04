@@ -921,7 +921,18 @@ document.getElementById('image-viewer').addEventListener('touchend',e=>{const de
 let savedFeedbackTimer=0;
 let leafFlyTimer=0;
 // ===== 诊断开关：URL 带 ?trace=1 时在右上角显示动画执行日志（正式使用无任何影响）=====
-const TRACE_ON=(()=>{try{return new URLSearchParams(location.search).has('trace');}catch(e){return false;}})();
+const TRACE_ON=(()=>{
+  try{
+    const qs=new URLSearchParams(location.search);
+    if(qs.has('trace')){
+      const v=qs.get('trace');
+      if(v==='0'||v==='off'){try{localStorage.removeItem('gtrace');}catch(e){} return false;}
+      try{localStorage.setItem('gtrace','1');}catch(e){}
+      return true;
+    }
+    try{return localStorage.getItem('gtrace')==='1';}catch(e){return false;}
+  }catch(e){return false;}
+})();
 function T(msg){
   if(!TRACE_ON)return;
   try{
