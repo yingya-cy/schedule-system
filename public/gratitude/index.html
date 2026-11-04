@@ -219,6 +219,7 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
 .cell .cmt-badge { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%; background: #e2574c; border: 2px solid #fdfbf3; box-shadow: 0 2px 4px #0000002e; z-index: 6; cursor: pointer; animation: cmtPulse 2.6s ease-in-out infinite; }
 @keyframes cmtPulse { 0%, 100% { box-shadow: 0 0 0 0 #e2574c66, 0 2px 4px #0000002e; } 50% { box-shadow: 0 0 0 4px #e2574c00, 0 2px 4px #0000002e; } }
 @media (prefers-reduced-motion: reduce) { .cell .cmt-badge { animation: none; } }
+.day-comment .day-comment-text { margin: 0; padding: 13px 15px; font-size: 14px; line-height: 1.85; color: #46584f; background: #fdfbf3; border: 1px dashed #d9d2b4; border-radius: 8px; }
 .cell.done { background: #e4ece1; border-color: #cedbca; }.cell.done::after { background: linear-gradient(135deg,#c7d9c2 50%,var(--paper) 50%); }
 .cell.done .s,.cell.done .n { color: var(--green); }
 .cell.today { background: #fce9df; border: 2px solid var(--accent); padding: 10px; }
@@ -1440,12 +1441,20 @@ async function openFill(x,opt={}){
   document.getElementById('fill-day-number').textContent = String(x.day_no).padStart(2,'0');
   document.getElementById('fill-form').innerHTML='<p class="inline-status" role="status" aria-busy="true">正在打开这页记录…</p>';
   try{
-    const d=await api('/day/'+ME.id+'/'+x.day_no);
+    const [d, cmt] = await Promise.all([
+      api('/day/'+ME.id+'/'+x.day_no),
+      api('/comment/'+ME.id+'/'+x.day_no).catch(()=>null)
+    ]);
     if(request!==openRequest||currentScreen!=='s-fill')return;
-    fillContext={x,d,editing:!x.done};fillDirty=false;
+    const dayComment = (cmt && cmt.comment) || '';
+    fillContext={x,d,editing:!x.done,comment:dayComment};fillDirty=false;
     window.__imgs=(d.uploads||[]).filter(u=>u.kind==='image'||!u.kind).map(u=>({url:API+'/img/'+u.file_path,path:u.file_path,kind:'image'}));
     window.__vids=(d.uploads||[]).filter(u=>u.kind==='video'||u.kind==='audio').map(u=>({url:API+'/img/'+u.file_path,path:u.file_path,kind:'video'}));
     renderFill();
+    if(dayComment){
+      cmtMark(x.day_no);
+      if(CMT_BY_DAY[String(x.day_no)]){ delete CMT_BY_DAY[String(x.day_no)]; paintCommentDots(); }
+    }
   }catch(e){
     if(request!==openRequest||currentScreen!=='s-fill')return;
     const f=document.getElementById('fill-form');
@@ -1460,10 +1469,15 @@ function editRecord(){
 }
 function renderFill(){
   const {x,d,editing}=fillContext;
+  const commentHtml = (fillContext && fillContext.comment) ? `
+    <section class="fill-section day-comment">
+      <header class="fill-section-heading"><span class="fill-section-index">&#10022;</span><div><h3>来自朋辈伙伴</h3><p>写给这一天的回应</p></div></header>
+      <p class="day-comment-text">${escapeHtml(fillContext.comment)}</p>
+    </section>` : '';
   document.getElementById('fill-subtitle').textContent=editing?'写下今天让你感到温暖的事':'回看这一天的感恩记录';
   const f=document.getElementById('fill-form');
   if(!editing){
-    f.innerHTML='<section class="record-summary"><h2>这一天的温暖，已收好</h2><p>已完成 · 第'+x.day_no+'天</p></section><div class="thumbs" id="thumbs"></div><div class="thumbs" id="vidThumbs"></div><button type="button" class="btn ghost" id="edit-record" onclick="editRecord()">'+icon('edit')+'修改记录</button>';
+    f.innerHTML='<section class="record-summary"><h2>这一天的温暖，已收好</h2><p>已完成 · 第'+x.day_no+'天</p></section>'+commentHtml+'<div class="thumbs" id="thumbs"></div><div class="thumbs" id="vidThumbs"></div><button type="button" class="btn ghost" id="edit-record" onclick="editRecord()">'+icon('edit')+'修改记录</button>';
     renderThumbs();renderVidThumbs();return;
   }
 
@@ -1513,6 +1527,7 @@ function renderFill(){
       <input type="file" id="audioIn" accept="audio/*" style="display:none" onchange="onPickAudio(this)">
       <div class="thumbs" id="vidThumbs"></div>
     </section>`:''}
+    ${commentHtml}
     <footer class="fill-submit-dock">
       <button class="btn acc" id="save-day" onclick="saveDay(${x.day_no}, ${d.is_special})" ${LOCAL_PREVIEW?'disabled aria-disabled="true"':''}>${icon('check')} ${LOCAL_PREVIEW?'本地预览 · 不会提交':'收好今天的温暖'}</button>
       <p id="save-status" role="status"></p>
