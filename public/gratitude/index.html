@@ -921,68 +921,19 @@ document.getElementById('image-viewer').addEventListener('touchend',e=>{const de
 let savedFeedbackTimer=0;
 let leafFlyTimer=0;
 // ===== 诊断开关：URL 带 ?trace=1 时在右上角显示动画执行日志（正式使用无任何影响）=====
-const TRACE_ON=(()=>{
-  try{
-    const qs=new URLSearchParams(location.search);
-    if(qs.has('trace')){
-      const v=qs.get('trace');
-      if(v==='0'||v==='off'){try{localStorage.removeItem('gtrace');}catch(e){} return false;}
-      try{localStorage.setItem('gtrace','1');}catch(e){}
-      return true;
-    }
-    try{return localStorage.getItem('gtrace')==='1';}catch(e){return false;}
-  }catch(e){return false;}
-})();
-function T(msg){
-  if(!TRACE_ON)return;
-  try{
-    window.__trace=window.__trace||[];
-    const t=new Date(); const stamp=String(t.getSeconds()).padStart(2,'0')+'.'+String(t.getMilliseconds()).padStart(3,'0');
-    window.__trace.push(stamp+' '+msg);
-    let box=document.getElementById('trace-box');
-    if(!box){
-      box=document.createElement('div');box.id='trace-box';
-      box.style.cssText='position:fixed;left:0;right:0;top:0;z-index:2147483000;max-height:46vh;overflow:auto;background:#0b0b0b;color:#9fe8b0;font:12px/1.6 ui-monospace,Consolas,monospace;padding:10px 12px;border-bottom:3px solid #e2574c;white-space:pre-wrap;pointer-events:none';
-      document.body.appendChild(box);
-    }
-    box.textContent='trace '+window.__trace.length+'\n'+window.__trace.slice(-14).join('\n');
-  }catch(e){}
-}
-if(TRACE_ON){
-  const boot=()=>{
-    T('boot vp='+innerWidth+'x'+innerHeight+' dpr='+(window.devicePixelRatio||1)+
-      ' reduced='+(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches));
-    try{console.log('[trace] on');}catch(e){}
-  };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-  setTimeout(boot,600);
-}
-function forceAnimOn(){
-  try{
-    const a=new URLSearchParams(location.search).get('anim');
-    if(a==='on'||a==='full'||a==='1') localStorage.setItem('gforceanim','1');
-    if(a==='off'||a==='0') localStorage.removeItem('gforceanim');
-    return localStorage.getItem('gforceanim')==='1';
-  }catch(e){return false;}
-}
 function flyLeafToTree(dayno){
-  T('fly 进入 day='+dayno);
-  if(!dayno){T('  × dayno 为空');return;}
-  const reduced=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches) && !forceAnimOn();
+  if(!dayno){return;}
   const grid=document.getElementById('daygrid');
   const tree=document.querySelector('.gratitude-sapling-art');
-  T('  reduced='+reduced+' vp='+innerWidth+'x'+innerHeight+' grid='+!!grid+' tree='+!!tree);
-  if(!grid||!tree){T('  × grid/tree 缺失');return;}
+  if(!grid||!tree){return;}
   // 树在视口上方看不见时，同步把页面滑回顶部（叶子是内容坐标，滑动不影响轨迹）
   if(tree.getBoundingClientRect().top<0)window.scrollTo(0,0);
   const cell=[...grid.querySelectorAll('.cell')].find(c=>String(c.dataset.day)===String(dayno));
-  T('  cell='+(cell?'yes':'no'));
-  if(!cell){T('  × 找不到第 '+dayno+' 天的格子');return;}
+  if(!cell){return;}
   const gr=grid.getBoundingClientRect();
   const cr=cell.getBoundingClientRect();
   const tr=tree.getBoundingClientRect();
-  T('  tree='+Math.round(tr.width)+'x'+Math.round(tr.height)+' cell@'+Math.round(cr.top));
-  if(tr.width<1||tr.height<1){T('  × 树尺寸为 0');return;}
+  if(tr.width<1||tr.height<1){return;}
   const size=44;
   const vh=window.innerHeight||document.documentElement.clientHeight||800;
   const vw=window.innerWidth||document.documentElement.clientWidth||400;
@@ -1002,30 +953,10 @@ function flyLeafToTree(dayno){
   img.alt='';img.className='leaf-fly';
   img.style.filter='drop-shadow(0 6px 10px rgba(40,60,50,.35))';
   img.style.width=size+'px';img.style.height=size+'px';
-  if(reduced){
-    // 尊重「减少动效」：不做飞行，只在树的位置淡入淡出一次 + 树自己呼吸一下
-    const imgR=document.createElement('img');
-    imgR.src='assets/'+LEAF_FILES[((dayno-1)%LEAF_FILES.length+LEAF_FILES.length)%LEAF_FILES.length];
-    imgR.alt='';imgR.className='leaf-fly';
-    imgR.style.width='40px';imgR.style.height='40px';
-    imgR.style.filter='drop-shadow(0 6px 10px rgba(40,60,50,.35))';
-    imgR.style.left=(tr.left+window.scrollX+tr.width*.5-20)+'px';
-    imgR.style.top=(tr.top+window.scrollY+tr.height*.42-20)+'px';
-    document.body.appendChild(imgR);
-    imgR.animate([{opacity:0,transform:'translateY(10px) scale(.85)'},
-                  {opacity:1,transform:'translateY(0) scale(1.12)',offset:.45},
-                  {opacity:1,transform:'translateY(-6px) scale(1)',offset:.7},
-                  {opacity:0,transform:'translateY(-14px) scale(.9)'}],
-                 {duration:1200,easing:'ease-in-out'});
-    setTimeout(()=>imgR.remove(),1350);
-    tree.animate([{transform:'scale(1)'},{transform:'scale(1.08)',offset:.5},{transform:'scale(1)'}],{duration:760,easing:'ease-out'});
-    return;
-  }
   const sx=window.scrollX||0, sy=window.scrollY||0;
   img.style.left=(gr.left+sx+ox-size/2)+'px';
   img.style.top=(gr.top+sy+oy-size/2)+'px';
   document.body.appendChild(img);
-  T('  叶子已插入 @'+Math.round(img.getBoundingClientRect().left)+','+Math.round(img.getBoundingClientRect().top));
   img.animate([
     { transform:'translate(0px,0px) scale(.7) rotate(-12deg)', opacity:0, offset:0 },
     { transform:'translate(0px,-8px) scale(1.15) rotate(-3deg)', opacity:1, offset:.16 },
@@ -1041,7 +972,6 @@ function flyLeafToTree(dayno){
   setTimeout(()=>{
     if(!tree.isConnected)return;
     tree.animate([{transform:'scale(1)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:620,easing:'cubic-bezier(.3,.8,.3,1)'});
-    T('  树脉动');
   },1520);
 }
 let leafStartTimer=0;
@@ -1073,7 +1003,6 @@ function savedFeedback(dayno, prog){
   savedFeedbackTimer=setTimeout(()=>el.classList.remove('on'),2700);
   // 顺序：先弹窗 → 再飞叶子 → 落树脉动之后 → 进度条才走
   const delay=prog?750:0;
-  T('savedFeedback day='+dayno+' prog='+(prog?'yes':'no')+' delay='+delay);
   leafStartTimer=setTimeout(()=>flyLeafToTree(dayno),delay);
   if(prog)animateProgress(delay+2140,prog);
 }
@@ -1495,7 +1424,7 @@ async function loadDays(){
   const request=++calendarRequest;
   const d = await api('/days/'+ME.id);
   if(request!==calendarRequest||!ME)return;
-  calendarSnapshot=d;renderDays(d);__animProbe();
+  calendarSnapshot=d;renderDays(d);
 }
 const LEAF_FILES=['gratitude-leaf-sticker.webp','gratitude-leaf-sticker-olive.webp','gratitude-leaf-sticker-red.webp','gratitude-leaf-sticker-ginkgo.webp','gratitude-leaf-sticker-oak.webp','gratitude-leaf-sticker-linden.webp','gratitude-leaf-sticker-birch.webp'];
 const LEAF_TURNS=[-9,5,-3,8,-6,3,-7];
@@ -1817,14 +1746,6 @@ function uploadFile(im,dayno,index,total){
     const fd=new FormData();fd.append('file',im.file);fd.append('participant_id',ME.id);fd.append('day_no',dayno);
     xhr.send(fd);
   });
-}
-function __animProbe(){
-  try{
-    const qs=new URLSearchParams(location.search);
-    if(!qs.has('anim'))return;
-    const n=+qs.get('anim')||7;
-    setTimeout(()=>{ T('probe 手动播放 day='+n); try{flyLeafToTree(n);}catch(e){T('  × 异常 '+e.message);} },1200);
-  }catch(e){}
 }
 async function refreshDays(){
   const box=document.getElementById('days-status');
