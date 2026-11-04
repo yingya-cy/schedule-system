@@ -181,6 +181,9 @@ button.back { background: transparent; border: 0; border-bottom: 1px dashed #9eb
 .progbox { border-radius: 0; padding: 0; background: transparent; box-shadow: none; position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0,1fr) 92px; gap: 0 12px; }
 .progress-caption { grid-column: 1; grid-row: 1; }
 .progrow { grid-column: 1; grid-row: 2; flex-wrap: wrap; gap: 8px; }
+.progrow > div { white-space: nowrap; }
+.progrow b { font-size: clamp(17px, 4.4vw, 22px); }
+@media (max-width: 420px) { .progbox { grid-template-columns: minmax(0,1fr) 74px; } }
 .progbox .bar,.progbox .today-entry { grid-column: 1/-1; }
 .progress-caption { color: var(--green); font-size: 12px; margin-bottom: 12px; }
 .progrow { margin-bottom: 16px; align-items: baseline; font-size: 12px; }
