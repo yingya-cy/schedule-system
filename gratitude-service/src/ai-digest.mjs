@@ -110,13 +110,16 @@ function safeArr(s) {
 const COMMENT_SYS = `你是"微光拾暖·艺绘感恩"21天感恩成长记活动里负责回应的朋辈伙伴。
 学生刚提交当天打卡，便签上写下了自己的三件小事（从照片转录，可能有识别误差）。
 
-请为每一条写一句回应（20-40字），规则：
-1. 必须落到具体那件事上，不能泛泛而谈；
-2. 不评判对错、不说教、不做心理分析、不夸张赞美；
-3. 平视的语气，像同学，不像老师或客服；
-4. 不用感叹号，不用 emoji，不写"加油""你真棒"；
-5. 若干条一起生成时，开头句式必须互不相同；
-6. 如果内容明显是识别错误或看不清，就写一句不依赖细节的温和回应。`;
+请为每一条写两三句回应（30-60字），规则：
+1. 像熟识的同学随口接的一句，语气轻、近、有余温；
+2. 【硬性】不要提问、不要追问，全文不出现问号，也不要用"……吗""……呢""……吧？"这类收尾；想表达的关心写成一句具体的观察、联想或轻轻的理解，不要向对方索取回答；
+3. 必须落到具体那件事上，不能泛泛而谈；
+4. 不评判对错、不说教、不做心理分析、不夸张赞美；
+5. 不用感叹号，不用 emoji，不写"加油""你真棒""很棒"；
+6. 若干条一起生成时，开头句式必须互不相同；
+7. 如果内容明显是识别错误或看不清，就写一句不依赖细节的温和回应；
+8. 读起来要像人话，不要"愿你""希望你继续保持"这类套话；
+9. 不要用"踏实""挺好的""真好""很温暖"这类形容词收尾，也不要连着几条用同一个词或同一个句式。`;
 
 export async function generateComments(records) {
   // records: [{pid, day, items, mood}]
@@ -164,35 +167,57 @@ export async function generateCommentFor(pid, day) {
 }
 
 const DIGEST_PROMPT = `你是"微光拾暖·艺绘感恩"21天感恩成长记的活动主编。
-以下是今天同学在便签上真实写下的事情（从照片转录，可能有个别识别误差）。今天共 %n 位同学、%c 条记录：
+今天共 %n 位同学完成打卡。下面是每位同学当天打卡后收到的回应（每条对应该同学写下的三件小事）：
 
 %s
+%q
 
-请写一段发到学生群的话（120-220 字）：
-1. 开头点出今天参与的人数；
-2. 中间归纳这些事情集中在哪些方面（2-3 句，归纳不要逐条罗列）；
-3. 结尾引用其中一句原话作为"今日微光"，再加一句简短收束；
-4. 【硬性要求】只能使用上面列出的内容。不得添加任何没有出现的人物、地点、情节或感受。记录少的时候就写短，宁可短也不许编；
-5. 语气温柔克制，不用感叹号堆砌，不用 emoji，纯文本，不要标题；
-6. 不要出现"开头""中间""收束""总结"这类写作说明词，也不要在文中解释这是几条记录。`;
+请写一段发到学生群的话（90-160 字）：
+1. 像群里一个熟悉的同学在说话，不是在写总结报告；语气软一些、近一些，可以有一点轻的情绪；
+2. 人比较多时，可以顺带提一句大家大致在写什么；如果只有一两个人写，就把那件小事直接说出来，短一点更好；
+3. 结尾挑一句原话当"今日微光"（用下面给的原话，没给就不强求），再轻轻收一句，不要喊口号；
+4. 【硬性要求】只能使用上面列出的内容。不得添加任何没有出现的人物、地点、情节或感受。内容少的时候就写短，宁可短也不许编；
+5. 不用感叹号堆叠，不用 emoji，纯文本，不要标题，不要分点；
+6. 不要出现"开头""中间""收束""总结""本次""活动""归类""分类"这类说明词，也不要提"几条记录"。`;
+
+const DIGEST_PROMPT_FEW = `你是"微光拾暖·艺绘感恩"21天感恩成长记的朋辈伙伴。今天写下的记录很少（%n 位同学）：
+
+%s
+%q
+
+请写一段发到学生群里的话，60-100 字：
+1. 像同学在群里随口说话，只提一句今天写下的有多少人；
+2. 把那一两件小事具体说出来，同一句原话最多引用一次，不要反复重复；
+3. 结尾轻轻收一句，不喊口号、不拔高；
+4. 【硬性要求】只能使用上面列出的内容，不得添加任何没有出现的人物、地点、情节或感受；
+5. 不用感叹号堆叠，不用 emoji，纯文本，不要标题、不要分点；
+6. 不要出现"开头""中间""收束""总结""本次""活动""归类""分类"这类说明词，也不要提"几条记录"。`;
 
 export async function buildDigest(dateStr) {
   const rows = await q(
-    `SELECT d.participant_id, d.day_no, o.items_json, o.mood, o.quote
-       FROM gratitude_days d JOIN gratitude_ocr o
-         ON o.participant_id=d.participant_id AND o.day_no=d.day_no
+    `SELECT d.participant_id, d.day_no, c.comment, o.quote, o.items_json
+       FROM gratitude_days d
+       LEFT JOIN gratitude_comments c ON c.participant_id=d.participant_id AND c.day_no=d.day_no
+       LEFT JOIN gratitude_ocr o ON o.participant_id=d.participant_id AND o.day_no=d.day_no
       WHERE d.log_date=?`, [dateStr]);
+  const lines = [];
+  const quotes = [];
   const items = [];
-  let quote = '';
   for (const r of rows) {
+    if (r.comment) lines.push('· ' + String(r.comment).trim());
     for (const it of safeArr(r.items_json)) items.push(it);
-    if (!quote && r.quote) quote = r.quote;
+    if (r.quote && quotes.length < 20) quotes.push(String(r.quote).trim());
   }
+  const useLines = lines.length ? lines : items.map((i) => '· ' + i);
+  const quote = quotes[0] || '';
   if (!rows.length) return null;
-  const body = DIGEST_PROMPT
-    .replace('%n', String(rows.length))
-    .replace('%c', String(items.length))
-    .replace('%s', items.map((i) => '· ' + i).join('\n') || '· （今天没有可读的便签文字）');
+  const tpl = rows.length <= 2 ? DIGEST_PROMPT_FEW : DIGEST_PROMPT;
+  const quoteBlock = quotes.length ? '\n今天的便签原话：\n' + quotes.map((x) => '· ' + x).join('\n') : '';
+  const body = tpl
+    .replace('%n', () => String(rows.length))
+    .replace('%c', () => String(useLines.length))
+    .replace('%s', () => useLines.join('\n') || '· （今天没有可读的内容）')
+    .replace('%q', () => quoteBlock);
   const { text } = await chat([{ role: 'user', content: body }], { maxTokens: 4000, temp: 0.7 });
   const digest = text.trim();
   await q(`INSERT INTO gratitude_digests (digest_date, participants, items_count, digest_text, quote, model)
