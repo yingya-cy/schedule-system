@@ -254,18 +254,23 @@ const DIGEST_PROMPT_FEW = `你是"微光拾暖·艺绘感恩"21天感恩成长�
 
 export async function buildDigest(dateStr) {
   const rows = await q(
-    `SELECT d.participant_id, d.day_no, g.grade, c.comment, o.quote, o.items_json
+    `SELECT d.participant_id, d.day_no, c.comment, o.quote, o.items_json,
+            (SELECT g.grade FROM gratitude_quality g
+              WHERE g.participant_id=d.participant_id AND g.day_no=d.day_no
+              ORDER BY FIELD(g.grade,'差劲','普通','优秀') DESC, g.chars DESC LIMIT 1) AS grade
        FROM gratitude_days d
-       LEFT JOIN gratitude_quality g ON g.participant_id=d.participant_id AND g.day_no=d.day_no
        LEFT JOIN gratitude_comments c ON c.participant_id=d.participant_id AND c.day_no=d.day_no
        LEFT JOIN gratitude_ocr o ON o.participant_id=d.participant_id AND o.day_no=d.day_no
       WHERE d.log_date=?`, [dateStr]);
   if (!rows.length) return null;
 
   // 优秀优先（AI 挑稿：从当天优秀记录里择 2-4 条做匿名分享）
-  const good = rows.filter((r) => r.grade === '优秀');
-  const pool = good.length ? good : rows.filter((r) => r.grade === '普通');
-  const picked = (pool.length ? pool : rows).slice(0, 5);
+  // 差劲的便签不进简报（只发提醒，不做分享素材）
+  const usable = rows.filter((r) => r.grade !== '差劲');
+  if (!usable.length) return null;   // 当天只有差劲/无有效内容，不做简报
+  const good = usable.filter((r) => r.grade === '优秀');
+  const pool = good.length ? good : usable.filter((r) => r.grade === '普通');
+  const picked = (pool.length ? pool : usable).slice(0, 5);
   if (good.length || pool.length) {
     const excerptOf = (r) => {
       const q = String(r.quote || '').trim();
@@ -294,7 +299,7 @@ export async function buildDigest(dateStr) {
   const lines = [];
   const quotes = [];
   const items = [];
-  for (const r of rows) {
+  for (const r of usable) {
     if (r.comment) lines.push('· ' + String(r.comment).trim());
     for (const it of safeArr(r.items_json)) items.push(it);
     if (r.quote && quotes.length < 20) quotes.push(String(r.quote).trim());
@@ -333,36 +338,30 @@ async function mapLimit(list, limit, fn) {
 }
 
 export async function runDaily(dateStr) {
-  const days = await q('SELECT participant_id, day_no FROM gratitude_days WHERE log_date=?', [dateStr]);
-  const stats = { date: dateStr, records: days.length, ocr_ok: 0, ocr_fail: 0, comments: 0, comment_fail: 0, digest: false };
+  const days = await q(
+    `SELECT d.participant_id, d.day_no, g.grade
+       FROM gratitude_days d
+       LEFT JOIN gratitude_quality g
+         ON g.participant_id = d.participant_id AND g.day_no = d.day_no
+      WHERE d.log_date=?`, [dateStr]);
+  const stats = { date: dateStr, records: days.length, done: 0, skip: 0, fail: 0, digest: false };
   if (!days.length) return stats;
 
-  const ocr = await mapLimit(days, 4, async (d) => ensureOcr(d.participant_id, d.day_no));
-  const withText = [];
-  days.forEach((d, i) => {
-    const o = ocr[i];
-    if (o && !o.error && o.items) { stats.ocr_ok++; withText.push({ pid: d.participant_id, day: d.day_no, items: o.items, mood: o.mood }); }
-    else stats.ocr_fail++;
-  });
-
+  // 缺评语/提醒的记录才补（已有同 kind 的跳过，generateCommentFor 内部判断）
   const need = [];
-  for (const r of withText) {
-    const hit = await q1('SELECT 1 AS x FROM gratitude_comments WHERE participant_id=? AND day_no=?', [r.pid, r.day]);
-    if (!hit) need.push(r);
+  for (const d of days) {
+    const kind = d.grade === '差劲' ? 'reminder' : 'comment';
+    const hit = await q1('SELECT kind FROM gratitude_comments WHERE participant_id=? AND day_no=?', [d.participant_id, d.day_no]);
+    if (hit && (hit.kind || 'comment') === kind) { stats.skip++; continue; }
+    need.push(d);
   }
-  for (let i = 0; i < need.length; i += 20) {
-    const batch = need.slice(i, i + 20);
+
+  await mapLimit(need, 4, async (d) => {
     try {
-      const m = await generateComments(batch);
-      for (const r of batch) {
-        const c = m.get(r.pid);
-        if (!c) { stats.comment_fail++; continue; }
-        await q(`INSERT INTO gratitude_comments (participant_id, day_no, comment, model) VALUES (?,?,?,?)
-                 ON DUPLICATE KEY UPDATE comment=VALUES(comment)`, [r.pid, r.day, c, TEXT_MODEL]);
-        stats.comments++;
-      }
-    } catch (e) { stats.comment_fail += batch.length; }
-  }
+      const r = await generateCommentFor(d.participant_id, d.day_no, { grade: d.grade || '' });
+      if (r && r.comment) stats.done++; else stats.fail++;
+    } catch (e) { stats.fail++; }
+  });
 
   try { stats.digest = !!(await buildDigest(dateStr)); } catch (e) { stats.digest_error = String(e.message || e).slice(0, 120); }
   return stats;

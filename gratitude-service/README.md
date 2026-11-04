@@ -53,3 +53,14 @@ done
 cp /home/ubuntu/gratitude/package.json gratitude-service/package.json
 git add gratitude-service && git commit -m "chore(打卡服务): 同步后端源码"
 ```
+""
+
+## 定时任务（服务器 crontab）
+
+```
+# AI 每日批处理：23:30 处理当天，00:20 补前一天漏掉的
+30 23 * * * cd /home/ubuntu/gratitude && set -a && . ./.env && set +a && /usr/bin/node src/ai-digest.mjs >> /tmp/ai-digest.log 2>&1
+20 0  * * * cd /home/ubuntu/gratitude && set -a && . ./.env && set +a && /usr/bin/node src/ai-digest.mjs $(date -d yesterday +\%F) >> /tmp/ai-digest.log 2>&1
+```
+
+`ai-digest.mjs` 会：补当天缺的评语/提醒（差劲→提醒，普通/优秀→评语）、从优秀记录挑 2-4 条生成匿名分享文案；已存在的同 kind 记录会跳过，重复跑无副作用。
