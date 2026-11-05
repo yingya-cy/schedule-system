@@ -381,7 +381,9 @@ app.post('/api/day', async (req, res) => {
                    ON DUPLICATE KEY UPDATE grade=VALUES(grade), kind=VALUES(kind), comment=VALUES(comment), hidden=0`,
             [participant_id, day_no, '差劲', 'reminder', g.reminder.msg]).catch(() => {});
         } else {
-          await generateCommentFor(participant_id, day_no, { grade: g.day_grade }).catch(() => {});
+          if (g.day_grade === '差劲') {
+            await generateCommentFor(participant_id, day_no, { grade: g.day_grade }).catch(() => {});
+          }
         }
         return g;
       });

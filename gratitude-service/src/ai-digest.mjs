@@ -350,7 +350,9 @@ export async function runDaily(dateStr) {
   // 缺评语/提醒的记录才补（已有同 kind 的跳过，generateCommentFor 内部判断）
   const need = [];
   for (const d of days) {
-    const kind = d.grade === '差劲' ? 'reminder' : 'comment';
+    // 目前只保留“差劲”的提醒；普通/优秀的每日评语暂停生成
+    if (d.grade !== '差劲') { stats.skip++; continue; }
+    const kind = 'reminder';
     const hit = await q1('SELECT kind FROM gratitude_comments WHERE participant_id=? AND day_no=?', [d.participant_id, d.day_no]);
     if (hit && (hit.kind || 'comment') === kind) { stats.skip++; continue; }
     need.push(d);
