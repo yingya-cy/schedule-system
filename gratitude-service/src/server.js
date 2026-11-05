@@ -84,7 +84,11 @@ const TMP_DIR = path.join(UP_DIR, '_tmp');
 fs.mkdirSync(TMP_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, TMP_DIR),
+  destination: (req, file, cb) => {
+    // 兜底：_tmp 可能被外部清理删掉，每次上传前确保目录存在
+    try { fs.mkdirSync(TMP_DIR, { recursive: true }); } catch (e) { /* 已存在 */ }
+    cb(null, TMP_DIR);
+  },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '.jpg';
     cb(null, `${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
