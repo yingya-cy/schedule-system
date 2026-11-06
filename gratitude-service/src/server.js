@@ -351,6 +351,13 @@ app.post('/api/day', async (req, res) => {
         if (abs.startsWith(UP_DIR + path.sep) && fs.existsSync(abs)) fs.unlinkSync(abs);
       } catch (_) {}
       await pool.execute('DELETE FROM gratitude_uploads WHERE id = ?', [u.id]);
+      // 同步清理该图的质检记录，避免留下指向已删文件的孤儿行（2026-11-06）
+      await pool.execute('DELETE FROM gratitude_quality WHERE file_path = ?', [u.file_path]).catch(() => {});
+    }
+
+    // 2.5) 该人该天的 OCR 结果随之失效（重传后由质检管线重新生成）
+    if (existing.length) {
+      await pool.execute('DELETE FROM gratitude_ocr WHERE participant_id = ? AND day_no = ?', [participant_id, day_no]).catch(() => {});
     }
 
     // 3) 为"本次提交但库里还没有"的补记录（新上传的）
