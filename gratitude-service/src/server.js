@@ -403,9 +403,9 @@ app.post('/api/day', async (req, res) => {
         if (!g || g.pending || !g.day_grade) return g;
         if (g.day_grade === '差劲' && g.reminder && g.reminder.msg) {
           // 差劲档：用按原因码分好的固定文案，措辞与问题一致，也省一次模型调用
-          await q(`INSERT INTO gratitude_comments (participant_id, day_no, grade, kind, comment)
-                   VALUES (?,?,?,?,?)
-                   ON DUPLICATE KEY UPDATE grade=VALUES(grade), kind=VALUES(kind), comment=VALUES(comment), hidden=0`,
+          await q(`INSERT INTO gratitude_comments (participant_id, day_no, grade, kind, comment, hidden)
+                   VALUES (?,?,?,?,?,1)
+                   ON DUPLICATE KEY UPDATE grade=VALUES(grade), kind=VALUES(kind), comment=VALUES(comment), hidden=1`,
             [participant_id, day_no, '差劲', 'reminder', g.reminder.msg]).catch(() => {});
         } else {
           if (g.day_grade === '差劲') {
@@ -1161,6 +1161,42 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'gratitud
 
 
 // ============ 15. AI：每日简报 & 逐条评语 ============
+// ============ 提醒人工闸门：AI 只提议，管理员点了才推给学生 ============
+app.get('/api/admin/ai/reminders', adminOnly, async (req, res) => {
+  try {
+    const rows = await q(`SELECT c.id, c.participant_id, p.name, p.student_id, p.campus, c.day_no, c.comment, c.created_at,
+                                 (SELECT u.file_path FROM gratitude_uploads u
+                                   WHERE u.participant_id=c.participant_id AND u.day_no=c.day_no
+                                   ORDER BY u.id LIMIT 1) AS file_path,
+                                 (SELECT q2.reason FROM gratitude_quality q2
+                                   WHERE q2.participant_id=c.participant_id AND q2.day_no=c.day_no
+                                   ORDER BY FIELD(q2.grade,'差劲','普通','优秀'), q2.id DESC LIMIT 1) AS reason
+                            FROM gratitude_comments c
+                            JOIN gratitude_participants p ON p.id = c.participant_id
+                           WHERE c.kind='reminder' AND c.hidden=1
+                           ORDER BY c.created_at DESC LIMIT 200`);
+    ok(res, { list: rows, total: rows.length });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+app.post('/api/admin/ai/reminder/push', adminOnly, async (req, res) => {
+  const id = +(req.body || {}).id;
+  if (!id) return fail(res, '缺少 id');
+  try {
+    await q('UPDATE gratitude_comments SET hidden=0 WHERE id=? AND kind=?', [id, 'reminder']);
+    ok(res, { id, pushed: true });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+app.post('/api/admin/ai/reminder/drop', adminOnly, async (req, res) => {
+  const id = +(req.body || {}).id;
+  if (!id) return fail(res, '缺少 id');
+  try {
+    await q('DELETE FROM gratitude_comments WHERE id=? AND kind=?', [id, 'reminder']);
+    ok(res, { id, dropped: true });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
 app.get('/api/comment/unread/:pid', async (req, res) => {
   try {
     const pid = +req.params.pid;

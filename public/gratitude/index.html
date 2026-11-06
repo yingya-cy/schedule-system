@@ -763,7 +763,7 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
       <div style="padding:12px 18px 4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <input type="date" id="digestDate" style="flex:1;min-width:140px;padding:9px 11px;border:1.5px solid #e0dad2;border-radius:11px;font-size:13px;font-family:inherit;background:#fff;">
         <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="runDigest()"><span data-icon="sparkles"></span>重新生成</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadDigests();loadComments();loadCandidates();"><span data-icon="refresh"></span>刷新</button>
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadDigests();loadComments();loadCandidates();loadReminders();"><span data-icon="refresh"></span>刷新</button>
       </div>
       <div style="padding:10px 18px 0;font-size:12px;color:#8a9690;line-height:1.7;">
         每天自动从便签里挑出「优秀」的，写成一段可匿名发群的话。下面先列候选（人工可换），再是成品。
@@ -773,6 +773,14 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
         <span id="cand-sum" style="font-size:12px;color:#8a9690;">—</span>
       </div>
       <div id="cand-list" style="padding:0 18px 4px;"></div>
+      <div style="padding:16px 18px 6px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;">
+        <b style="font-size:13px;color:var(--ink,#243c35);">待推送提醒</b>
+        <span id="rem-sum" style="font-size:12px;color:#8a9690;">—</span>
+      </div>
+      <div style="padding:0 18px;font-size:12px;color:#8a9690;line-height:1.7;">
+        AI 只是提议，这里点「推给学生」才会出现在学生端；觉得判错了就点「忽略」直接删掉。
+      </div>
+      <div id="rem-list" style="padding:8px 18px 4px;"></div>
       <div style="padding:14px 18px 6px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;">
         <b style="font-size:13px;color:var(--ink,#243c35);">分享文案</b>
         <span id="digest-count" style="font-size:12px;color:#8a9690;"></span>
@@ -2032,11 +2040,55 @@ function adminPersonCard(x, rank){
 let RANK = { list: [], min_days: 18 };
 
 const DIGEST = { list: [], comments: [] };
+async function loadReminders(){
+  const box = document.getElementById('rem-list');
+  const sum = document.getElementById('rem-sum');
+  if(!box) return;
+  box.innerHTML = '<div class="empty">加载中…</div>';
+  try{
+    const r = await api('/admin/ai/reminders');
+    const list = r.list || [];
+    if(sum) sum.textContent = list.length ? (list.length + ' 条待确认') : '没有待确认的';
+    if(!list.length){ box.innerHTML = '<div class="empty">暂时没有需要提醒的</div>'; return; }
+    box.innerHTML = list.map(function(x){
+      const img = x.file_path ? ('<img src="' + API + '/img/' + x.file_path + '" alt="" style="width:74px;height:74px;object-fit:cover;border-radius:9px;flex:0 0 auto;background:#eee;">') : '<div style="width:74px;height:74px;border-radius:9px;background:#f0efea;flex:0 0 auto;"></div>';
+      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #ece7dc;border-radius:12px;background:#fffdf6;margin-bottom:9px;">'
+        + img
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:13px;font-weight:600;color:#243c35;">' + escapeHtml(x.name||'') + ' <span style="font-weight:400;color:#8a9690;">· 第' + x.day_no + '天</span></div>'
+        + '<div style="font-size:12px;color:#6f8177;line-height:1.6;margin:3px 0 7px;">' + escapeHtml(x.comment||'') + '</div>'
+        + '<div style="display:flex;gap:7px;">'
+        + '<button class="btn" style="flex:0 0 auto;padding:6px 12px;font-size:12px;width:auto;" onclick="pushReminder(' + x.id + ')">推给学生</button>'
+        + '<button class="btn ghost" style="flex:0 0 auto;padding:6px 12px;font-size:12px;width:auto;" onclick="dropReminder(' + x.id + ')">忽略</button>'
+        + '</div></div></div>';
+    }).join('');
+  }catch(e){
+    if(sum) sum.textContent = '加载失败';
+    box.innerHTML = '<div class="empty">' + escapeHtml(e.message||'加载失败') + '</div>';
+  }
+}
+
+async function pushReminder(id){
+  try{
+    await api('/admin/ai/reminder/push', {method:'POST', body: JSON.stringify({id:id})});
+    toast('已推送给学生');
+    loadReminders();
+  }catch(e){ toast('推送失败：' + (e.message||'')); }
+}
+
+async function dropReminder(id){
+  try{
+    await api('/admin/ai/reminder/drop', {method:'POST', body: JSON.stringify({id:id})});
+    toast('已忽略，学生端不会看到');
+    loadReminders();
+  }catch(e){ toast('操作失败：' + (e.message||'')); }
+}
+
 async function openDigest(){
   const d = document.getElementById('digestDate');
   if(d && !d.value) d.value = new Date().toISOString().slice(0,10);
   go('s-digest');
-  await Promise.all([loadDigests(), loadComments(), loadCandidates()]);
+  await Promise.all([loadDigests(), loadComments(), loadCandidates(), loadReminders()]);
 }
 async function loadCandidates(){
   const box = document.getElementById('cand-list');
