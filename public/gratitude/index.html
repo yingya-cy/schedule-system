@@ -2070,7 +2070,7 @@ async function loadReminders(){
 
 async function pushReminder(id){
   try{
-    await api('/admin/ai/reminder/push', {method:'POST', body: JSON.stringify({id:id})});
+    await api('/admin/ai/reminder/push', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id})});
     toast('已推送给学生');
     loadReminders();
   }catch(e){ toast('推送失败：' + (e.message||'')); }
@@ -2078,7 +2078,7 @@ async function pushReminder(id){
 
 async function dropReminder(id){
   try{
-    await api('/admin/ai/reminder/drop', {method:'POST', body: JSON.stringify({id:id})});
+    await api('/admin/ai/reminder/drop', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id})});
     toast('已忽略，学生端不会看到');
     loadReminders();
   }catch(e){ toast('操作失败：' + (e.message||'')); }
