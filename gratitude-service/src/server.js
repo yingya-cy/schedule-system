@@ -1252,18 +1252,17 @@ app.get('/api/admin/ai/candidates', adminOnly, async (req, res) => {
   try {
     const date = String(req.query.date || '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail(res, '日期格式应为 YYYY-MM-DD');
-    const list = await q(`SELECT x.file_path, x.excerpt, x.chars, x.day_no, x.participant_id,
-                                 p.name, p.student_id
-                            FROM (
-                              SELECT g.participant_id, g.day_no, g.file_path, g.excerpt, g.chars,
-                                     ROW_NUMBER() OVER (PARTITION BY g.participant_id, g.day_no ORDER BY g.chars DESC) AS rn
-                                FROM gratitude_quality g
-                                JOIN gratitude_days d ON d.participant_id = g.participant_id AND d.day_no = g.day_no
-                               WHERE d.log_date = ? AND g.grade = '优秀'
-                            ) x
-                            JOIN gratitude_participants p ON p.id = x.participant_id
-                           WHERE x.rn = 1
-                           ORDER BY x.chars DESC
+    const list = await q(`SELECT g.participant_id, g.day_no, p.name, p.student_id,
+                                 MAX(g.chars) AS chars,
+                                 SUBSTRING_INDEX(GROUP_CONCAT(g.excerpt ORDER BY g.chars DESC SEPARATOR '||'), '||', 1) AS excerpt,
+                                 GROUP_CONCAT(g.file_path ORDER BY g.chars DESC SEPARATOR '||') AS files,
+                                 COUNT(*) AS n
+                            FROM gratitude_quality g
+                            JOIN gratitude_days d ON d.participant_id = g.participant_id AND d.day_no = g.day_no
+                            JOIN gratitude_participants p ON p.id = g.participant_id
+                           WHERE d.log_date = ? AND g.grade = '优秀'
+                           GROUP BY g.participant_id, g.day_no, p.name, p.student_id
+                           ORDER BY MAX(g.chars) DESC
                            LIMIT 200`, [date]);
     const stats = await q(`SELECT g.grade, COUNT(DISTINCT CONCAT(g.participant_id, '-', g.day_no)) AS n
                              FROM gratitude_quality g
