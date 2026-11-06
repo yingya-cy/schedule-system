@@ -36,6 +36,28 @@ const QUALITY_PROMPT = `你在一场校园"21天感恩打卡"活动里做便签�
   · ok：判定为优秀或普通。
 - 直接给出 JSON，不要写分析过程。`;
 
+// —— 整组判定（同一天的多张照片一起看）——
+const SET_PROMPT = `你要判断的是"这一组照片"（同一位同学同一天的打卡提交，共若干张），而不是其中某一张。
+
+背景：同学应当在便签纸上写下当天三件感恩小事，然后拍这张便签上传；但很多人会额外多传几张随手拍（饭菜、风景、猫、自拍、截图等）。这些附带照片本身不算错。
+
+判档规则（只看这一组里有没有一张合格的便签）：
+- 只要这组里有【至少一张】能辨认出文字的感恩便签，就按那张便签判档：写了具体的事且有细节→优秀；有具体的事但很短→普通。
+- 只有当【整组没有一张是便签】时才判差劲（全是饭菜/风景/人物/截图/网络图片等）。
+- 便签模糊看不清字（整组都没有可读文字）→ 差劲，reason_code 用 no_text。
+- 有便签但整张只有状态词（"今天很开心""还行"），一件具体的事都没写 → 差劲，reason_code 用 too_brief。
+- 拿不准时一律判普通，不要轻易判差劲。
+
+输出格式（只输出一个 JSON，不要解释、不要代码块）：
+{"has_note": true, "text_ok": true, "items": ["第一件事","第二件事","第三件事"], "mood": "温暖", "quote": "便签里最有画面感的一句原话，逐字抄",
+ "grade": "优秀", "reason_code": "ok", "chars": 42, "excerpt": "能代表这张便签的10-40字原文", "reason": "12字以内的判档理由"}
+
+要求：
+- has_note 表示这组里是否有一张合格便签；false 时 text_ok 为 false、items 为空数组、chars 为 0；
+- items 最多 3 条，看不清的条目写 "[看不清]"；mood 从 温暖/平静/感动/疲惫/开心 里选一个；
+- grade 只能是"优秀""普通""差劲"；reason_code 只能是 no_text / off_topic / too_brief / ok；
+- excerpt 里不要出现英文引号。`;
+
 function jsonObj(text) {
   if (!text) return null;
   text = String(text).replace(/```json/g, '').replace(/```/g, '');
@@ -109,6 +131,42 @@ export async function gradeOne(absPath) {
   }
 }
 
+/** 整组判定：一次调用看完整组照片 */
+export async function gradeSet(absPaths) {
+  const list = (absPaths || []).filter((p) => p && fs.existsSync(p));
+  if (!list.length) return null;
+  const parts = [{ type: 'text', text: SET_PROMPT }];
+  for (const p of list) {
+    const ext = path.extname(p).toLowerCase();
+    const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+    parts.push({ type: 'image_url', image_url: { url: `data:${mime};base64,` + fs.readFileSync(p).toString('base64') } });
+  }
+  try {
+    const { text } = await chat([{ role: 'user', content: parts }], { maxTokens: 2000, timeout: 60000 });
+    const d = jsonObj(text);
+    if (!d) return null;
+    const grade = [GRADE.GOOD, GRADE.NORMAL, GRADE.POOR].includes(d.grade) ? d.grade : GRADE.NORMAL;
+    const textOk = d.text_ok === true && d.has_note !== false && !(grade === GRADE.POOR && (d.chars || 0) === 0);
+    const items = Array.isArray(d.items)
+      ? d.items.map((x) => String(x || '').trim()).filter((x) => x && x !== '[看不清]').slice(0, 3)
+      : [];
+    return {
+      text_ok: textOk,
+      has_note: d.has_note !== false,
+      grade,
+      chars: Number(d.chars) || 0,
+      excerpt: String(d.excerpt || '').slice(0, 120),
+      reason: String(d.reason || '').slice(0, 30),
+      reason_code: String(d.reason_code || '').slice(0, 16),
+      items,
+      mood: String(d.mood || '').slice(0, 10),
+      quote: String(d.quote || '').slice(0, 200),
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** 并发检测多张，聚合当日结论 */
 export async function gradeImages(absPaths) {
   const list = (absPaths || []).filter(Boolean);
@@ -150,52 +208,57 @@ import { q } from './db.js';
 const IMG_RE = /\.(jpe?g|png|webp|heic)$/i;
 
 /** 检测 + 落库 + 聚合；带总时长预算，超时的标"待检测" */
-export async function gradeAndStore({ pid, dayno, upDir, relPaths, budgetMs = 8000 }) {
+export async function gradeAndStore({ pid, dayno, upDir, relPaths, budgetMs = 20000 }) {
   const imgs = (relPaths || []).filter((p) => IMG_RE.test(p));
   if (!imgs.length) return null;
 
-  const run = Promise.all(imgs.map((rel) => gradeOne(path.join(upDir, rel)).then((r) => [rel, r])));
-
-  let pairs;
+  let set = null;
   try {
-    pairs = await Promise.race([run, new Promise((_, rej) => setTimeout(() => rej(new Error('budget')), budgetMs))]);
-  } catch {
-    pairs = imgs.map((rel) => [rel, null]);
+    set = await Promise.race([
+      gradeSet(imgs.map((rel) => path.join(upDir, rel))),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('budget')), budgetMs)),
+    ]);
+  } catch { set = null; }
+
+  if (!set) {
+    for (const rel of imgs) {
+      await q(`INSERT INTO gratitude_quality (participant_id, day_no, file_path, grade, text_ok, chars, excerpt, reason, reason_code, model)
+               VALUES (?,?,?,?,?,?,?,?,?,?)
+               ON DUPLICATE KEY UPDATE grade=VALUES(grade), text_ok=VALUES(text_ok), chars=VALUES(chars),
+                 excerpt=VALUES(excerpt), reason=VALUES(reason), reason_code=VALUES(reason_code), model=VALUES(model), created_at=NOW()`,
+        [pid, dayno, rel, '待检测', 0, 0, '', '', '', VISION_MODEL]).catch(() => {});
+    }
+    return { pending: true, reminder: null, items: [] };
   }
 
-  const done = [];
-  for (const [rel, r] of pairs) {
-    if (!r) continue;
-    done.push(r);
+  // 整组结论写到这一天的每一张图上（同一天多行同档位，统计按天去重）
+  for (const rel of imgs) {
     await q(`INSERT INTO gratitude_quality (participant_id, day_no, file_path, grade, text_ok, chars, excerpt, reason, reason_code, model)
              VALUES (?,?,?,?,?,?,?,?,?,?)
              ON DUPLICATE KEY UPDATE grade=VALUES(grade), text_ok=VALUES(text_ok), chars=VALUES(chars),
                excerpt=VALUES(excerpt), reason=VALUES(reason), reason_code=VALUES(reason_code), model=VALUES(model), created_at=NOW()`,
-      [pid, dayno, rel, r.grade, r.text_ok ? 1 : 0, r.chars, r.excerpt, r.reason, r.reason_code || '', VISION_MODEL]);
+      [pid, dayno, rel, set.grade, set.text_ok ? 1 : 0, set.chars, set.excerpt, set.reason, set.reason_code || '', VISION_MODEL]);
   }
-  // 同一次调用顺手把 OCR 结果落库，避免后续评语/简报再读一遍图
-  const withText = done.find((x) => x.text_ok && (x.items?.length || x.quote));
-  if (withText) {
+
+  // 同一次调用顺手把 OCR 结果落库
+  if (set.text_ok && ((set.items && set.items.length) || set.quote)) {
     try {
       await q(`INSERT INTO gratitude_ocr (participant_id, day_no, items_json, mood, quote, model)
                VALUES (?,?,?,?,?,?)
                ON DUPLICATE KEY UPDATE items_json=VALUES(items_json), mood=VALUES(mood), quote=VALUES(quote), model=VALUES(model)`,
-        [pid, dayno, JSON.stringify(withText.items || []), withText.mood || '', withText.quote || '', VISION_MODEL]);
+        [pid, dayno, JSON.stringify(set.items || []), set.mood || '', set.quote || '', VISION_MODEL]);
     } catch { /* 落 OCR 失败不影响主流程 */ }
   }
 
-  if (!done.length) return { pending: true, reminder: null, items: [] };
-
-  const rank = { [GRADE.GOOD]: 3, [GRADE.NORMAL]: 2, [GRADE.POOR]: 1 };
-  const top = done.reduce((a, b) => (rank[b.grade] > rank[a.grade] ? b : a), done[0]);
   const agg = {
-    day_grade: top.grade,
-    text_ok: done.some((x) => x.text_ok),
-    excerpt: top.excerpt,
-    reason: top.reason,
-    reason_code: top.reason_code || '',
-    items: done.map((x) => ({ grade: x.grade, text_ok: x.text_ok, chars: x.chars, excerpt: x.excerpt })),
-    pending: done.length < imgs.length,
+    day_grade: set.grade,
+    text_ok: set.text_ok,
+    has_note: set.has_note,
+    excerpt: set.excerpt,
+    reason: set.reason,
+    reason_code: set.reason_code || '',
+    items: [{ grade: set.grade, text_ok: set.text_ok, chars: set.chars, excerpt: set.excerpt }],
+    pending: false,
   };
   agg.reminder = reminderFor(agg);
   return agg;
