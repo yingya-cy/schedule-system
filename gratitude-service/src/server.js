@@ -295,7 +295,23 @@ app.post('/api/day', async (req, res) => {
     if (!d) return fail(res, '天数超出范围');
 
     const today = todayStr();
-    if (cfg.test_mode !== '1' && d.date > today) return fail(res, '还没到这一天哦～');
+    const isMakeup = d.date < today;              // 补卡：应打卡日已过
+    if (cfg.test_mode !== '1') {
+      if (today > cfg.end_date) return fail(res, '活动已经结束啦，不能再补卡了');
+      if (d.date > today) return fail(res, '还没到这一天哦～');
+      if (isMakeup) {
+        // 已用掉的补卡次数（不含当前这一天，避免重复编辑重复计数）
+        const mk = await q1(
+          `SELECT COUNT(*) AS n FROM gratitude_days
+            WHERE participant_id = ? AND day_no <> ?
+              AND log_date <> DATE_ADD(?, INTERVAL day_no - 1 DAY)`,
+          [participant_id, +day_no, cfg.start_date]
+        );
+        if (Number(mk && mk.n || 0) >= 3) {
+          return fail(res, '最多只能补 3 天哦，这次补卡机会已经用完了');
+        }
+      }
+    }
 
     // ⚠️ 防护：必须至少提交 1 张图（防前端 bug 传空数组导致清空）
     const imgsArr = Array.isArray(action_images) ? action_images.filter(Boolean) : [];
@@ -367,7 +383,7 @@ app.post('/api/day', async (req, res) => {
       VALUES (?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         action_images=VALUES(action_images), updated_at=NOW()
-    `, [participant_id, day_no, d.date, imgsArr.length ? JSON.stringify(imgsArr) : null]);
+    `, [participant_id, day_no, today, imgsArr.length ? JSON.stringify(imgsArr) : null]);
 
     // 便签质量检测：改为异步后台跑，保存立即返回（用户体验优先，2026-11-04）
     // 结果只落库供管理端筛“优秀便签”，不再当场打断学生
