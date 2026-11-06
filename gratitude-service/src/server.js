@@ -1165,9 +1165,9 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'gratitud
 app.get('/api/admin/ai/reminders', adminOnly, async (req, res) => {
   try {
     const rows = await q(`SELECT c.id, c.participant_id, p.name, p.student_id, p.campus, c.day_no, c.comment, c.created_at,
-                                 (SELECT u.file_path FROM gratitude_uploads u
-                                   WHERE u.participant_id=c.participant_id AND u.day_no=c.day_no
-                                   ORDER BY u.id LIMIT 1) AS file_path,
+                                 (SELECT GROUP_CONCAT(u.file_path ORDER BY u.id SEPARATOR '||')
+                                    FROM gratitude_uploads u
+                                   WHERE u.participant_id=c.participant_id AND u.day_no=c.day_no) AS files,
                                  (SELECT q2.reason FROM gratitude_quality q2
                                    WHERE q2.participant_id=c.participant_id AND q2.day_no=c.day_no
                                    ORDER BY FIELD(q2.grade,'差劲','普通','优秀'), q2.id DESC LIMIT 1) AS reason

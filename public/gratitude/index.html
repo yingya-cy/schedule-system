@@ -757,13 +757,11 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
     <div class="top">
       <span class="back" onclick="go('s-admin')">‹ 返回</span>
       <h1>每日分享</h1>
-      <p id="digest-sum">—</p>
     </div>
     <div class="body">
       <div style="padding:12px 18px 4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <input type="date" id="digestDate" style="flex:1;min-width:140px;padding:9px 11px;border:1.5px solid #e0dad2;border-radius:11px;font-size:13px;font-family:inherit;background:#fff;">
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="runDigest()"><span data-icon="sparkles"></span>重新生成</button>
-        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadDigests();loadCandidates();loadReminders();"><span data-icon="refresh"></span>刷新</button>
+        <button class="btn ghost" style="font-size:12px;padding:9px;flex:1;" onclick="loadCandidates();loadReminders();"><span data-icon="refresh"></span>刷新</button>
       </div>
       <div style="padding:10px 18px 0;font-size:12px;color:#8a9690;line-height:1.7;">
         每天自动从便签里挑出「优秀」的，写成一段可匿名发群的话。下面先列候选（人工可换），再是成品。
@@ -781,11 +779,6 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
         <span id="cand-sum" style="font-size:12px;color:#8a9690;">—</span>
       </div>
       <div id="cand-list" style="padding:0 18px 4px;"></div>
-      <div style="padding:14px 18px 6px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;">
-        <b style="font-size:13px;color:var(--ink,#243c35);">分享文案</b>
-        <span id="digest-count" style="font-size:12px;color:#8a9690;"></span>
-      </div>
-      <div id="digest-list" style="padding:12px 18px 6px;"></div>
     </div>
   </div>
 
@@ -2049,11 +2042,18 @@ async function loadReminders(){
     if(sum) sum.textContent = list.length ? (list.length + ' 条待确认') : '没有待确认的';
     if(!list.length){ box.innerHTML = '<div style="padding:2px 0 8px;font-size:12.5px;color:#9aa39d;">今天没有需要人工确认的提醒</div>'; return; }
     box.innerHTML = list.map(function(x){
-      const img = x.file_path ? ('<img src="' + API + '/img/' + x.file_path + '" alt="" style="width:74px;height:74px;object-fit:cover;border-radius:9px;flex:0 0 auto;background:#eee;">') : '<div style="width:74px;height:74px;border-radius:9px;background:#f0efea;flex:0 0 auto;"></div>';
+      const files = String(x.files||'').split('||').filter(Boolean);
+      const urls = files.map(function(f){ return API + '/img/' + f; });
+      const thumbs = urls.length
+        ? '<div style="display:flex;gap:4px;flex:0 0 auto;">' + urls.slice(0,3).map(function(u){
+            return '<img src="' + u + '" alt="" style="width:74px;height:74px;object-fit:cover;border-radius:9px;background:#eee;cursor:zoom-in;"'
+              + ' onclick="openViewer(\'' + u + '\', ' + JSON.stringify(urls).replace(/"/g,'&quot;') + ')">';
+          }).join('') + '</div>'
+        : '<div style="width:74px;height:74px;border-radius:9px;background:#f0efea;flex:0 0 auto;"></div>';
       return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #ece7dc;border-radius:12px;background:#fffdf6;margin-bottom:9px;">'
-        + img
+        + thumbs
         + '<div style="flex:1;min-width:0;">'
-        + '<div style="font-size:13px;font-weight:600;color:#243c35;">' + escapeHtml(x.name||'') + ' <span style="font-weight:400;color:#8a9690;">· 第' + x.day_no + '天</span></div>'
+        + '<div style="font-size:13px;font-weight:600;color:#243c35;">' + escapeHtml(x.name||'') + ' <span style="font-weight:400;color:#8a9690;">· 第' + x.day_no + '天' + (files.length>1 ? ' · ' + files.length + ' 图' : '') + '</span></div>'
         + '<div style="font-size:12px;color:#6f8177;line-height:1.6;margin:3px 0 7px;">' + escapeHtml(x.comment||'') + '</div>'
         + '<div style="display:flex;gap:7px;">'
         + '<button class="btn" style="flex:0 0 auto;padding:6px 12px;font-size:12px;width:auto;" onclick="pushReminder(' + x.id + ')">推给学生</button>'
@@ -2086,7 +2086,7 @@ async function openDigest(){
   const d = document.getElementById('digestDate');
   if(d && !d.value) d.value = new Date().toISOString().slice(0,10);
   go('s-digest');
-  await Promise.all([loadDigests(), loadCandidates(), loadReminders()]);
+  await Promise.all([loadCandidates(), loadReminders()]);
 }
 const CAND = { list: [], page: 1, size: 24 };
 async function loadCandidates(){
@@ -2165,44 +2165,6 @@ function candGo(n){
   if(el) el.scrollIntoView({block:'start', behavior:'smooth'});
 }
 
-async function loadDigests(){
-  const box = document.getElementById('digest-list');
-  box.innerHTML = '<div class="empty">加载中…</div>';
-  try{
-    const r = await api('/admin/ai/digests');
-    DIGEST.list = r.list || [];
-    document.getElementById('digest-sum').textContent = `已生成 ${DIGEST.list.length} 篇 · 共 ${r.list.reduce((a,x)=>a+x.participants,0)} 人次`;
-    const dc = document.getElementById('digest-count');
-    if(dc) dc.textContent = DIGEST.list.length ? `按日期倒序 · 最近 ${DIGEST.list.length} 篇` : '';
-    if(!DIGEST.list.length){ box.innerHTML = '<div class="empty">还没有简报，选个日期点「生成简报」</div>'; return; }
-    box.innerHTML = DIGEST.list.map((x,i)=>`
-      <div style="background:#fbf8ee;border:1px solid #e9e2cd;border-radius:12px;padding:14px 16px;margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <b style="font-size:13px;color:var(--ink,#243c35);">${x.digest_date}</b>
-          <span style="font-size:12px;color:#9a8b6a;">${x.participants} 人 · ${x.items_count} 条</span>
-        </div>
-        <p style="margin:0;font-size:14px;line-height:1.9;color:#3c4a44;white-space:pre-wrap;">${(x.digest_text||'').replace(/</g,'&lt;')}</p>
-        <div style="margin-top:10px;display:flex;gap:8px;">
-          <button class="btn ghost" style="font-size:12px;padding:7px 12px;flex:0 0 auto;width:auto;" onclick="copyDigest(${i})">复制</button>
-        </div>
-      </div>`).join('');
-  }catch(e){ box.innerHTML = '<div class="empty">加载失败：'+e.message+'</div>'; }
-}
-function copyDigest(i){
-  const t = (DIGEST.list[i]||{}).digest_text || '';
-  if(navigator.clipboard) navigator.clipboard.writeText(t).then(()=>toast('已复制'));
-  else toast('复制失败');
-}
-async function runDigest(){
-  const date = (document.getElementById('digestDate')||{}).value || '';
-  if(!date) return toast('请选择日期');
-  toast('正在生成…');
-  try{
-    const r = await api('/admin/ai/digest/run', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date})});
-    toast(`完成：参与 ${r.participants} 人 / ${r.items} 条`);
-  }catch(e){ toast('生成失败：'+e.message); }
-  await loadDigests();
-}
 async function openRank(){ go('s-rank'); await loadRank(); }
 
 async function loadRank(){
