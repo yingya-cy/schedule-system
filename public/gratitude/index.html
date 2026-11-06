@@ -2050,7 +2050,7 @@ async function loadReminders(){
               + ' onclick="openViewer(\'' + u + '\', ' + JSON.stringify(urls).replace(/"/g,'&quot;') + ')">';
           }).join('') + '</div>'
         : '<div style="width:74px;height:74px;border-radius:9px;background:#f0efea;flex:0 0 auto;"></div>';
-      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #ece7dc;border-radius:12px;background:#fffdf6;margin-bottom:9px;">'
+      return '<div data-remid="' + x.id + '" style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #ece7dc;border-radius:12px;background:#fffdf6;margin-bottom:9px;">'
         + thumbs
         + '<div style="flex:1;min-width:0;">'
         + '<div style="font-size:13px;font-weight:600;color:#243c35;">' + escapeHtml(x.name||'') + ' <span style="font-weight:400;color:#8a9690;">· 第' + x.day_no + '天' + (files.length>1 ? ' · ' + files.length + ' 图' : '') + '</span></div>'
@@ -2066,11 +2066,22 @@ async function loadReminders(){
   }
 }
 
+function removeReminderCard(id){
+  const box = document.getElementById('rem-list');
+  if(!box) return;
+  const el = box.querySelector('[data-remid="' + id + '"]');
+  if(el) el.remove();
+  if(!box.querySelector('[data-remid]')){
+    box.innerHTML = '<div style="padding:2px 0 8px;font-size:12.5px;color:#9aa39d;">今天没有需要人工确认的提醒</div>';
+    const sum = document.getElementById('rem-sum'); if(sum) sum.textContent = '没有待确认的';
+  }
+}
 async function pushReminder(id){
   try{
     await api('/admin/ai/reminder/push', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id})});
     toast('已推送给学生');
-    loadReminders();
+    removeReminderCard(id);
+    await loadReminders();
   }catch(e){ toast('推送失败：' + (e.message||'')); }
 }
 
@@ -2078,7 +2089,8 @@ async function dropReminder(id){
   try{
     await api('/admin/ai/reminder/drop', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id})});
     toast('已忽略，学生端不会看到');
-    loadReminders();
+    removeReminderCard(id);
+    await loadReminders();
   }catch(e){ toast('操作失败：' + (e.message||'')); }
 }
 
