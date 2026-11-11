@@ -1626,7 +1626,12 @@ function compressImage(file){
         else resolve(file);
       }, 'image/jpeg', 0.82);
     };
-    img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(file); };
+    img.onerror = ()=>{
+      URL.revokeObjectURL(url);
+      if(/\.(heic|heif)$/i.test(file.name||'') && typeof toast==='function')
+        toast('这是 iPhone 的 HEIC 原图：预览可能空白，但能正常上传');
+      resolve(file);
+    };
     img.src = url;
   });
 }

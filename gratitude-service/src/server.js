@@ -98,10 +98,25 @@ const upload = multer({
   storage,
   limits: { fileSize: 32 * 1024 * 1024 },         // 20MB（图片5M + 视频15M）
   fileFilter: (req, file, cb) => {
-    const isImg = /^image\/(jpeg|png|gif|webp)$/.test(file.mimetype);
-    const isVid = /^video\/(mp4|quicktime|webm|x-msvideo)$/.test(file.mimetype);
-    const isAud = /^audio\/(mpeg|mp3|mp4|x-m4a|m4a|wav|x-wav|wave|aac|ogg|x-ogg|webm|3gpp)$/.test(file.mimetype);
-    cb((isImg || isVid || isAud) ? null : new Error('只支持图片、视频或录音'), isImg || isVid || isAud);
+    // 放宽：iPhone 原图是 HEIC，部分安卓/微信会带 octet-stream，一律按「扩展名兜底」
+    const ext = (file.originalname || '').toLowerCase().split('.').pop() || '';
+    const IMG_EXT = ['jpg','jpeg','jpe','png','gif','webp','heic','heif','bmp','tif','tiff','avif','dng'];
+    const VID_EXT = ['mp4','mov','m4v','webm','avi','3gp'];
+    const AUD_EXT = ['mp3','m4a','wav','aac','ogg','opus','amr','3gp','mp4'];
+    const isImg = /^image\/(jpeg|pjpeg|png|gif|webp|heic|heif|heic-sequence|heif-sequence|bmp|x-ms-bmp|tiff|avif)$/.test(file.mimetype)
+                  || IMG_EXT.includes(ext);
+    const isVid = /^video\/(mp4|quicktime|webm|x-msvideo|3gpp)$/.test(file.mimetype) || VID_EXT.includes(ext);
+    const isAud = /^audio\/(mpeg|mp3|mp4|x-m4a|m4a|wav|x-wav|wave|aac|ogg|x-ogg|webm|3gpp)$/.test(file.mimetype) || AUD_EXT.includes(ext);
+    const pass = isImg || isVid || isAud;
+    if (!pass) {
+      // 记录细节，便于事后定位是谁、什么格式
+      console.warn('[upload reject]', JSON.stringify({
+        mimetype: file.mimetype, name: file.originalname, size: file.size || null,
+        pid: req.body && req.body.participant_id, day: req.body && req.body.day_no,
+        ua: (req.headers['user-agent'] || '').slice(0, 80)
+      }));
+    }
+    cb(pass ? null : new Error('只支持图片、视频或录音'), pass);
   },
 });
 
