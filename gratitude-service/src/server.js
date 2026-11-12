@@ -107,7 +107,10 @@ const upload = multer({
                   || IMG_EXT.includes(ext);
     const isVid = /^video\/(mp4|quicktime|webm|x-msvideo|3gpp)$/.test(file.mimetype) || VID_EXT.includes(ext);
     const isAud = /^audio\/(mpeg|mp3|mp4|x-m4a|m4a|wav|x-wav|wave|aac|ogg|x-ogg|webm|3gpp)$/.test(file.mimetype) || AUD_EXT.includes(ext);
-    const pass = isImg || isVid || isAud;
+    // 微信/安卓内置浏览器常把照片传成 octet-stream 且文件名没有扩展名（如 vsg_output_xxx），
+    // 这类不做白名单判断，先放行，写入后按文件头嗅探类型（2026-11-12）
+    const unknownType = !file.mimetype || file.mimetype === 'application/octet-stream';
+    const pass = isImg || isVid || isAud || unknownType;
     if (!pass) {
       // 记录细节，便于事后定位是谁、什么格式
       console.warn('[upload reject]', JSON.stringify({
@@ -456,10 +459,48 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     const pid = String(pidNum);
     const dayno = dayNum;
 
+    // 按文件头嗅探真实类型（兜住 octet-stream / 无扩展名的情况）
+    const sniffExt = (fp) => {
+      let b;
+      try { b = fs.readFileSync(fp).subarray(0, 32); } catch (_) { return ''; }
+      if (b.length < 12) return '';
+      const hex = b.toString('hex').toLowerCase();
+      if (hex.startsWith('ffd8ff')) return '.jpg';
+      if (hex.startsWith('89504e47')) return '.png';
+      if (hex.startsWith('474946')) return '.gif';
+      if (hex.startsWith('424d')) return '.bmp';
+      if (hex.startsWith('49492a00') || hex.startsWith('4d4d002a')) return '.tiff';
+      const ascii = b.toString('latin1');
+      if (ascii.startsWith('RIFF') && ascii.slice(8, 12) === 'WEBP') return '.webp';
+      if (ascii.slice(4, 8) === 'ftyp') {
+        const brand = ascii.slice(8, 12);
+        if (/^(heic|heix|hevc|hevx|mif1|msf1)$/.test(brand)) return '.heic';
+        if (/^(avif|avis)$/.test(brand)) return '.avif';
+        if (brand === 'qt  ') return '.mov';
+        return '.mp4';
+      }
+      if (ascii.startsWith('RIFF') && ascii.slice(8, 12) === 'WAVE') return '.wav';
+      if (ascii.startsWith('ID3') || hex.startsWith('fffb') || hex.startsWith('fff3')) return '.mp3';
+      if (hex.startsWith('1a45dfa3')) return '.webm';
+      return '';
+    };
+
     // 移动到最终目录：uploads/<pid>/<day>/
     const destDir = path.join(UP_DIR, pid, String(dayno));
     fs.mkdirSync(destDir, { recursive: true });
-    const finalPath = path.join(destDir, path.basename(req.file.path));
+    let baseName = path.basename(req.file.path);
+    const curExt = path.extname(baseName).toLowerCase();
+    const KNOWN = ['.jpg','.jpeg','.png','.gif','.webp','.bmp','.tiff','.heic','.heif','.avif','.dng','.mp4','.mov','.m4v','.webm','.avi','.3gp','.mp3','.m4a','.wav','.aac','.ogg','.opus','.amr'];
+    if (!KNOWN.includes(curExt)) {
+      const ext = sniffExt(req.file.path);
+      if (!ext) {
+        fs.unlink(req.file.path, () => {});
+        console.warn('[upload reject-sniff]', JSON.stringify({ name: req.file.originalname, mimetype: req.file.mimetype, pid: pidNum, day: dayno }));
+        return fail(res, '这个文件不像图片或音视频，请换个格式再试');
+      }
+      baseName = baseName + ext;
+    }
+    const finalPath = path.join(destDir, baseName);
     fs.renameSync(req.file.path, finalPath);
 
     // 相对路径（用于 URL 访问）
@@ -467,8 +508,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     const url = `/api/gratitude/img/${rel}`;
 
     // kind 由 mime 自动判断
-    const kind = req.file.mimetype.startsWith('video/') ? 'video'
-               : req.file.mimetype.startsWith('audio/') ? 'audio' : 'image';
+    const ext2 = path.extname(finalPath).toLowerCase();
+    const kind = /^video\//.test(req.file.mimetype) || ['.mp4','.mov','.m4v','.webm','.avi'].includes(ext2) ? 'video'
+               : (/^audio\//.test(req.file.mimetype) || ['.mp3','.m4a','.wav','.aac','.ogg','.opus','.amr'].includes(ext2)) && !['.mp4'].includes(ext2) ? 'audio'
+               : 'image';
     if (kind === 'audio' && dayno !== 21) {
       try { fs.unlinkSync(finalPath); } catch (_) {}
       return fail(res, '录音只能作为第 21 天的最终提交素材上传');
