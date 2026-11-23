@@ -121,8 +121,11 @@ export function registerJudgeRoutes(app, ctx) {
 
       const vals = {};
       for (const [key, , max] of DIMS) {
-        const v = Number(b[key]);
-        if (!Number.isFinite(v) || v < 0 || v > max) return fail(res, `「${key}」需在 0–${max} 之间`);
+        let v = Number(b[key]);
+        if (!Number.isFinite(v)) v = 0;
+        if (v < 0) v = 0;
+        if (v > max) v = max;   // 超出上限按满分算，不报错
+        
         vals[key] = Math.round(v);
       }
       const comment = String(b.comment || '').slice(0, 500);
