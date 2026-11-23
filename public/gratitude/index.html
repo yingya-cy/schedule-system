@@ -531,12 +531,52 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
 #jscore-form .score-summary{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:#5c7268;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e6e0d6;}
 #jscore-form .score-gallery{margin-bottom:22px;}
 #jscore-form .score-gallery h2,#jscore-form .score-inputs h2{margin:0 0 10px;font-size:16px;}
-#jscore-form .score-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:10px;}
+#jscore-form .score-gallery-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:8px;margin-top:10px;}
 #jscore-form .score-actions{display:flex;gap:10px;margin-top:6px;}
 #jscore-form .score-actions .btn{flex:1 1 0;width:auto;margin:0;}
+<style id="judge-visual-css">
+/* ===== 评委端视觉升级 ===== */
+.j-hero{display:flex;align-items:center;gap:10px;margin:2px 0 14px;}
+.j-hero .dot{width:9px;height:9px;border-radius:50%;background:var(--coral,#C97B54);flex:0 0 9px;}
+.j-badge{display:inline-flex;align-items:center;gap:6px;background:#fff6ec;border:1px solid #f2dcc9;color:#B5653F;font-size:11.5px;letter-spacing:.04em;padding:4px 10px;border-radius:999px;}
+.j-login-card{background:#fff;border:1px solid #eee6da;border-radius:16px;padding:18px 16px 16px;box-shadow:0 6px 18px rgba(120,95,70,.06);}
+.j-login-card .btn.pri{width:100%;margin-top:6px;}
+.j-login-card .field{margin-bottom:14px;}
+.j-login-card .field label{display:block;margin-bottom:7px;}
+.j-login-card .field input{width:100%;box-sizing:border-box;display:block;}
+#jlogin-tip{margin:10px 2px 0;font-size:12px;line-height:1.7;color:#98a09a;}
+/* 进度 */
+.j-bar{height:9px;border-radius:999px;background:#efe9df;overflow:hidden;}
+.j-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#E8896A,#C97B54);transition:width .5s cubic-bezier(.4,0,.2,1);}
+.j-bar-txt{margin-top:7px;font-size:12.5px;color:#7d8a81;}
+.j-bar-txt b{font-size:15px;color:#2f4a3f;}
+.j-progress{background:#fff;border:1px solid #eee6da;border-radius:14px;padding:13px 14px;margin-bottom:12px;}
+/* 名单卡片 */
+.j-card{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:#fff;border:1px solid #eee6da;border-radius:14px;padding:13px 14px;margin-bottom:9px;cursor:pointer;transition:transform .12s,box-shadow .2s,border-color .2s;}
+.j-card:active{transform:scale(.985);}
+.j-card:hover{border-color:#e3d4c2;box-shadow:0 4px 14px rgba(120,95,70,.07);}
+.j-card.is-done{background:#fbfdf9;border-color:#dfe9dd;}
+.j-idx{flex:0 0 30px;height:30px;border-radius:9px;background:#f6f0e6;color:#A9805C;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.j-card.is-done .j-idx{background:#e8f0e6;color:#4f7a58;}
+.j-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.j-name{font-size:15.5px;font-weight:700;color:#2f3a33;letter-spacing:.01em;}
+.j-sub{font-size:11.5px;color:#95a099;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.j-right{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
+.j-days{font-size:11.5px;color:#a8b0aa;}
+.j-pill{font-size:11.5px;padding:3px 9px;border-radius:999px;white-space:nowrap;}
+.j-pill.todo{background:#fdf1ea;color:#C0703F;border:1px solid #f3d9c8;}
+.j-pill.done{background:#eaf3ea;color:#4c7a55;border:1px solid #d7e6d5;}
+/* 评分页 */
+.j-cand{background:linear-gradient(180deg,#fffdf8,#fff);border:1px solid #eee6da;border-radius:16px;padding:15px 16px;margin-bottom:14px;}
+.j-cand .n{font-size:22px;font-weight:700;color:#2f3a33;letter-spacing:.01em;}
+.j-cand .m{margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;}
+.j-chip{font-size:11.5px;color:#7d8a81;background:#f7f2e9;border-radius:999px;padding:3px 9px;}
+.score-actions{position:sticky;bottom:0;padding:12px 0 6px;background:linear-gradient(180deg,rgba(255,253,247,0),#fffdf7 42%);}
+</style>
 </style>
 <style id="judge-ui-css">
-.judge-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.judge-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px;padding:0;width:100%;box-sizing:border-box}
+.judge-toolbar .btn{flex:1 1 auto;min-width:0}
 .judge-toolbar .btn{flex:0 0 auto;width:auto;padding:9px 16px;margin:0}
 #jl-list .judge-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left}
 #jl-list .judge-row .participant-name{font-weight:600}
@@ -820,15 +860,17 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
   <!-- 评委端 -->
   <div class="screen" id="s-jlogin">
     <div class="top">
+      <div class="j-hero"><span class="dot"></span><span class="j-badge">评委通道 · 21 天感恩打卡</span></div>
       <h1>评委登录</h1>
-      <p>请填写本人姓名与学号，系统会按你所在部门分配评分名单</p>
+      <p>用本人姓名与学号进入，系统会按你所在部门自动分配要评的同学</p>
     </div>
     <div class="body">
-      <div class="form">
+      <div class="j-login-card">
         <div class="field"><label>姓名</label><input id="jl-name" placeholder="请输入姓名" autocomplete="name"></div>
         <div class="field"><label>学号</label><input id="jl-sid" placeholder="请输入学号" inputmode="numeric" autocomplete="off"></div>
         <button type="button" class="btn pri" id="jl-login-btn" onclick="doJLogin()">进入评分</button>
         <p id="jl-status" class="inline-status" role="status"></p>
+        <p id="jlogin-tip">登录后只会看到分给你部门的同学；你的打分不会公开。</p>
       </div>
     </div>
   </div>
@@ -839,6 +881,7 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
       <p id="jl-meta">—</p>
     </div>
     <div class="body">
+      <div class="j-progress" id="jl-progress"></div>
       <div class="judge-toolbar">
         <button type="button" class="btn ghost" onclick="loadJList()">刷新</button>
         <button type="button" class="btn acc" onclick="openNextJ()">下一位未评</button>
@@ -2726,8 +2769,22 @@ function renderJList(){
   }
   const done=JLIST.filter(p=>p.scored).length;
   meta.textContent = (JME?JME.dept+' · ':'')+'共 '+JLIST.length+' 人，已评 '+done+' 人，还剩 '+(JLIST.length-done)+' 人';
+  const bar=document.getElementById('jl-progress');
+  if(bar){
+    const pct=JLIST.length?Math.round(done/JLIST.length*100):0;
+    bar.innerHTML='<div class="j-bar"><i style="width:'+pct+'%"></i></div>'
+      +'<div class="j-bar-txt"><b>'+done+'</b> / '+JLIST.length+' 已评 · 还剩 '+(JLIST.length-done)+' 人</div>';
+  }
   box.innerHTML = JLIST.length
-    ? JLIST.map(p=>'<button type="button" class="judge-row participant-row" onclick="openJScore('+p.id+')"><span class="participant-name">'+escapeHtml(p.name)+'<span class="participant-meta">'+escapeHtml(p.student_id)+' · '+escapeHtml(p.class_name||p.college||'')+'</span></span><span>'+p.days_done+' 天</span><span class="judge-state">'+(p.scored?('已评 '+p.my_total):'未评')+'</span></button>').join('')
+    ? JLIST.map(function(p,i){
+        return '<button type="button" class="j-card'+(p.scored?' is-done':'')+'" onclick="openJScore('+p.id+')">'
+          +'<span class="j-idx">'+String(i+1).padStart(2,'0')+'</span>'
+          +'<span class="j-main"><span class="j-name">'+escapeHtml(p.name)+'</span>'
+          +'<span class="j-sub">'+escapeHtml(p.student_id)+' · '+escapeHtml(p.class_name||p.college||'')+'</span></span>'
+          +'<span class="j-right"><span class="j-days">打卡 '+p.days_done+' 天</span>'
+          +'<span class="j-pill '+(p.scored?'done':'todo')+'">'+(p.scored?('已评 '+p.my_total+' 分'):'未评')+'</span></span>'
+          +'</button>';
+      }).join('')
     : '<div class="empty">名单还没生成，请联系管理员先做分片</div>';
 }
 
@@ -2741,7 +2798,7 @@ async function openJScore(pid){
   if(!JME) return;
   const p=JLIST.find(x=>x.id===pid);
   go('s-jscore');
-  document.getElementById('jscore-title').textContent = p?p.name:('#'+pid);
+  document.getElementById('jscore-title').textContent = '评分';
   document.getElementById('jscore-sub').textContent = '评委：'+JME.name+'（'+JME.dept+'）';
   const form=document.getElementById('jscore-form');
   form.innerHTML='<p class="inline-status" aria-busy="true">正在打开该同学的记录…</p>';
@@ -2760,7 +2817,7 @@ async function openJScore(pid){
     const imgs=list.filter(u=>u.kind==='image'||!u.kind);
     const audios=list.filter(u=>u.kind==='audio');
     const videos=list.filter(u=>u.kind==='video');
-    let inner=imgs.map((u,i)=>`<img src="${API}/img/${u.file_path}" alt="第${n}天图片" onclick="openViewer(this.src,Array.from(document.querySelectorAll('.score-gallery img')).map(im=>im.src))" style="width:100%;height:72px;object-fit:cover;border-radius:6px;cursor:zoom-in;${i>0?'margin-top:4px;':''}">`).join('');
+    let inner=imgs.map((u,i)=>`<img src="${API}/img/${u.file_path}" alt="第${n}天图片" onclick="openViewer(this.src,Array.from(document.querySelectorAll('.score-gallery img')).map(im=>im.src))" style="width:100%;height:104px;object-fit:cover;border-radius:6px;cursor:zoom-in;${i>0?'margin-top:4px;':''}">`).join('');
     if(audios.length) inner+=audios.map(u=>`<audio controls preload="none" src="${API}/img/${u.file_path}" style="width:100%;margin-top:4px;height:32px;"></audio>`).join('');
     if(videos.length) inner+=videos.map(u=>`<video controls playsinline preload="metadata" src="${API}/img/${u.file_path}" style="width:100%;margin-top:6px;border-radius:6px;background:#000;display:block;max-height:260px;"></video>`).join('');
     const wide=(videos.length||audios.length)?'grid-column:1/-1;':'';
@@ -2769,7 +2826,7 @@ async function openJScore(pid){
   gallery+='</div>'+(any?'':'<div class="empty">该同学还没有上传素材</div>')+'</section>';
 
   form.innerHTML=`
-    <div class="score-summary"><div>打卡天数：<b>${days.length} / 21</b></div><div>${escapeHtml(pt.student_id||'')} · ${escapeHtml(pt.class_name||pt.college||'')}</div></div>
+    <div class="j-cand"><div class="n">${escapeHtml(pt.name||'')}</div><div class="m"><span class="j-chip">打卡 ${days.length} / 21 天</span><span class="j-chip">${escapeHtml(pt.student_id||'')}</span><span class="j-chip">${escapeHtml(pt.class_name||pt.college||'')}</span></div></div>
     ${gallery}
     <section class="score-inputs"><h2>本次评分</h2>
     <div class="field"><label>① 真实性 <span class="opt">0-30分</span></label><p class="score-hint">素材与文字描述一致，能体现真实场景细节</p>
