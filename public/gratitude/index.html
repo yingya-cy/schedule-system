@@ -543,7 +543,12 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
 .jg-row b{flex:0 0 88px;color:#2F3A34;}
 .jg-pts{flex:0 0 26px;color:#C97B54;font-weight:700;font-size:12px;}
 .jg-row span.txt{flex:1;}
+.j-howto{margin:4px 0 10px;padding:0 12px;font-size:12.5px;line-height:1.7;color:#8A968E;}
 .jg-tip{margin:10px 0 0;font-size:12px;line-height:1.75;color:#7C8A82;}
+.jg-step{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed #EEE8DD;font-size:13px;line-height:1.75;color:#3C4A42;}
+.jg-step:last-of-type{border-bottom:0;}
+.jg-step b{flex:0 0 22px;height:22px;line-height:22px;border-radius:50%;background:#2F5D50;color:#fff;font-size:12px;font-weight:600;text-align:center;}
+.jg-step span{flex:1;}
 #jscore-form .score-actions{display:flex;gap:10px;margin-top:6px;}
 #jscore-form .score-actions .btn{flex:1 1 0;width:auto;margin:0;}
 <style id="judge-visual-css">
@@ -907,6 +912,7 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
     <div class="top">
       <h1>我的评分名单</h1>
       <p id="jl-meta">—</p>
+      <p class="j-howto">点下面任意一位同学 → 看她的 21 天便签 → 填 5 个分数 → 点「提交并评下一位」</p>
     </div>
     <div class="body">
       <div class="j-progress" id="jl-progress"></div>
@@ -2856,15 +2862,15 @@ async function openJScore(pid){
   form.innerHTML=`
     <div class="j-cand"><div class="n">${escapeHtml(pt.name||'')}</div><div class="m"><span class="j-chip">打卡 ${days.length} / 21 天</span><span class="j-chip">${escapeHtml(pt.student_id||'')}</span><span class="j-chip">${escapeHtml(pt.class_name||pt.college||'')}</span></div></div>
     <details class="j-guide">
-      <summary><span>评分指导</span><em>75 分怎么给 · 点开看</em></summary>
+      <summary><span>怎么评分</span><em>点什么、填哪里 · 点开看</em></summary>
       <div class="jg-body">
-        <p class="jg-tip">先看她有没有认真写「三件小事」，再看是否具体、真诚，最后看素材和创意。整体把握在 55–75 分之间；27 分以上和 15 分以下的都少见。</p>
-        <div class="jg-row"><b>① 真实性</b><span class="jg-pts">30</span><span class="txt">27–30 三件事都有时间/地点/人物或当时的感受；22–26 事写清了但偏概括；15–21 只有结论（今天很开心）；0–14 看不清或与照片无关</span></div>
-        <div class="jg-row"><b>② 主题契合</b><span class="jg-pts">25</span><span class="txt">22–25 围绕「被温暖/想感谢」，情感自然不喊口号；17–21 方向对但偏流水账；10–16 只是生活记录，与感恩关系弱；0–9 跑题</span></div>
-        <div class="jg-row"><b>③ 素材质量</b><span class="jg-pts">15</span><span class="txt">13–15 照片清晰、便签完整入镜；9–12 看得清但有阴影/倾斜/边角被裁；4–8 模糊反光或只拍到一半；0–3 几乎无法辨认</span></div>
-        <div class="jg-row"><b>④ 文字完整</b><span class="jg-pts">15</span><span class="txt">看照片里写的字：13–15 三件事俱全、语句通顺；9–12 内容完整但有错字或潦草；4–8 只写了一两件；0–3 几乎没有可读文字</span></div>
-        <div class="jg-row"><b>⑤ 创意性</b><span class="jg-pts">15</span><span class="txt">13–15 角度独特、图文呼应（手绘/拼贴/树叶摆拍等）；9–12 自然有一点个人风格；4–8 中规中矩；0–3 明显敷衍</span></div>
-        <p class="jg-tip">最终排名会去掉一个最高分、一个最低分再取平均，所以按你的真实判断给分就好，不用刻意压分或抬分；同一个人前后标准保持一致即可。</p>
+        <div class="jg-step"><b>1</b><span>你在「我的评分名单」里，就是分给你评的同学，看一眼打卡天数就知道她打了多少天。</span></div>
+        <div class="jg-step"><b>2</b><span>点任意一位同学的名字，进入她的页面；上面是她 21 天的便签照片，点图片可以放大看字。</span></div>
+        <div class="jg-step"><b>3</b><span>往下滑到「本次评分」，在 5 个输入框里直接填分数：真实性 0-30、主题契合 0-25、素材质量 0-15、文字完整 0-15、创意 0-15。</span></div>
+        <div class="jg-step"><b>4</b><span>最下面的「评语」可写可不写。</span></div>
+        <div class="jg-step"><b>5</b><span>点页面最底部的「提交并评下一位」，保存成功后会自动跳到下一位没评的同学。</span></div>
+        <div class="jg-step"><b>6</b><span>中途想停就点左上角「‹ 返回名单」，分数已经存好；名单上会显示「已评 XX」，没评的显示「未评」。</span></div>
+        <p class="jg-tip">名单上方的「下一位未评」按钮，可以直接跳到下一位还没评的同学。</p>
       </div>
     </details>
     ${gallery}
