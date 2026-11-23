@@ -2751,9 +2751,47 @@ async function openJScore(pid){
   }
   gallery+='</div>'+(any?'':'<div class="empty">该同学还没有上传素材</div>')+'</section>';
 
+  const imgsAll=ups.filter(u=>u.kind==='image'||!u.kind).map(u=>u.file_path);
+  window.__JIMGS = imgsAll.map(x=>API+'/img/'+x);
+  window.__jcView = function(i){ const a=window.__JIMGS||[]; if(!a.length) return; openViewer(a[i]||a[0], a); };
+  const jl = d.judges||[];
+  const DIMS=[['真实性','score_real',30],['主题契合度','score_theme',25],['素材质量','score_quality',15],['文字完整性','score_text',15],['创意性','score_creative',15]];
+  let cards='<section class="score-gallery" style="margin-top:18px;"><h2>各评委评分</h2>';
+  if(!jl.length){ cards+='<div style="padding:6px 0 10px;font-size:12.5px;color:#9aa39d;">还没有评委打分，等第一位评委提交后这里会自动出现</div>'; }
+  else{
+    cards+='<div style="display:flex;flex-direction:column;gap:10px;">';
+    for(const r of jl){
+      let rows='';
+      DIMS.forEach(function(dim,k){
+        const v=r[dim[1]];
+        const thumb = imgsAll.length
+          ? '<span style="width:40px;height:40px;flex:0 0 40px;overflow:hidden;border-radius:7px;display:block;background:#f0ece4;"><img src="'+API+'/img/'+imgsAll[k%imgsAll.length]+'" loading="lazy" onerror="this.remove()" onclick="event.stopPropagation();window.__jcView('+(k%imgsAll.length)+')" style="width:40px;height:40px;object-fit:cover;display:block;cursor:zoom-in;margin:0;"></span>'
+          : '<span style="width:40px;height:40px;flex:0 0 40px;display:block;"></span>';
+        rows+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px dashed #ece7e0;">'
+            + '<span style="flex:1;font-size:12.5px;color:#5c6b62;">'+dim[0]+'</span>'
+            + '<span style="font-size:13px;color:#243c35;"><b style="font-size:15px;">'+(v==null?'-':v)+'</b><span style="color:#9aa39d;font-size:11px;">/'+dim[2]+'</span></span>'
+            + thumb + '</div>';
+      });
+      const total=r.total||0;
+      cards+='<div style="background:#fff;border:1.5px solid #ece7e0;border-radius:12px;padding:11px 12px 9px;">'
+        + '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px;">'
+        + '<b style="font-size:14.5px;color:#243c35;">'+escapeHtml(r.judge_name||'')+'</b>'
+        + (r.dept?'<span style="font-size:11px;color:#9aa39d;">'+escapeHtml(r.dept)+'</span>':'')
+        + (r.role?'<span style="font-size:11px;color:#c2c9c2;">'+escapeHtml(r.role)+'</span>':'')
+        + '<span style="margin-left:auto;font-size:19px;font-weight:700;color:#C97B54;">'+total+'</span></div>'
+        + rows
+        + (r.comment?'<div style="margin-top:7px;background:#faf7ee;border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.65;color:#4b5a52;">'+escapeHtml(r.comment)+'</div>':'')
+        + (imgsAll.length?'<div style="text-align:right;margin-top:6px;"><button type="button" onclick="window.__jcView(0)" style="background:none;border:0;color:#C97B54;font-size:12.5px;cursor:pointer;padding:2px 0;">看素材 ›</button></div>':'')
+        + '</div>';
+    }
+    cards+='</div>';
+  }
+  cards+='</section>';
+
   form.innerHTML=`
     <div class="score-summary"><div>打卡天数：<b>${days.length} / 21</b></div><div>${escapeHtml(pt.student_id||'')} · ${escapeHtml(pt.class_name||pt.college||'')}</div></div>
     ${gallery}
+    ${cards}
     <section class="score-inputs"><h2>本次评分</h2>
     <div class="field"><label>① 真实性 <span class="opt">0-30分</span></label><p class="score-hint">素材与文字描述一致，能体现真实场景细节</p>
       <input type="number" inputmode="numeric" min="0" max="30" step="1" id="jc1" placeholder="0-30" value="${mine.score_real??''}"></div>

@@ -105,7 +105,17 @@ export function registerJudgeRoutes(app, ctx) {
         'SELECT score_real, score_theme, score_quality, score_text, score_creative, comment, updated_at FROM gratitude_scores WHERE participant_id = ? AND judge_id = ?',
         [pid, j.id]
       );
-      ok(res, { participant: p, days, uploads, my_score: mine || null });
+      const judges = await q(
+        `SELECT s.id, s.judge_id, s.judge_name,
+                s.score_real, s.score_theme, s.score_quality, s.score_text, s.score_creative,
+                s.comment, s.updated_at, j.dept, j.role,
+                (IFNULL(s.score_real,0)+IFNULL(s.score_theme,0)+IFNULL(s.score_quality,0)
+                 +IFNULL(s.score_text,0)+IFNULL(s.score_creative,0)) AS total
+           FROM gratitude_scores s
+           LEFT JOIN gratitude_judges j ON j.id = s.judge_id
+          WHERE s.participant_id = ?
+          ORDER BY s.id`, [pid]);
+      ok(res, { participant: p, days, uploads, my_score: mine || null, judges });
     } catch (e) { fail(res, e.message, 500); }
   });
 
