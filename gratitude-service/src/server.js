@@ -96,7 +96,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 120 * 1024 * 1024 },        // 120MB（第21天视频/录音放宽）
+  limits: { fileSize: 500 * 1024 * 1024 },        // 500MB（第21天视频/录音放宽）
   fileFilter: (req, file, cb) => {
     // 放宽：iPhone 原图是 HEIC，部分安卓/微信会带 octet-stream，一律按「扩展名兜底」
     const ext = (file.originalname || '').toLowerCase().split('.').pop() || '';

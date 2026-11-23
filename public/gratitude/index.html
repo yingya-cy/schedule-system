@@ -1594,12 +1594,12 @@ function renderFill(){
       <div class="fill-media-options">
       <div class="fill-media-option upload" role="button" tabindex="0" onclick="document.getElementById('videoIn').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('videoIn').click();}">
         <div class="ic">${icon('video')}</div><div class="t1">视频</div>
-        <div class="t2">15秒–5分钟<br>不超过60MB</div>
+        <div class="t2">15秒–5分钟<br>不超过500MB</div>
       </div>
       <input type="file" id="videoIn" accept="video/*" style="display:none" onchange="onPickVideo(this)">
       <div class="fill-media-option upload" role="button" tabindex="0" onclick="document.getElementById('audioIn').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('audioIn').click();}">
         <div class="ic">${icon('audio')}</div><div class="t1">录音</div>
-        <div class="t2">30秒–5分钟<br>不超过60MB</div>
+        <div class="t2">30秒–5分钟<br>不超过500MB</div>
       </div>
       </div>
       <input type="file" id="audioIn" accept="audio/*" style="display:none" onchange="onPickAudio(this)">
@@ -1692,7 +1692,7 @@ function onPickVideo(inp){
   const f = inp.files[0];
   if(!f){ return; }
   if(!(f.type||'').startsWith('video/')){ toast('请选择视频文件'); inp.value=''; return; }
-  if(f.size > 60*1024*1024){ toast('视频不能超过 60MB'); inp.value=''; return; }
+  if(f.size > 500*1024*1024){ toast('视频不能超过 500MB'); inp.value=''; return; }
   window.__vids = (window.__vids||[]).filter(function(v){
     if(v.kind==='video'){ if(v.url&&v.url.indexOf('blob:')===0)URL.revokeObjectURL(v.url); return false; }
     return true;
@@ -1709,7 +1709,7 @@ function onPickAudio(inp){
   const f = inp.files[0];
   if(!f){ return; }
   if(!(f.type||'').startsWith('audio/')){ toast('请选择音频文件'); inp.value=''; return; }
-  if(f.size > 60*1024*1024){ toast('录音不能超过 60MB'); inp.value=''; return; }
+  if(f.size > 500*1024*1024){ toast('录音不能超过 500MB'); inp.value=''; return; }
   window.__vids = (window.__vids||[]).filter(function(v){
     if(v.kind==='audio'){ if(v.url&&v.url.indexOf('blob:')===0)URL.revokeObjectURL(v.url); return false; }
     return true;
