@@ -541,9 +541,25 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
 .j-badge{display:inline-flex;align-items:center;gap:6px;background:#fff6ec;border:1px solid #f2dcc9;color:#B5653F;font-size:11.5px;letter-spacing:.04em;padding:4px 10px;border-radius:999px;}
 .j-login-card{background:#fff;border:1px solid #eee6da;border-radius:16px;padding:18px 16px 16px;box-shadow:0 6px 18px rgba(120,95,70,.06);}
 .j-login-card .btn.pri{width:100%;margin-top:6px;}
-.j-login-card .field{margin-bottom:14px;}
-.j-login-card .field label{display:block;margin-bottom:7px;}
-.j-login-card .field input{width:100%;box-sizing:border-box;display:block;}
+.j-login-card{margin:0 12px;padding:24px 20px 20px;box-sizing:border-box;border-radius:18px;}
+.j-login-card .field{margin-bottom:16px;}
+.j-login-card .field label{display:block;margin-bottom:9px;font-size:13px;font-weight:600;letter-spacing:.6px;color:#5C6B62;}
+.j-login-card .field input{
+  width:100%;box-sizing:border-box;display:block;height:58px;
+  font-size:17px;color:#2F3A34;padding:0 16px 0 48px;
+  border:1.5px solid #E4DDD0;border-radius:14px;background-color:#FCFAF5;
+  box-shadow:inset 0 1px 3px rgba(70,80,70,.05);
+  background-repeat:no-repeat;background-position:16px center;background-size:20px 20px;
+  transition:border-color .18s, box-shadow .18s, background-color .18s;
+}
+.j-login-card #jl-name{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239AA69E' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='12' cy='8' r='3.6'/%3E%3Cpath d='M4.5 20c1.2-3.6 4-5.4 7.5-5.4S18.3 16.4 19.5 20'/%3E%3C/svg%3E");}
+.j-login-card #jl-sid{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239AA69E' stroke-width='1.8' stroke-linecap='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2.5'/%3E%3Ccircle cx='8.5' cy='11' r='2'/%3E%3Cpath d='M5.6 16c.6-1.6 1.7-2.3 2.9-2.3s2.3.7 2.9 2.3'/%3E%3Cpath d='M14.5 10h4M14.5 13.5h4'/%3E%3C/svg%3E");}
+.j-login-card .field input::placeholder{color:#B3BAB4;font-size:16px;}
+.j-login-card .field input:focus{
+  outline:none;border-color:#497363;background-color:#fff;
+  box-shadow:0 0 0 4px rgba(73,115,99,.10), inset 0 1px 3px rgba(70,80,70,.04);
+}
+.j-login-card .btn.pri{height:58px;border-radius:14px;font-size:17px;letter-spacing:2px;margin-top:4px;}
 #jlogin-tip{margin:10px 2px 0;font-size:12px;line-height:1.7;color:#98a09a;}
 /* 进度 */
 .j-bar{height:9px;border-radius:999px;background:#efe9df;overflow:hidden;}
