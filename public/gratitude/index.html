@@ -2762,8 +2762,9 @@ async function openJScore(pid){
     const videos=list.filter(u=>u.kind==='video');
     let inner=imgs.map((u,i)=>`<img src="${API}/img/${u.file_path}" alt="第${n}天图片" onclick="openViewer(this.src,Array.from(document.querySelectorAll('.score-gallery img')).map(im=>im.src))" style="width:100%;height:72px;object-fit:cover;border-radius:6px;cursor:zoom-in;${i>0?'margin-top:4px;':''}">`).join('');
     if(audios.length) inner+=audios.map(u=>`<audio controls preload="none" src="${API}/img/${u.file_path}" style="width:100%;margin-top:4px;height:32px;"></audio>`).join('');
-    if(videos.length) inner+=videos.map(u=>`<div onclick="window.open('${API}/img/${u.file_path}','_blank')" style="margin-top:4px;height:34px;background:#333;color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;">▶ 视频</div>`).join('');
-    gallery+=`<div style="background:#fff;border:1.5px solid #ece7e0;border-radius:9px;padding:5px;"><div style="font-size:10px;color:#C97B54;font-weight:600;margin-bottom:4px;">D${String(n).padStart(2,'0')}</div>${inner}</div>`;
+    if(videos.length) inner+=videos.map(u=>`<video controls playsinline preload="metadata" src="${API}/img/${u.file_path}" style="width:100%;margin-top:6px;border-radius:6px;background:#000;display:block;max-height:260px;"></video>`).join('');
+    const wide=(videos.length||audios.length)?'grid-column:1/-1;':'';
+    gallery+=`<div style="background:#fff;border:1.5px solid #ece7e0;border-radius:9px;padding:5px;${wide}"><div style="font-size:10px;color:#C97B54;font-weight:600;margin-bottom:4px;">D${String(n).padStart(2,'0')}</div>${inner}</div>`;
   }
   gallery+='</div>'+(any?'':'<div class="empty">该同学还没有上传素材</div>')+'</section>';
 
