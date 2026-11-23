@@ -2766,7 +2766,7 @@ async function openJScore(pid){
     <div class="field"><label>⑤ 创意性 <span class="opt">0-15分</span></label><p class="score-hint">多素材组合、视角新颖；感恩树制作有特色且美观</p>
       <input type="number" inputmode="numeric" min="0" max="15" step="1" id="jc5" placeholder="0-15" oninput="jcClamp(this,15)" value="${mine.score_creative??''}"></div>
     <div class="field"><label>评语 <span class="opt">（可选）</span></label><textarea rows="3" id="jc6" placeholder="简短评语…">${escapeHtml(mine.comment||'')}</textarea></div>
-    <div class="score-actions"><button type="button" class="btn acc" onclick="submitJScore(false)">提交评分</button><button type="button" class="btn ghost" onclick="submitJScore(true)">保存并下一位</button></div>
+    <div class="score-actions"><button type="button" class="btn acc" onclick="submitJScore(true)">提交并评下一位</button></div>
     <p id="jscore-status" class="inline-status" role="status"></p>
     </section>`;
 }
@@ -2790,15 +2790,9 @@ async function submitJScore(goNext){
   try{
     const d=await jApi('/judge/score',{method:'POST',body:JSON.stringify(payload)});
     const p=JLIST.find(x=>x.id===JSCORE_CTX.pid); if(p){ p.scored=true; p.my_total=d.total; }
-    if(goNext){
-      toast('已保存：'+d.total+' 分');
-      const nx=JLIST.find(x=>!x.scored);
-      if(nx){ await openJScore(nx.id); } else { renderJList(); go('s-jlist'); toast('名单已全部评完 🎉'); }
-    } else {
-      renderJList();
-      st.textContent='已保存 '+d.total+' 分（可继续修改，或点「保存并下一位」）';
-      toast('已保存：'+d.total+' 分');
-    }
+    toast('已保存：'+d.total+' 分');
+    const nx=JLIST.find(x=>!x.scored);
+    if(nx){ await openJScore(nx.id); } else { renderJList(); go('s-jlist'); toast('名单已全部评完 🎉'); }
   }catch(e){ st.textContent=e.message; }
   finally{ JSAVING=false; }
 }
