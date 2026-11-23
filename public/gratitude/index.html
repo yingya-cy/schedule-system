@@ -1544,6 +1544,21 @@ function renderFill(){
     renderThumbs();renderVidThumbs();return;
   }
 
+  window.__maxImgs = d.is_special ? 6 : 3;
+  setTimeout(function(){
+    var h=document.getElementById('pick-hint'); if(h) h.textContent='必填，最多 '+window.__maxImgs+' 张 JPG 或 PNG';
+    var grid=document.querySelector('#fill-form .photo-slot-grid')||document.querySelector('#fill-form .photo-slots');
+    if(grid){
+      var slots=grid.querySelectorAll('.photo-slot');
+      while(slots.length < window.__maxImgs){
+        var clone=slots[slots.length-1].cloneNode(true);
+        clone.classList.remove('filled');
+        clone.querySelector('span') && (clone.querySelector('span').textContent=String(slots.length+1));
+        grid.appendChild(clone); slots=grid.querySelectorAll('.photo-slot');
+      }
+    }
+    renderThumbs();
+  },0);
   let specialHtml='';
   if(d.is_special){
     specialHtml=`<aside class="special fill-last-day"><h4>${icon('star')} 最后一页 · 完成整本手账</h4>
@@ -1562,7 +1577,7 @@ function renderFill(){
     <section class="fill-section">
       <header class="fill-section-heading">
         <span class="fill-section-index">01</span>
-        <div><h3>贴上今天的照片</h3><p>必填，最多 3 张 JPG 或 PNG</p></div>
+        <div><h3>贴上今天的照片</h3><p id="pick-hint">必填，最多 3 张 JPG 或 PNG</p></div>
         <span class="fill-count" id="photo-count">0 / 3</span>
       </header>
       <div class="photo-board upload" role="button" tabindex="0" onclick="pickImage()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pickImage();}">
@@ -1579,12 +1594,12 @@ function renderFill(){
       <div class="fill-media-options">
       <div class="fill-media-option upload" role="button" tabindex="0" onclick="document.getElementById('videoIn').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('videoIn').click();}">
         <div class="ic">${icon('video')}</div><div class="t1">视频</div>
-        <div class="t2">15秒–3分钟<br>不超过15MB</div>
+        <div class="t2">15秒–5分钟<br>不超过60MB</div>
       </div>
       <input type="file" id="videoIn" accept="video/*" style="display:none" onchange="onPickVideo(this)">
       <div class="fill-media-option upload" role="button" tabindex="0" onclick="document.getElementById('audioIn').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('audioIn').click();}">
         <div class="ic">${icon('audio')}</div><div class="t1">录音</div>
-        <div class="t2">30秒–3分钟<br>不超过30MB</div>
+        <div class="t2">30秒–5分钟<br>不超过60MB</div>
       </div>
       </div>
       <input type="file" id="audioIn" accept="audio/*" style="display:none" onchange="onPickAudio(this)">
@@ -1639,8 +1654,9 @@ function compressImage(file){
 async function onPick(inp){
   if(savingDay||pickingFiles)return;
   pickingFiles=true;syncFillControls();
-  const files=[...inp.files].slice(0,3-(window.__imgs?.length||0));
-  if(files.length===0){ toast('最多3张'); inp.value='';pickingFiles=false;syncFillControls();return; }
+  const cap=window.__maxImgs||3;
+  const files=[...inp.files].slice(0,cap-(window.__imgs?.length||0));
+  if(files.length===0){ toast('最多'+cap+'张'); inp.value='';pickingFiles=false;syncFillControls();return; }
   try{
   for(const f of files){
     const c = await compressImage(f);
@@ -1666,7 +1682,7 @@ function renderThumbs(){
   box.innerHTML=images.map((im,i)=>
     `<div class="thumb ${im.uploadState==='error'?'upload-error':''}"><img src="${im.url}" alt="打卡图片 ${i+1}" onclick="openViewer(this.src,window.__imgs.map(im=>im.url))">${fillContext?.editing?'<button type="button" class="x" aria-label="移除图片 '+(i+1)+'" onclick="delImg('+i+')">×</button>':''}<small class="file-state">${im.uploadState==='error'?'上传失败':im.uploadState==='uploaded'?'已上传':im.file?'待保存':''}</small></div>`).join('');
   const count=document.getElementById('photo-count');
-  if(count)count.textContent=images.length+' / 3';
+  if(count)count.textContent=images.length+' / '+(window.__maxImgs||3);
   document.querySelectorAll('#fill-form .photo-slot').forEach((slot,index)=>slot.classList.toggle('filled',index<images.length));
   syncFillControls();
 }
@@ -1676,7 +1692,7 @@ function onPickVideo(inp){
   const f = inp.files[0];
   if(!f){ return; }
   if(!(f.type||'').startsWith('video/')){ toast('请选择视频文件'); inp.value=''; return; }
-  if(f.size > 15*1024*1024){ toast('视频不能超过 15MB'); inp.value=''; return; }
+  if(f.size > 60*1024*1024){ toast('视频不能超过 60MB'); inp.value=''; return; }
   window.__vids = (window.__vids||[]).filter(function(v){
     if(v.kind==='video'){ if(v.url&&v.url.indexOf('blob:')===0)URL.revokeObjectURL(v.url); return false; }
     return true;
@@ -1693,7 +1709,7 @@ function onPickAudio(inp){
   const f = inp.files[0];
   if(!f){ return; }
   if(!(f.type||'').startsWith('audio/')){ toast('请选择音频文件'); inp.value=''; return; }
-  if(f.size > 30*1024*1024){ toast('录音不能超过 30MB'); inp.value=''; return; }
+  if(f.size > 60*1024*1024){ toast('录音不能超过 60MB'); inp.value=''; return; }
   window.__vids = (window.__vids||[]).filter(function(v){
     if(v.kind==='audio'){ if(v.url&&v.url.indexOf('blob:')===0)URL.revokeObjectURL(v.url); return false; }
     return true;

@@ -96,7 +96,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 32 * 1024 * 1024 },         // 20MB（图片5M + 视频15M）
+  limits: { fileSize: 120 * 1024 * 1024 },        // 120MB（第21天视频/录音放宽）
   fileFilter: (req, file, cb) => {
     // 放宽：iPhone 原图是 HEIC，部分安卓/微信会带 octet-stream，一律按「扩展名兜底」
     const ext = (file.originalname || '').toLowerCase().split('.').pop() || '';
@@ -333,11 +333,12 @@ app.post('/api/day', async (req, res) => {
 
     // ⚠️ 防护：必须至少提交 1 张图（防前端 bug 传空数组导致清空）
     const imgsArr = Array.isArray(action_images) ? action_images.filter(Boolean) : [];
+    const isFinalDay = +day_no === +cfg.total_days;
     if (imgsArr.length === 0) {
-      return fail(res, '请至少上传一张图片');
+      return fail(res, isFinalDay ? '最后一天至少要交一份素材（图片 / 视频 / 录音）' : '请至少上传一张图片');
     }
-    if (imgsArr.length > 5) {
-      return fail(res, '图片最多 5 张');     // 防异常
+    if (imgsArr.length > (isFinalDay ? 6 : 5)) {
+      return fail(res, '图片最多 ' + (isFinalDay ? 6 : 5) + ' 张');     // 防异常
     }
     // 每张路径必须是安全的相对路径（防注入/穿越）
     // ⚠️ 且必须属于 "该人该天" 的目录（防日期错乱时把别的天的图挂错）
@@ -1149,7 +1150,7 @@ app.get('/api/admin/scores/export', adminOnly, async (req, res) => {
     const byPerson = {};
     for (const r of rows) {
       const k = r.participant_id;
-      if (!byPerson[k]) byPerson[k] = { name: r.name, sid: r.student_id, cls: r.class_name, camp: r.campus, judges: {} };
+      if (!byPerson[k]) byPerson[k] = { name: r.name, sid: r.student_id, col: r.college, cls: r.class_name, camp: r.campus, judges: {} };
       byPerson[k].judges[r.judge_name] = r.total;
     }
 
@@ -1177,7 +1178,7 @@ app.get('/api/admin/scores/export', adminOnly, async (req, res) => {
     hr.height = 22;
 
     for (const x of list) {
-      const row = [x.sid, x.name, '', x.cls || '', x.camp, x.days];
+      const row = [x.sid, x.name, x.col || '', x.cls || '', x.camp, x.days];
       for (const j of judgeSet) row.push(x.judges[j] !== undefined ? x.judges[j] : '');
       row.push(x.avg, x.rank);
       const r = ws.addRow(row);
