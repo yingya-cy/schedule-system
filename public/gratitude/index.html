@@ -472,6 +472,13 @@ body {
 #s-fill .thumb { width: 100%; height: auto; aspect-ratio: 4/5; }
 .fill-media-section { padding: 18px 16px 8px; background: #f5e9df; border-top: 2px solid #d6a98f; border-bottom: 1px solid #e5cdbf; }
 .fill-media-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fill-media-options.three { grid-template-columns: repeat(3,1fr); gap: 8px; }
+.lastday-rule { background:#fdf8ef; border:1px solid #ece2d2; border-radius:12px; padding:12px 14px; margin:0 0 14px; font-size:12.5px; line-height:1.8; color:#5d6b62; }
+.lastday-rule p { margin:0 0 7px; }
+.lastday-rule p:last-child { margin-bottom:0; }
+.lastday-rule b { color:#3f5348; }
+.lastday-rule .muted { color:#8b9690; }
+#s-fill .tree-slot { aspect-ratio: auto; height: 120px; font-size: 13px; }
 .fill-media-option.upload { min-height: 126px; padding: 18px 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-color: #d5a98f; background: #fffaf5; }
 .fill-media-option .t1 { color: #67463a; }
 .fill-media-option .t2 { line-height: 1.5; }
@@ -1632,7 +1639,7 @@ function renderFill(){
       while(slots.length < window.__maxImgs){
         var clone=slots[slots.length-1].cloneNode(true);
         clone.classList.remove('filled');
-        clone.querySelector('span') && (clone.querySelector('span').textContent=String(slots.length+1));
+        var nxt=String(slots.length+1); var sp=clone.querySelector('span'); if(sp){sp.textContent=nxt;} else {clone.textContent=nxt;}
         grid.appendChild(clone); slots=grid.querySelectorAll('.photo-slot');
       }
     }
@@ -1641,7 +1648,7 @@ function renderFill(){
   let specialHtml='';
   if(d.is_special){
     specialHtml=`<aside class="special fill-last-day"><h4>${icon('star')} 最后一页 · 完成整本手账</h4>
-      <p>除了三件小事，还可以留下一个视频或一段录音。</p></aside>`;
+      <p>今天要交三样：<b>三件小事</b>、<b>感恩树</b>、<b>感恩行为素材</b>。</p></aside>`;
   }
 
   const previewHtml=LOCAL_PREVIEW?'<div class="preview-note">本地设计预览：可以查看并体验上传控件，但不会提交或修改线上记录。</div>':'';
@@ -1668,21 +1675,46 @@ function renderFill(){
       <div class="thumbs" id="thumbs"></div>
     </section>
     ${d.is_special?`
+    <section class="fill-section">
+      <header class="fill-section-heading">
+        <span class="fill-section-index">02</span>
+        <div><h3>你的感恩树</h3><p>把 21 天页面上那棵树截图，或拍下来，1 张</p></div>
+        <span class="fill-count" id="tree-count">0 / 1</span>
+      </header>
+      <div class="photo-board upload" role="button" tabindex="0" onclick="pickTree()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pickTree();}">
+        <div class="photo-slot-grid" style="grid-template-columns:1fr;" aria-hidden="true"><i class="photo-slot tree-slot">树</i></div>
+        <div class="photo-board-copy"><div class="ic">${icon('camera')}</div><div><div class="t1">上传感恩树截图</div>
+        <div class="t2">手机上长按保存自己的感恩树，再选这里</div></div></div>
+      </div>
+      <input type="file" id="treeIn" accept="image/*" style="display:none" onchange="onPickTree(this)">
+      <div class="thumbs" id="treeThumb"></div>
+    </section>
     <section class="fill-section fill-media-section">
-      <header class="fill-section-heading"><span class="fill-section-index">02</span><div><h3>留下感恩行为素材</h3><p>视频、录音可只传其一，各最多 1 个</p></div></header>
-      <div class="fill-media-options">
-      <div class="fill-media-option upload" role="button" tabindex="0" onclick="document.getElementById('videoIn').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('videoIn').click();}">
-        <div class="ic">${icon('video')}</div><div class="t1">视频</div>
-        <div class="t2">15秒–5分钟<br>不超过500MB</div>
+      <header class="fill-section-heading"><span class="fill-section-index">03</span><div><h3>感恩行为素材</h3><p>下面四类里选一类交即可</p></div><span class="fill-count" id="act-count">0 / 2</span></header>
+      <div class="lastday-rule">
+        <p><b>声音表达类</b>（二选一）：①对话录音（征得对方同意）；②口述感谢，也可配现场画面拍成短视频加旁白。</p>
+        <p><b>文字输出类</b>（二选一）：①给帮助过你的人发感谢消息，截图提交；②手写感谢信或感恩便签，拍照上传。</p>
+        <p class="muted">记录真实发生的事就好，不强制对方回复。视角二选一：他人助力 / 自己主动回馈。</p>
       </div>
-      <input type="file" id="videoIn" accept="video/*" style="display:none" onchange="onPickVideo(this)">
-      <div class="fill-media-option upload" role="button" tabindex="0" onclick="document.getElementById('audioIn').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('audioIn').click();}">
-        <div class="ic">${icon('audio')}</div><div class="t1">录音</div>
-        <div class="t2">30秒–5分钟<br>不超过500MB</div>
-      </div>
+      <div class="fill-media-options three">
+        <div class="fill-media-option upload" role="button" tabindex="0" onclick="document.getElementById('audioIn').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('audioIn').click();}">
+          <div class="ic">${icon('audio')}</div><div class="t1">录音</div>
+          <div class="t2">对话录音 / 口述感谢<br>不超过500MB</div>
+        </div>
+        <div class="fill-media-option upload" role="button" tabindex="0" onclick="document.getElementById('videoIn').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('videoIn').click();}">
+          <div class="ic">${icon('video')}</div><div class="t1">视频</div>
+          <div class="t2">口述感谢配画面<br>不超过500MB</div>
+        </div>
+        <div class="fill-media-option upload" role="button" tabindex="0" onclick="pickActImage()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pickActImage();}">
+          <div class="ic">${icon('camera')}</div><div class="t1">照片</div>
+          <div class="t2">聊天截图 / 手写稿<br>最多 2 张</div>
+        </div>
       </div>
       <input type="file" id="audioIn" accept="audio/*" style="display:none" onchange="onPickAudio(this)">
+      <input type="file" id="videoIn" accept="video/*" style="display:none" onchange="onPickVideo(this)">
+      <input type="file" id="actIn" accept="image/*" multiple style="display:none" onchange="onPickAct(this)">
       <div class="thumbs" id="vidThumbs"></div>
+      <div class="thumbs" id="actThumbs"></div>
     </section>`:''}
     ${commentHtml}
     <footer class="fill-submit-dock">
@@ -1748,6 +1780,34 @@ async function onPick(inp){
   }finally{pickingFiles=false;syncFillControls();}
 }
 function pickImage(){if(!savingDay&&!pickingFiles)document.getElementById('fileIn')?.click();}
+
+function pickTree(){if(!savingDay&&!pickingFiles)document.getElementById('treeIn')?.click();}
+function pickActImage(){if(!savingDay&&!pickingFiles)document.getElementById('actIn')?.click();}
+
+async function onPickTree(inp){
+  const f=inp.files[0]; inp.value='';
+  if(!f)return;
+  window.__imgs=(window.__imgs||[]).filter(im=>im.slot!=='tree');
+  try{
+    const c=await compressImage(f);
+    window.__imgs.push({url:URL.createObjectURL(c),file:c,slot:'tree'});
+    fillDirty=true; renderThumbs(); toast('已选择感恩树截图');
+  }finally{syncFillControls();}
+}
+async function onPickAct(inp){
+  const files=[...inp.files]; inp.value='';
+  if(!files.length)return;
+  const cur=(window.__imgs||[]).filter(im=>im.slot==='act');
+  const take=files.slice(0,Math.max(0,2-cur.length));
+  if(!take.length){toast('感恩行为照片最多 2 张');return;}
+  try{
+    for(const f of take){
+      const c=await compressImage(f);
+      window.__imgs.push({url:URL.createObjectURL(c),file:c,slot:'act'});
+    }
+    fillDirty=true; renderThumbs(); toast('已选择 '+take.length+' 张');
+  }finally{syncFillControls();}
+}
 function syncFillControls(){
   const busy=savingDay||pickingFiles;
   document.querySelectorAll('#fill-form input,#fill-form button').forEach(el=>el.disabled=busy);
@@ -1757,11 +1817,25 @@ function syncFillControls(){
 }
 function renderThumbs(){
   const box=document.getElementById('thumbs');
-  const images=window.__imgs||[];
+  const all=window.__imgs||[];
+  const images=all.filter(im=>im.slot!=='tree'&&im.slot!=='act');
+  const treeImgs=all.filter(im=>im.slot==='tree');
+  const actImgs=all.filter(im=>im.slot==='act');
+  const card=(slot,boxId)=>{
+    const b=document.getElementById(boxId); if(!b)return;
+    b.innerHTML=list_of(slot).map((im,i)=>'<div class="thumb '+(im.uploadState==='error'?'upload-error':'')+'"><img src="'+im.url+'" alt="素材" onclick="openSlotViewer(\''+slot+'\','+i+')">'
+      +'<button type="button" class="x" aria-label="移除" onclick="delExtra(\''+slot+'\','+i+')">×</button>'
+      +'<small class="file-state">'+(im.uploadState==='error'?'上传失败':im.uploadState==='uploaded'?'已上传':im.file?'待保存':'')+'</small></div>').join('');
+  };
+  card('tree','treeThumb');
+  card('act','actThumbs');
+  const tc=document.getElementById('tree-count'); if(tc)tc.textContent=treeImgs.length+' / 1';
+  const ac=document.getElementById('act-count'); if(ac)ac.textContent=actImgs.length+' / 2';
   box.innerHTML=images.map((im,i)=>
     `<div class="thumb ${im.uploadState==='error'?'upload-error':''}"><img src="${im.url}" alt="打卡图片 ${i+1}" onclick="openViewer(this.src,window.__imgs.map(im=>im.url))">${fillContext?.editing?'<button type="button" class="x" aria-label="移除图片 '+(i+1)+'" onclick="delImg('+i+')">×</button>':''}<small class="file-state">${im.uploadState==='error'?'上传失败':im.uploadState==='uploaded'?'已上传':im.file?'待保存':''}</small></div>`).join('');
   const count=document.getElementById('photo-count');
   if(count)count.textContent=images.length+' / '+(window.__maxImgs||3);
+  window.__noteCount=images.length; window.__treeCount=treeImgs.length; window.__actCount=actImgs.length;
   document.querySelectorAll('#fill-form .photo-slot').forEach((slot,index)=>slot.classList.toggle('filled',index<images.length));
   syncFillControls();
 }
@@ -1799,6 +1873,15 @@ function onPickAudio(inp){
   syncFillControls();
   inp.value='';
   toast('已选择录音');
+}
+function list_of(slot){return (window.__imgs||[]).filter(im=>im.slot===slot);}
+function openSlotViewer(slot,i){const l=list_of(slot);if(l[i])openViewer(l[i].url,l.map(x=>x.url));}
+function delExtra(slot,idx){
+  const list = list_of(slot);
+  const target=list[idx]; if(!target)return;
+  window.__imgs=(window.__imgs||[]).filter(im=>im!==target);
+  if(target.url&&target.url.indexOf('blob:')===0)URL.revokeObjectURL(target.url);
+  fillDirty=true; renderThumbs(); syncFillControls();
 }
 function renderVidThumbs(){
   const box=document.getElementById('vidThumbs');
@@ -1864,7 +1947,14 @@ async function saveDay(dayno,isSpecial){
   if(!ME){toast('请先以学生身份登录');return;}
   if(savingDay||pickingFiles||!fillDirty)return;
   const imgs=window.__imgs||[],vids=window.__vids||[];
-  if(!imgs.length)return toast('请至少上传一张图片');
+  if(isSpecial){
+    const note=imgs.filter(im=>im.slot!=='tree'&&im.slot!=='act');
+    const tree=imgs.filter(im=>im.slot==='tree');
+    const actImg=imgs.filter(im=>im.slot==='act');
+    if(!note.length)return toast('还差「三件小事」的照片');
+    if(!tree.length)return toast('还差「感恩树」的截图');
+    if(!actImg.length && !vids.length)return toast('还差「感恩行为素材」（录音 / 视频 / 照片任一）');
+  }else if(!imgs.length)return toast('请至少上传一张图片');
   const button=document.getElementById('save-day'),status=document.getElementById('save-status');
   savingDay=true;syncFillControls();button.textContent='正在保存…';
   const pending=[...imgs,...vids].filter(im=>im.file&&!im.path);
