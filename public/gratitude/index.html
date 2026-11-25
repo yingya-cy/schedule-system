@@ -1637,7 +1637,7 @@ function renderFill(){
     const _act=_all.filter(im=>im.slot==='act');
     const _grp=(title,list)=>list.length?('<div class="read-group"><h4>'+title+'</h4><div class="thumbs" id="rg-'+title+'"></div></div>'):'';
     const _grouped=(_tree.length||_act.length)
-      ? ('<section class="fill-section">'+_grp('三件小事',_note)+_grp('感恩树',_tree)+_grp('感恩行为素材',_act)+'</section>')
+      ? ('<section class="fill-section">'+_grp('三件小事',_note)+_grp('感恩树',_tree)+_grp('感恩行为素材',_act)+'</section><div class="thumbs" id="thumbs" style="display:none"></div>')
       : '<div class="thumbs" id="thumbs"></div>';
     f.innerHTML='<section class="record-summary"><h2>这一天的温暖，已收好</h2><p>已完成 · 第'+x.day_no+'天</p></section>'+commentHtml+_grouped+'<div class="thumbs" id="vidThumbs"></div><button type="button" class="btn ghost" id="edit-record" onclick="editRecord()">'+icon('edit')+'修改记录</button>';
     if(_tree.length||_act.length){
@@ -1850,6 +1850,7 @@ function renderThumbs(){
   card('act','actThumbs');
   const tc=document.getElementById('tree-count'); if(tc)tc.textContent=treeImgs.length+' / 1';
   const ac=document.getElementById('act-count'); if(ac)ac.textContent=actImgs.length+' / 2';
+  if(!box){ syncFillControls(); return; }
   box.innerHTML=images.map((im,i)=>
     `<div class="thumb ${im.uploadState==='error'?'upload-error':''}"><img src="${im.url}" alt="打卡图片 ${i+1}" onclick="openViewer(this.src,window.__imgs.map(im=>im.url))">${fillContext?.editing?'<button type="button" class="x" aria-label="移除图片 '+(i+1)+'" onclick="delImg('+i+')">×</button>':''}<small class="file-state">${im.uploadState==='error'?'上传失败':im.uploadState==='uploaded'?'已上传':im.file?'待保存':''}</small></div>`).join('');
   const count=document.getElementById('photo-count');
