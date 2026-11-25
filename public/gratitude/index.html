@@ -1649,7 +1649,7 @@ function renderFill(){
     renderThumbs();renderVidThumbs();return;
   }
 
-  window.__maxImgs = d.is_special ? 6 : 3;
+  window.__maxImgs = 3;
   setTimeout(function(){
     var h=document.getElementById('pick-hint'); if(h) h.textContent='必填，最多 '+window.__maxImgs+' 张 JPG 或 PNG';
     var grid=document.querySelector('#fill-form .photo-slot-grid')||document.querySelector('#fill-form .photo-slots');
