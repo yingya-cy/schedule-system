@@ -1709,7 +1709,7 @@ function renderFill(){
       <div class="thumbs" id="treeThumb"></div>
     </section>
     <section class="fill-section fill-media-section">
-      <header class="fill-section-heading"><span class="fill-section-index">03</span><div><h3>感恩行为素材</h3><p>四类里选一类交即可（至少 1 项）</p></div><span class="fill-count" id="act-count">0 / 1</span></header>
+      <header class="fill-section-heading"><span class="fill-section-index">03</span><div><h3>感恩行为素材</h3><p>至少交 1 项，可以组合（如录音 + 截图）</p></div><span class="fill-count" id="act-count">0 / 1</span></header>
       <div class="lastday-rule">
         <p><b>声音表达类</b>（二选一）：①对话录音（征得对方同意）；②口述感谢，也可配现场画面拍成短视频加旁白。</p>
         <p><b>文字输出类</b>（二选一）：①给帮助过你的人发感谢消息，截图提交；②手写感谢信或感恩便签，拍照上传。</p>
@@ -1726,7 +1726,7 @@ function renderFill(){
         </div>
         <div class="fill-media-option upload" role="button" tabindex="0" onclick="pickActImage()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pickActImage();}">
           <div class="ic">${icon('camera')}</div><div class="t1">照片</div>
-          <div class="t2">聊天截图 / 手写稿<br>最多 2 张</div>
+          <div class="t2">聊天截图 / 手写稿<br>最多 6 张</div>
         </div>
       </div>
       <input type="file" id="audioIn" accept="audio/*" style="display:none" onchange="onPickAudio(this)">
@@ -1817,8 +1817,8 @@ async function onPickAct(inp){
   const files=[...inp.files]; inp.value='';
   if(!files.length)return;
   const cur=(window.__imgs||[]).filter(im=>im.slot==='act');
-  const take=files.slice(0,Math.max(0,2-cur.length));
-  if(!take.length){toast('感恩行为照片最多 2 张');return;}
+  const take=files.slice(0,Math.max(0,6-cur.length));
+  if(!take.length){toast('感恩行为照片最多 6 张');return;}
   try{
     for(const f of take){
       const c=await compressImage(f);
