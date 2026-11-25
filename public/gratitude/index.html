@@ -472,6 +472,8 @@ body {
 #s-fill .thumb { width: 100%; height: auto; aspect-ratio: 4/5; }
 .fill-media-section { padding: 18px 16px 8px; background: #f5e9df; border-top: 2px solid #d6a98f; border-bottom: 1px solid #e5cdbf; }
 .fill-media-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.read-group { margin: 0 0 16px; }
+.read-group h4 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: #4f6255; }
 .fill-media-options.three { grid-template-columns: repeat(3,1fr); gap: 8px; }
 .lastday-rule { background:#fdf8ef; border:1px solid #ece2d2; border-radius:12px; padding:12px 14px; margin:0 0 14px; font-size:12.5px; line-height:1.8; color:#5d6b62; }
 .lastday-rule p { margin:0 0 7px; }
@@ -538,6 +540,8 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
 #jscore-form .score-summary{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:#5c7268;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e6e0d6;}
 #jscore-form .score-gallery{margin-bottom:22px;}
 #jscore-form .score-gallery h2,#jscore-form .score-inputs h2{margin:0 0 10px;font-size:16px;}
+.gal-lbl{display:block;font-size:10px;font-weight:700;letter-spacing:.4px;color:#8C9A90;margin:8px 0 2px;}
+.gal-lbl:first-child{margin-top:2px;}
 #jscore-form .score-gallery-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:8px;margin-top:10px;}
 .j-guide{margin:0 0 16px;border:1.5px solid #E8E1D5;border-radius:14px;background:#FBF8F1;overflow:hidden;}
 .j-guide summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;font-size:14px;font-weight:600;color:#3C4A42;}
@@ -558,6 +562,7 @@ body.mat-wide #admin-pager{display:flex !important;grid-template-columns:none !i
 .jg-step span{flex:1;}
 #s-jlist .back,#s-jscore .back{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;margin:2px 0 10px;border:1.5px solid #E2DACD;border-radius:999px;background:#fff;color:#3C4A42;font-size:13.5px;font-weight:600;text-decoration:none;box-shadow:0 1px 2px rgba(70,80,70,.06);border-bottom:1.5px solid #E2DACD;transition:.18s;}
 #s-jlist .back:active,#s-jscore .back:active{transform:translateY(1px);box-shadow:none;background:#F7F3EA;}
+#jscore-form{padding-bottom:78px;}
 #jscore-form .score-actions{display:flex;gap:10px;margin-top:6px;}
 #jscore-form .score-actions .btn{flex:1 1 0;width:auto;margin:0;}
 <style id="judge-visual-css">
@@ -1597,7 +1602,7 @@ async function openFill(x,opt={}){
     if(request!==openRequest||currentScreen!=='s-fill')return;
     const dayComment = (cmt && cmt.comment) || '';
     fillContext={x,d,editing:!x.done,comment:dayComment};fillDirty=false;
-    window.__imgs=(d.uploads||[]).filter(u=>u.kind==='image'||!u.kind).map(u=>({url:API+'/img/'+u.file_path,path:u.file_path,kind:'image'}));
+    window.__imgs=(d.uploads||[]).filter(u=>u.kind==='image'||!u.kind).map(u=>({url:API+'/img/'+u.file_path,path:u.file_path,kind:'image',slot:u.slot||'note'}));
     window.__vids=(d.uploads||[]).filter(u=>u.kind==='video'||u.kind==='audio').map(u=>({url:API+'/img/'+u.file_path,path:u.file_path,kind:'video'}));
     renderFill();
     if(dayComment){
@@ -1626,7 +1631,21 @@ function renderFill(){
   document.getElementById('fill-subtitle').textContent=editing?'写下今天让你感到温暖的事':'回看这一天的感恩记录';
   const f=document.getElementById('fill-form');
   if(!editing){
-    f.innerHTML='<section class="record-summary"><h2>这一天的温暖，已收好</h2><p>已完成 · 第'+x.day_no+'天</p></section>'+commentHtml+'<div class="thumbs" id="thumbs"></div><div class="thumbs" id="vidThumbs"></div><button type="button" class="btn ghost" id="edit-record" onclick="editRecord()">'+icon('edit')+'修改记录</button>';
+    const _all=window.__imgs||[];
+    const _note=_all.filter(im=>!im.slot||im.slot==='note');
+    const _tree=_all.filter(im=>im.slot==='tree');
+    const _act=_all.filter(im=>im.slot==='act');
+    const _grp=(title,list)=>list.length?('<div class="read-group"><h4>'+title+'</h4><div class="thumbs" id="rg-'+title+'"></div></div>'):'';
+    const _grouped=(_tree.length||_act.length)
+      ? ('<section class="fill-section">'+_grp('三件小事',_note)+_grp('感恩树',_tree)+_grp('感恩行为素材',_act)+'</section>')
+      : '<div class="thumbs" id="thumbs"></div>';
+    f.innerHTML='<section class="record-summary"><h2>这一天的温暖，已收好</h2><p>已完成 · 第'+x.day_no+'天</p></section>'+commentHtml+_grouped+'<div class="thumbs" id="vidThumbs"></div><button type="button" class="btn ghost" id="edit-record" onclick="editRecord()">'+icon('edit')+'修改记录</button>';
+    if(_tree.length||_act.length){
+      const put=(id,list)=>{const b=document.getElementById('rg-'+id); if(!b)return;
+        b.innerHTML=list.map(im=>'<div class="thumb"><img src="'+im.url+'" alt=""></div>').join('');
+      };
+      put('三件小事',_note); put('感恩树',_tree); put('感恩行为素材',_act);
+    }
     renderThumbs();renderVidThumbs();return;
   }
 
@@ -1928,7 +1947,7 @@ function uploadFile(im,dayno,index,total){
       if(xhr.status<200||xhr.status>=300||!j.success||!j.data?.path)return reject(new Error('上传失败，请重试'));
       resolve(j.data.path);
     };
-    const fd=new FormData();fd.append('file',im.file);fd.append('participant_id',ME.id);fd.append('day_no',dayno);
+    const fd=new FormData();fd.append('file',im.file);fd.append('participant_id',ME.id);fd.append('day_no',dayno);fd.append('slot',im.slot||'note');
     xhr.send(fd);
   });
 }
@@ -2943,10 +2962,23 @@ async function openJScore(pid){
     const imgs=list.filter(u=>u.kind==='image'||!u.kind);
     const audios=list.filter(u=>u.kind==='audio');
     const videos=list.filter(u=>u.kind==='video');
-    let inner=imgs.map((u,i)=>`<img src="${API}/img/${u.file_path}" alt="第${n}天图片" onclick="openViewer(this.src,Array.from(document.querySelectorAll('.score-gallery img')).map(im=>im.src))" style="width:100%;height:104px;object-fit:cover;border-radius:6px;cursor:zoom-in;${i>0?'margin-top:4px;':''}">`).join('');
-    if(audios.length) inner+=audios.map(u=>`<audio controls preload="none" src="${API}/img/${u.file_path}" style="width:100%;margin-top:4px;height:32px;"></audio>`).join('');
-    if(videos.length) inner+=videos.map(u=>`<video controls playsinline preload="metadata" src="${API}/img/${u.file_path}" style="width:100%;margin-top:6px;border-radius:6px;background:#000;display:block;max-height:260px;"></video>`).join('');
-    const wide=(videos.length||audios.length)?'grid-column:1/-1;':'';
+    const pickH=(arr,h)=>arr.map(u=>`<img src="${API}/img/${u.file_path}" alt="第${n}天图片" onclick="openViewer(this.src,Array.from(document.querySelectorAll('.score-gallery img')).map(im=>im.src))" style="width:100%;height:${h}px;object-fit:cover;border-radius:6px;cursor:zoom-in;margin-top:4px;">`).join('');
+    const pick=arr=>pickH(arr,104);
+    const noteI=imgs.filter(u=>(u.slot||'note')==='note');
+    const treeI=imgs.filter(u=>u.slot==='tree');
+    const actI=imgs.filter(u=>u.slot==='act');
+    const grouped=(treeI.length||actI.length);
+    let inner='';
+    if(grouped){
+      if(noteI.length) inner+='<div class="gal-lbl">三件小事</div>'+pick(noteI);
+      if(treeI.length) inner+='<div class="gal-lbl">感恩树</div>'+pickH(treeI,190);
+      if(actI.length) inner+='<div class="gal-lbl">感恩行为</div>'+pickH(actI,130);
+    } else {
+      inner+=pick(imgs);
+    }
+    if(audios.length) inner+=(grouped?'<div class="gal-lbl">录音</div>':'')+audios.map(u=>`<audio controls preload="none" src="${API}/img/${u.file_path}" style="width:100%;margin-top:4px;height:32px;"></audio>`).join('');
+    if(videos.length) inner+=(grouped?'<div class="gal-lbl">视频</div>':'')+videos.map(u=>`<video controls playsinline preload="metadata" src="${API}/img/${u.file_path}" style="width:100%;margin-top:6px;border-radius:6px;background:#000;display:block;max-height:260px;"></video>`).join('');
+    const wide=(videos.length||audios.length||grouped)?'grid-column:1/-1;':'';
     gallery+=`<div style="background:#fff;border:1.5px solid #ece7e0;border-radius:9px;padding:5px;${wide}"><div style="font-size:10px;color:#C97B54;font-weight:600;margin-bottom:4px;">D${String(n).padStart(2,'0')}</div>${inner}</div>`;
   }
   gallery+='</div>'+(any?'':'<div class="empty">该同学还没有上传素材</div>')+'</section>';
