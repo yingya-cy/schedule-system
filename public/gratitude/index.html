@@ -1709,7 +1709,7 @@ function renderFill(){
       <div class="thumbs" id="treeThumb"></div>
     </section>
     <section class="fill-section fill-media-section">
-      <header class="fill-section-heading"><span class="fill-section-index">03</span><div><h3>感恩行为素材</h3><p>下面四类里选一类交即可</p></div><span class="fill-count" id="act-count">0 / 2</span></header>
+      <header class="fill-section-heading"><span class="fill-section-index">03</span><div><h3>感恩行为素材</h3><p>四类里选一类交即可（至少 1 项）</p></div><span class="fill-count" id="act-count">0 / 1</span></header>
       <div class="lastday-rule">
         <p><b>声音表达类</b>（二选一）：①对话录音（征得对方同意）；②口述感谢，也可配现场画面拍成短视频加旁白。</p>
         <p><b>文字输出类</b>（二选一）：①给帮助过你的人发感谢消息，截图提交；②手写感谢信或感恩便签，拍照上传。</p>
@@ -1834,6 +1834,14 @@ function syncFillControls(){
   const save=document.getElementById('save-day');
   if(save)save.disabled=busy||!fillDirty;
 }
+function renderActCount(){
+  const ac=document.getElementById('act-count'); if(!ac) return;
+  const imgs=(window.__imgs||[]).filter(im=>im.slot==='act').length;
+  const n=imgs+((window.__vids||[]).length);
+  ac.textContent = n>=1 ? ('已交 '+n+' 项') : '0 / 1';
+  ac.style.background = n>=1 ? '#E7F0E4' : '';
+  ac.style.color = n>=1 ? '#3F6B4F' : '';
+}
 function renderThumbs(){
   const box=document.getElementById('thumbs');
   const all=window.__imgs||[];
@@ -1849,7 +1857,7 @@ function renderThumbs(){
   card('tree','treeThumb');
   card('act','actThumbs');
   const tc=document.getElementById('tree-count'); if(tc)tc.textContent=treeImgs.length+' / 1';
-  const ac=document.getElementById('act-count'); if(ac)ac.textContent=actImgs.length+' / 2';
+  renderActCount();
   if(!box){ syncFillControls(); return; }
   box.innerHTML=images.map((im,i)=>
     `<div class="thumb ${im.uploadState==='error'?'upload-error':''}"><img src="${im.url}" alt="打卡图片 ${i+1}" onclick="openViewer(this.src,window.__imgs.map(im=>im.url))">${fillContext?.editing?'<button type="button" class="x" aria-label="移除图片 '+(i+1)+'" onclick="delImg('+i+')">×</button>':''}<small class="file-state">${im.uploadState==='error'?'上传失败':im.uploadState==='uploaded'?'已上传':im.file?'待保存':''}</small></div>`).join('');
@@ -1870,9 +1878,10 @@ function onPickVideo(inp){
     if(v.kind==='video'){ if(v.url&&v.url.indexOf('blob:')===0)URL.revokeObjectURL(v.url); return false; }
     return true;
   });
-  window.__vids.push({url:URL.createObjectURL(f), file:f, kind:'video'});
+  window.__vids.push({url:URL.createObjectURL(f), file:f, kind:'video', slot:'act'});
   fillDirty=true;
   renderVidThumbs();
+  if(typeof renderActCount==='function') renderActCount();
   syncFillControls();
   inp.value='';
   toast('已选择视频');
@@ -1887,9 +1896,10 @@ function onPickAudio(inp){
     if(v.kind==='audio'){ if(v.url&&v.url.indexOf('blob:')===0)URL.revokeObjectURL(v.url); return false; }
     return true;
   });
-  window.__vids.push({url:URL.createObjectURL(f), file:f, kind:'audio'});
+  window.__vids.push({url:URL.createObjectURL(f), file:f, kind:'audio', slot:'act'});
   fillDirty=true;
   renderVidThumbs();
+  if(typeof renderActCount==='function') renderActCount();
   syncFillControls();
   inp.value='';
   toast('已选择录音');
