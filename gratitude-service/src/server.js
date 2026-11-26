@@ -290,7 +290,7 @@ app.get('/api/day/:pid/:dayno', async (req, res) => {
       : [];
 
     // 该天的图片（从 uploads 表查）
-    const ups = await q('SELECT id, file_path, kind, mime_type, created_at FROM gratitude_uploads WHERE participant_id=? AND day_no=? ORDER BY id', [pid, dayno]);
+    const ups = await q('SELECT id, file_path, kind, slot, mime_type, created_at FROM gratitude_uploads WHERE participant_id=? AND day_no=? ORDER BY FIELD(slot,\'note\',\'tree\',\'act\'), id', [pid, dayno]);
 
     ok(res, {
       ...d,
@@ -313,9 +313,11 @@ app.post('/api/day', async (req, res) => {
     if (!d) return fail(res, '天数超出范围');
 
     const today = todayStr();
-    const isMakeup = d.date < today;              // 补卡：应打卡日已过
+    // 活动结束后仍允许补交“最后一天”（总天数那一天）的材料，且不计补卡、不扣分
+    const isFinalLate = today > cfg.end_date && +day_no === +cfg.total_days;
+    const isMakeup = d.date < today && !isFinalLate;   // 补卡：应打卡日已过（最后一天的宽限提交不算补卡）
     if (cfg.test_mode !== '1') {
-      if (today > cfg.end_date) return fail(res, '活动已经结束啦，不能再补卡了');
+      if (today > cfg.end_date && !isFinalLate) return fail(res, '活动已经结束啦，不能再补卡了');
       if (d.date > today) return fail(res, '还没到这一天哦～');
       if (isMakeup) {
         // 已用掉的补卡次数（不含当前这一天，避免重复编辑重复计数）
@@ -398,9 +400,10 @@ app.post('/api/day', async (req, res) => {
         : 'image/jpeg';
       let size = 0;
       try { if (fs.existsSync(abs)) size = fs.statSync(abs).size; } catch (_) {}
+      const slotByKind = /\/tree_/.test(pth) ? 'tree' : /\/act_/.test(pth) ? 'act' : 'note';
       await pool.execute(
-        'INSERT INTO gratitude_uploads (participant_id, day_no, kind, file_path, file_size, mime_type) VALUES (?, ?, ?, ?, ?, ?)',
-        [participant_id, day_no, kindByExt, pth, size, mimeByExt]
+        'INSERT INTO gratitude_uploads (participant_id, day_no, kind, slot, file_path, file_size, mime_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [participant_id, day_no, kindByExt, slotByKind, pth, size, mimeByExt]
       );
     }
 
@@ -409,7 +412,7 @@ app.post('/api/day', async (req, res) => {
       VALUES (?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         action_images=VALUES(action_images), updated_at=NOW()
-    `, [participant_id, day_no, today, imgsArr.length ? JSON.stringify(imgsArr) : null]);
+    `, [participant_id, day_no, isFinalLate ? d.date : today, imgsArr.length ? JSON.stringify(imgsArr) : null]);
 
     // 便签质量检测：改为异步后台跑，保存立即返回（用户体验优先，2026-11-04）
     // 结果只落库供管理端筛“优秀便签”，不再当场打断学生
@@ -500,6 +503,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         return fail(res, '这个文件不像图片或音视频，请换个格式再试');
       }
       baseName = baseName + ext;
+    }
+    const slotReq = String((req.body && req.body.slot) || '').toLowerCase();
+    if (slotReq === 'tree' || slotReq === 'act') {
+      if (!baseName.startsWith(slotReq + '_')) baseName = slotReq + '_' + baseName;
     }
     const finalPath = path.join(destDir, baseName);
     fs.renameSync(req.file.path, finalPath);
@@ -804,7 +811,7 @@ app.get('/api/view/day', async (req, res) => {
     if (!person) return fail(res, '用户不存在', 404);
 
     const ups = await q(
-      'SELECT kind, file_path, file_size, mime_type FROM gratitude_uploads WHERE participant_id=? AND day_no=? ORDER BY id',
+      'SELECT kind, slot, file_path, file_size, mime_type FROM gratitude_uploads WHERE participant_id=? AND day_no=? ORDER BY FIELD(slot,\'note\',\'tree\',\'act\'), id',
       [pid, day]
     );
 
